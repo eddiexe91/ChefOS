@@ -4,7 +4,7 @@ INVENTARIO MAESTRO DE RECONSTRUCCIÓN — ChefOS Sprint 3
 
 SECCIÓN 1 — MIGRACIONES SQL
 
-Archivo| Ubicación| Estado esperado| Dependencias| Prioridad |
+Archivo| Ubicación| Estado esperado| Dependencias| Prioridad 
 "001_schema_base.sql"| "supabase/migrations/"| 20 tablas base + triggers + RLS + índices| PostgreSQL 15, extensiones pg_trgm/unaccent| CRÍTICO
 "002_funciones_negocio.sql"| "supabase/migrations/"| inicializar_restaurante(), alertas stock, seed categorías| 001 ejecutada| CRÍTICO
 "003_arquitectura_decisiones.sql"| "supabase/migrations/"| tablas gramos, costos desactualizados, consumo teórico/real| 002 ejecutada| CRÍTICO
@@ -121,3 +121,152 @@ Archivo| Ubicación| Estado esperado| Dependencias| Prioridad
 |---|---|---|---|---|
 | `LayoutApp.tsx` | `src/components/layout/` | Navegación inferior, badge de alertas y banner offline | AppProvider | **CRÍTICO** |
 | `HeaderApp.tsx` | `src/components/layout/` | Header con restaurante, alertas, estado online y logout | AppProvider, Supabase | **CRÍTICO** |
+
+---
+
+## SECCIÓN 14 — UI COMPONENTS
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `index.tsx` | `src/components/ui/` | Exports: GramInput, StockBadge, BarraStock, MarginBadge, KPICard, SkeletonCard, SkeletonLista, EmptyState, ErrorInline, PullToRefresh | clsx, lucide-react, src/types/index.ts | **CRÍTICO** |
+
+---
+
+## SECCIÓN 15 — DASHBOARD
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `page.tsx` | `src/app/(autenticado)/dashboard/` | Server Component. Precarga alertas, stock crítico, lote activo, recetas desactualizadas y mermas del día | crearClienteServidor, DashboardCliente | **CRÍTICO** |
+| `DashboardCliente.tsx` | `src/components/dashboard/` | KPIs, acciones rápidas, alertas, stock crítico y lote activo | AppProvider, useDominio, UI Components | **CRÍTICO** |
+
+---
+
+## SECCIÓN 16 — BIBLIOTECA CULINARIA (PÁGINAS)
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `page.tsx` | `src/app/(autenticado)/biblioteca/` | Carga categorías y recetas iniciales | crearClienteServidor, BibliotecaCliente | **CRÍTICO** |
+| `page.tsx` | `src/app/(autenticado)/biblioteca/nueva/` | Guard de roles y carga de productos/categorías | crearClienteServidor, RecetaForm | **CRÍTICO** |
+| `page.tsx` | `src/app/(autenticado)/biblioteca/[id]/` | Carga receta, ingredientes, pasos y fotos ordenadas | crearClienteServidor, RecetaDetalleCliente | **CRÍTICO** |
+| `page.tsx` | `src/app/(autenticado)/biblioteca/[id]/editar/` | Guard de rol y carga de receta para edición | crearClienteServidor, RecetaForm | **CRÍTICO** |
+
+---
+
+## SECCIÓN 17 — BIBLIOTECA CULINARIA (COMPONENTES)
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `BibliotecaCliente.tsx` | `src/components/biblioteca/` | Búsqueda local, filtros y FAB nueva receta | useRecetas, AppProvider | **CRÍTICO** |
+| `RecetaDetalleCliente.tsx` | `src/components/biblioteca/` | Escalado de porciones, costos y producción | useApp, QK, EscaladoModal | **CRÍTICO** |
+| `RecetaForm.tsx` | `src/components/biblioteca/` | Formulario de creación y edición de recetas | Supabase, AppProvider, GramInput | **CRÍTICO** |
+| `EscaladoModal.tsx` | `src/components/biblioteca/` | Escalado de recetas con validación de stock | lucide-react, src/types | **CRÍTICO** |
+
+---
+
+## SECCIÓN 18 — PRODUCCIÓN
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `page.tsx` | `src/app/(autenticado)/produccion/` | Carga lote activo, registros y recetas | crearClienteServidor, ProduccionCliente | **CRÍTICO** |
+| `ProduccionCliente.tsx` | `src/components/produccion/` | Gestión de lotes, producción y sincronización offline | AppProvider, cola offline, UI Components | **CRÍTICO** |
+
+---
+
+## SECCIÓN 19 — INVENTARIO
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `page.tsx` | `src/app/(autenticado)/inventario/` | Carga productos y categorías | crearClienteServidor, InventarioCliente | **CRÍTICO** |
+| `page.tsx` | `src/app/(autenticado)/inventario/[id]/` | Carga producto completo y movimientos recientes | crearClienteServidor, ProductoDetalleCliente | **CRÍTICO** |
+| `InventarioCliente.tsx` | `src/components/inventario/` | Filtros, búsqueda y stock crítico | useInventario, UI Components | **CRÍTICO** |
+| `ProductoDetalleCliente.tsx` | `src/components/inventario/` | KPI stock, ficha técnica y ajustes | useAjustarInventario, QK | **CRÍTICO** |
+
+---
+
+## SECCIÓN 20 — MERMAS
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `page.tsx` | `src/app/(autenticado)/mermas/nueva/` | Carga productos y equipo | crearClienteServidor, MermaFormCliente | **CRÍTICO** |
+| `MermaFormCliente.tsx` | `src/components/mermas/` | Wizard de 3 pasos para registrar mermas | useRegistrarMerma, GramInput | **CRÍTICO** |
+
+---
+
+## SECCIÓN 21 — ALERTAS
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `page.tsx` | `src/app/(autenticado)/alertas/` | Carga alertas iniciales ordenadas | crearClienteServidor, AlertasCliente | **CRÍTICO** |
+| `AlertasCliente.tsx` | `src/components/alertas/` | Filtros y gestión de alertas | AppProvider, useAlertas | **CRÍTICO** |
+
+---
+
+## SECCIÓN 22 — CONFIGURACIÓN
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `page.tsx` | `src/app/(autenticado)/configuracion/` | Hub principal de configuración | crearClienteServidor | **IMPORTANTE** |
+| `page.tsx` | `src/app/(autenticado)/configuracion/perfil/` | Carga perfil del usuario | crearClienteServidor, PerfilCliente | **IMPORTANTE** |
+| `PerfilCliente.tsx` | `src/components/configuracion/` | Edición de perfil | obtenerClienteNavegador | **IMPORTANTE** |
+
+---
+
+## SECCIÓN 23 — API ROUTES
+
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `route.ts` | `src/app/api/produccion/` | Registro completo de producción | crearClienteServidor | **CRÍTICO** |
+| `route.ts` | `src/app/api/produccion/lotes/` | Apertura y recuperación de lotes | crearClienteServidor | **CRÍTICO** |
+| `route.ts` | `src/app/api/produccion/lotes/[id]/cerrar/` | Cierre de lotes | crearClienteServidor | **CRÍTICO** |
+| `route.ts` | `src/app/api/mermas/` | Registro de mermas y movimientos | crearClienteServidor, convertirAGramos | **CRÍTICO** |
+| `route.ts` | `src/app/api/inventario/movimientos/` | Ajustes manuales de stock | crearClienteServidor | **CRÍTICO** |
+| `route.ts` | `src/app/api/biblioteca/recetas/` | Consulta de recetas con filtros | crearClienteServidor | **IMPORTANTE** |
+| `route.ts` | `src/app/api/biblioteca/recetas/[id]/costo/` | Recalcular costo receta | crearClienteServidor | **CRÍTICO** |
+| `route.ts` | `src/app/api/biblioteca/recetas/[id]/escalar/` | Escalado de recetas | crearClienteServidor | **CRÍTICO** |
+
+---
+
+## SECCIÓN 24 — DEPENDENCIAS npm
+
+### Dependencias críticas
+
+- next
+- react
+- react-dom
+- @supabase/supabase-js
+- @supabase/ssr
+- @tanstack/react-query
+- clsx
+- lucide-react
+- date-fns
+- sonner
+- typescript
+- tailwindcss
+- @tailwindcss/typography
+- postcss
+- autoprefixer
+
+### Dependencias importantes
+
+- @ducanh2912/next-pwa
+- eslint
+- eslint-config-next
+- supabase CLI
+
+### Paquetes excluidos
+
+- next-pwa
+- @radix-ui/*
+- zod
+- react-hook-form
+- @hookform/resolvers
+- tailwind-merge
+- date-fns-tz
+
+---
+
+## RESUMEN CUANTITATIVO
+
+| Categoría | Crítico | Importante | Opcional | Total |
+|---|---|---|---|---|
+| Total Inventario Sprint 3 | 74 | 14 | 1 | **89** |
