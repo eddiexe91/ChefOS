@@ -4,36 +4,38 @@ INVENTARIO MAESTRO DE RECONSTRUCCIÓN — ChefOS Sprint 3
 
 SECCIÓN 1 — MIGRACIONES SQL
 
-Archivo| Ubicación| Estado esperado| Dependencias| Prioridad 
-"001_schema_base.sql"| "supabase/migrations/"| 20 tablas base + triggers + RLS + índices| PostgreSQL 15, extensiones pg_trgm/unaccent| CRÍTICO
-"002_funciones_negocio.sql"| "supabase/migrations/"| inicializar_restaurante(), alertas stock, seed categorías| 001 ejecutada| CRÍTICO
-"003_arquitectura_decisiones.sql"| "supabase/migrations/"| tablas gramos, costos desactualizados, consumo teórico/real| 002 ejecutada| CRÍTICO
-"004_biblioteca_culinaria.sql"| "supabase/migrations/"| recetas_pasos, recetas_fotos, produccion_lotes, escalar_receta(), registrar_produccion_completa()| 003 ejecutada| CRÍTICO
-"005_correccion_costo_por_gramo.sql"| "supabase/migrations/"| Fix trigger costo_por_gramo — usa factor_unidad no stock| 003 ejecutada| CRÍTICO
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `001_schema_base.sql` | `supabase/migrations/` | 20 tablas base + triggers + RLS + índices | PostgreSQL 15, extensiones pg_trgm/unaccent | **CRÍTICO** |
+| `002_funciones_negocio.sql` | `supabase/migrations/` | inicializar_restaurante(), alertas stock, seed categorías | 001 ejecutada | **CRÍTICO** |
+| `003_arquitectura_decisiones.sql` | `supabase/migrations/` | tablas gramos, costos desactualizados, consumo teórico/real | 002 ejecutada | **CRÍTICO** |
+| `004_biblioteca_culinaria.sql` | `supabase/migrations/` | recetas_pasos, recetas_fotos, produccion_lotes, escalar_receta(), registrar_produccion_completa() | 003 ejecutada | **CRÍTICO** |
+| `005_correccion_costo_por_gramo.sql` | `supabase/migrations/` | Fix trigger costo_por_gramo — usa factor_unidad no stock | 003 ejecutada | **CRÍTICO** |
 
 ---
 
 SECCIÓN 2 — CONFIGURACIÓN RAÍZ
 
-Archivo| Ubicación| Estado esperado| Dependencias| Prioridad
-"package.json"| "/"| next 14.2.3, react 18, @tanstack/react-query v5, @ducanh2912/next-pwa, clsx, lucide-react, date-fns, sonner, @supabase/supabase-js, @supabase/ssr| Node 18+| CRÍTICO
-"tsconfig.json"| "/"| strict:true, paths aliases @/* @/components/* @/lib/* @/hooks/* @/types/* @/styles/* @/providers/*| —| CRÍTICO
-"next.config.js"| "/"| serverExternalPackages, @ducanh2912/next-pwa, remotePatterns Supabase| package.json| CRÍTICO
-"tailwind.config.ts"| "/"| tokens de color, tipografía Syne/DM_Sans/JetBrains_Mono, animaciones, plugin typography| @tailwindcss/typography en devDeps| CRÍTICO
-"postcss.config.js"| "/"| tailwindcss + autoprefixer| —| CRÍTICO
-".eslintrc.json"| "/"| next/core-web-vitals, @typescript-eslint/no-explicit-any: off| eslint-config-next| CRÍTICO
-".gitignore"| "/"| node_modules, .next, .env.local, /public/sw.js| —| IMPORTANTE
-".env.example"| "/"| Plantilla con NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY| —| CRÍTICO
-".env.local"| "/"| Valores reales (NO al repositorio)| .env.example| CRÍTICO
-"public/manifest.json"| "/public/"| PWA: nombre, iconos, theme_color, display:standalone| —| IMPORTANTE
-
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `package.json` | `/` | next 14.2.3, react 18, @tanstack/react-query v5, @ducanh2912/next-pwa, clsx, lucide-react, date-fns, sonner, @supabase/supabase-js, @supabase/ssr | Node 18+ | **CRÍTICO** |
+| `tsconfig.json` | `/` | strict:true, paths aliases @/* @/components/* @/lib/* @/hooks/* @/types/* @/styles/* @/providers/* | — | **CRÍTICO** |
+| `next.config.js` | `/` | serverExternalPackages, @ducanh2912/next-pwa, remotePatterns Supabase | package.json | **CRÍTICO** |
+| `tailwind.config.ts` | `/` | tokens de color, tipografía Syne/DM_Sans/JetBrains_Mono, animaciones, plugin typography | @tailwindcss/typography en devDeps | **CRÍTICO** |
+| `postcss.config.js` | `/` | tailwindcss + autoprefixer | — | **CRÍTICO** |
+| `.eslintrc.json` | `/` | next/core-web-vitals, @typescript-eslint/no-explicit-any: off | eslint-config-next | **CRÍTICO** |
+| `.gitignore` | `/` | node_modules, .next, .env.local, /public/sw.js | — | **IMPORTANTE** |
+| `.env.example` | `/` | Plantilla con NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY | — | **CRÍTICO** |
+| `.env.local` | `/` | Valores reales (NO al repositorio) | .env.example | **CRÍTICO** |
+| `public/manifest.json` | `/public/` | PWA: nombre, iconos, theme_color, display:standalone | — | **IMPORTANTE** |
 ---
 
 SECCIÓN 3 — TIPOS TYPESCRIPT
 
-Archivo| Ubicación| Estado esperado| Dependencias| Prioridad
-"index.ts"| "src/types/"| Todas las entidades del dominio y utilidades centrales| —| CRÍTICO
-"database.types.ts"| "src/types/"| Placeholder: export type Database = any| —| CRÍTICO
+| Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
+|---|---|---|---|---|
+| `index.ts` | `src/types/` | Todas las entidades del dominio: RolUsuario, Restaurante, Usuario, Producto, Receta, RecetaIngrediente, Merma, ProduccionRegistro, VentaImportacion, VentaItem, AlertaSistema, AnalisisConsumo, InventarioSnapshot, UnidadMedida, DensidadProducto. Funciones: convertirAGramos(), gramosAUnidadDisplay(). Constantes: PERMISOS_POR_ROL, tienePermiso(). Interfaces de formulario: FormNuevaMerma, FormNuevaReceta | — | **CRÍTICO** |
+| `database.types.ts` | `src/types/` | Placeholder: `export type Database = any`. Reemplazar con `supabase gen types` en producción | — | **CRÍTICO** |
 
 ---
 
