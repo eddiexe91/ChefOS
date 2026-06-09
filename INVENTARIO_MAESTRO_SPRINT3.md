@@ -4,7 +4,7 @@ INVENTARIO MAESTRO DE RECONSTRUCCIÓN — ChefOS Sprint 3
 
 SECCIÓN 1 — MIGRACIONES SQL
 
-Archivo| Ubicación| Estado esperado| Dependencias| Prioridad
+Archivo| Ubicación| Estado esperado| Dependencias| Prioridad |
 "001_schema_base.sql"| "supabase/migrations/"| 20 tablas base + triggers + RLS + índices| PostgreSQL 15, extensiones pg_trgm/unaccent| CRÍTICO
 "002_funciones_negocio.sql"| "supabase/migrations/"| inicializar_restaurante(), alertas stock, seed categorías| 001 ejecutada| CRÍTICO
 "003_arquitectura_decisiones.sql"| "supabase/migrations/"| tablas gramos, costos desactualizados, consumo teórico/real| 002 ejecutada| CRÍTICO
