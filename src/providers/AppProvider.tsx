@@ -237,4 +237,4 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
       </ContextoApp.Provider>
     </QueryClientProvider>
   )
-      }
+}
