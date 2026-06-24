@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ChefHat, Loader2, Mail } from 'lucide-react'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 type Modo = 'password' | 'magic-link'
 
-export default function PaginaLogin() {
+function LoginContenido() {
   const supabase = obtenerClienteNavegador()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -207,3 +207,10 @@ export default function PaginaLogin() {
     </div>
   )
                   }
+export default function PaginaLogin() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <LoginContenido />
+    </Suspense>
+  )
+}
