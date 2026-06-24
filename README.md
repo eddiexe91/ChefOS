@@ -29,3 +29,4 @@ Centralizar inventario, recetas, producción, mermas, costos y alertas operativa
 ## Estado actual
 
 En reconstrucción a partir de documentación maestra e inventario de arquitectura.
+Fase 2 terminada y compilada en github
