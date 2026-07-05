@@ -11,16 +11,16 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO ACTUAL (Fase 3.1):
- * Los fetchers contienen exclusivamente placeholders.
- * Las implementaciones reales se completan en Fase 3.2,
- * una vez validados los nombres de tablas en Supabase.
+ * ESTADO (Fase 3.2 — Iteración 1):
+ * fetchProductos y fetchProductoPorId implementados con queries reales.
+ * Los demás fetchers siguen siendo placeholders hasta iteraciones siguientes.
  *
- * TODO (Fase 3.2):
- * - Reemplazar ClienteSupabase por el tipo real del cliente Supabase.
- * - Implementar el cuerpo real de cada fetcher.
- * - Importar obtenerClienteNavegador desde src/lib/supabase/navegador.ts
+ * TODO (Fase 3.2 — iteraciones siguientes):
+ * - Implementar fetchers restantes por orden de dependencia.
+ * - Regenerar database.types.ts con Supabase CLI cuando esté disponible.
  */
+
+import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
 
 import type {
   Receta,
@@ -41,13 +41,15 @@ import type {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Tipo temporal del cliente Supabase.
+ * Tipo real del cliente Supabase.
+ * Derivado de obtenerClienteNavegador() — única fuente autorizada en ChefOS.
  *
- * TODO (Fase 3.2):
- * Reemplazar por el tipo real del cliente Supabase
- * cuando los fetchers reales sean implementados.
+ * createBrowserClient<Database> retorna SupabaseClient<Database>.
+ * Mientras database.types.ts sea un placeholder (Database = any),
+ * el cliente acepta cualquier nombre de tabla sin verificación estática.
+ * Se volverá completamente tipado al regenerar database.types.ts con CLI.
  */
-type ClienteSupabase = unknown
+type ClienteSupabase = ReturnType<typeof obtenerClienteNavegador>
 
 /**
  * Métricas del dashboard.
@@ -56,10 +58,7 @@ type ClienteSupabase = unknown
  *
  * TODO (Fase 3.2):
  * El campo `resumen` debe ser reemplazado por una interfaz
- * concreta una vez validadas las vistas o queries de agregación
- * en Supabase (totales, tendencias, conteos por período).
- * No es posible tiparlo en Fase 3.1 sin asumir nombres
- * de tablas o estructuras de datos no confirmadas.
+ * concreta una vez validadas las vistas o queries de agregación en Supabase.
  */
 export interface MetricasDashboard {
   briefing: Briefing | null
@@ -125,25 +124,8 @@ export interface FiltrosProduccion extends FiltrosPaginacion {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Patrón de fábrica jerárquica uniforme en tres niveles:
- *
- * Nivel 1 — Dominio:    bibliotecaKeys.all
- *                       → ['biblioteca']
- *
- * Nivel 2 — Entidad:    bibliotecaKeys.recetas()
- *                       → ['biblioteca', 'recetas']
- *
- * Nivel 3 — Filtro/ID:  bibliotecaKeys.receta('uuid')
- *                       → ['biblioteca', 'recetas', { id }]
- *                       bibliotecaKeys.recetasFiltradas({ activa: true })
- *                       → ['biblioteca', 'recetas', { filtros }]
- *
- * Compatible con React Query v5:
- * - useQuery
- * - useSuspenseQuery
- * - prefetchQuery
- * - invalidateQueries
- * - setQueryData
+ * Patrón de fábrica jerárquica uniforme en tres niveles.
+ * Compatible con React Query v5: useQuery, invalidateQueries, setQueryData.
  */
 
 // ─────────────────────────────────────────────────────────────
@@ -271,24 +253,11 @@ export const configuracionKeys = {
 } as const
 
 // ═══════════════════════════════════════════════════════════════
-// SECCIÓN 3 — Contratos de fetchers
+// SECCIÓN 3 — Fetchers
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Todos los fetchers de esta sección son contratos arquitectónicos.
- *
- * Estado actual: placeholder obligatorio.
- * Ningún fetcher realiza llamadas reales a Supabase en esta fase.
- * Ningún fetcher asume nombres de tablas ni estructuras de datos.
- *
- * Los parámetros están prefijados con _ para satisfacer
- * TypeScript strict sin warnings de ESLint por variables no utilizadas.
- *
- * TODO (Fase 3.2): implementar cuerpo real de cada fetcher.
- */
-
 // ─────────────────────────────────────────────────────────────
-// Dashboard
+// Dashboard — placeholder
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchMetricasDashboard(
@@ -298,7 +267,7 @@ export async function fetchMetricasDashboard(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Biblioteca
+// Biblioteca — placeholder
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchRecetas(
@@ -316,25 +285,120 @@ export async function fetchRecetaPorId(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Inventario
+// Inventario — IMPLEMENTADO (Fase 3.2 — Iteración 1)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna todos los productos activos del restaurante autenticado.
+ *
+ * RLS filtra automáticamente por restaurante via mi_restaurante_id().
+ * No se necesita .eq('restaurante_id', ...) explícito.
+ *
+ * Relaciones cargadas:
+ * - categoria: categorias_producto — necesaria para display en lista.
+ *   FK: productos.categoria_id → categorias_producto.id
+ *
+ * Filtros aplicados:
+ * - activo = true (obligatorio — activa índices partial idx_productos_stock
+ *   e idx_productos_nombre_trgm definidos en DATABASE_SPEC)
+ * - categoria_id (opcional)
+ * - stock_bajo: cantidad_gramos <= stock_minimo_gramos (filtrado en cliente)
+ *
+ * Proveedor omitido en listado general — solo se carga en fetchProductoPorId.
+ *
+ * Ordenación: nombre ASC (alfabética)
+ *
+ * TODO (Fase 3.2 — iteración futura):
+ * - Implementar paginación cuando el volumen lo requiera.
+ */
 export async function fetchProductos(
-  _client: ClienteSupabase,
-  _filtros?: FiltrosProducto
+  client: ClienteSupabase,
+  filtros?: FiltrosProducto
 ): Promise<Producto[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  let query = client
+    .from('productos')
+    .select(`
+      *,
+      categoria:categorias_producto(id, nombre, tipo, activa, restaurante_id)
+    `)
+    .eq('activo', true)
+    .order('nombre', { ascending: true })
+
+  if (filtros?.categoria_id) {
+    query = query.eq('categoria_id', filtros.categoria_id)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/inventario] Error al cargar productos: ${error.message}`
+    )
+  }
+
+  const productos = (data ?? []) as Producto[]
+
+  if (filtros?.stock_bajo) {
+    return productos.filter((p) =>
+      p.cantidad_gramos !== undefined && p.stock_minimo_gramos !== undefined
+        ? p.cantidad_gramos <= p.stock_minimo_gramos
+        : p.stock_actual <= p.stock_minimo
+    )
+  }
+
+  return productos
 }
 
+/**
+ * Retorna un producto activo por ID con todas sus relaciones.
+ *
+ * RLS garantiza que solo se accede a productos del restaurante autenticado.
+ *
+ * Relaciones cargadas:
+ * - categoria: categorias_producto — completa.
+ *   FK: productos.categoria_id → categorias_producto.id
+ * - proveedor_principal: proveedores — completo.
+ *   FK: productos.proveedor_principal_id → proveedores.id
+ *
+ * Comportamiento ante ausencia de datos:
+ * - error Supabase (incluido PGRST116 de .single()) → lanza Error con mensaje.
+ * - data null (RLS oculta la fila) → lanza Error descriptivo.
+ *
+ * @throws Error si el producto no existe, está inactivo o no pertenece
+ *         al restaurante autenticado.
+ */
 export async function fetchProductoPorId(
-  _client: ClienteSupabase,
-  _id: string
+  client: ClienteSupabase,
+  id: string
 ): Promise<Producto> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const { data, error } = await client
+    .from('productos')
+    .select(`
+      *,
+      categoria:categorias_producto(id, nombre, tipo, activa, restaurante_id),
+      proveedor_principal:proveedores(id, nombre, contacto, telefono, email, activo, restaurante_id, ruc_nit, condiciones_pago, dias_entrega, notas)
+    `)
+    .eq('id', id)
+    .eq('activo', true)
+    .single()
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/inventario] Error al cargar producto "${id}": ${error.message}`
+    )
+  }
+
+  if (!data) {
+    throw new Error(
+      `[ChefOS/inventario] Producto "${id}" no encontrado o no disponible.`
+    )
+  }
+
+  return data as Producto
 }
 
 // ─────────────────────────────────────────────────────────────
-// Producción
+// Producción — placeholder
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchLotesProduccion(
@@ -359,7 +423,7 @@ export async function fetchRegistrosProduccion(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Mermas
+// Mermas — placeholder
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchMermas(
@@ -370,7 +434,7 @@ export async function fetchMermas(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Alertas
+// Alertas — placeholder
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchAlertasActivas(
@@ -380,7 +444,7 @@ export async function fetchAlertasActivas(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Compras
+// Compras — placeholder
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchCompras(
@@ -398,7 +462,7 @@ export async function fetchCompraPorId(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Configuración
+// Configuración — placeholder
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchRestaurante(
@@ -418,4 +482,4 @@ export async function fetchUsuarioPorId(
   _id: string
 ): Promise<Usuario> {
   throw new Error('TODO: implementar en Fase 3.2')
-}
+  }
