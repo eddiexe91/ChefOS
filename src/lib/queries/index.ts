@@ -11,9 +11,10 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO (Fase 3.2 — Iteración 1):
- * fetchProductos y fetchProductoPorId implementados con queries reales.
- * Los demás fetchers siguen siendo placeholders hasta iteraciones siguientes.
+ * ESTADO (Fase 3.2 — Iteración 2):
+ * - fetchProductos y fetchProductoPorId: implementados (Iteración 1).
+ * - fetchRecetas y fetchRecetaPorId: implementados (Iteración 2).
+ * - Demás fetchers: placeholders hasta iteraciones siguientes.
  *
  * TODO (Fase 3.2 — iteraciones siguientes):
  * - Implementar fetchers restantes por orden de dependencia.
@@ -53,8 +54,6 @@ type ClienteSupabase = ReturnType<typeof obtenerClienteNavegador>
 
 /**
  * Métricas del dashboard.
- *
- * Agrupa los tipos conocidos de Briefing y CierreDiario.
  *
  * TODO (Fase 3.2):
  * El campo `resumen` debe ser reemplazado por una interfaz
@@ -267,21 +266,148 @@ export async function fetchMetricasDashboard(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Biblioteca — placeholder
+// Biblioteca — IMPLEMENTADO (Fase 3.2 — Iteración 2)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna todas las recetas activas del restaurante autenticado.
+ *
+ * RLS filtra automáticamente por restaurante y por activa=true
+ * ("activas mismo restaurante" — DATABASE_SPEC sección RLS).
+ * El filtro .eq('activa', true) se incluye igualmente para activar
+ * el índice partial idx_recetas_nombre_trgm WHERE activa=true.
+ *
+ * Relaciones cargadas:
+ * - categoria: categorias_receta — necesaria para display en lista.
+ *   FK: recetas.categoria_id → categorias_receta.id
+ *
+ * Ingredientes NO cargados en listado general — costoso y no necesario.
+ * Se cargan únicamente en fetchRecetaPorId.
+ *
+ * Filtros opcionales:
+ * - categoria_id: filtra por categoría de receta.
+ * - en_carta: filtra recetas de carta.
+ * - es_produccion: filtra mise en place.
+ *
+ * Ordenación: nombre ASC (alfabética).
+ *
+ * TODO (Fase 3.2 — iteración futura):
+ * - Implementar paginación cuando el volumen lo requiera.
+ * - Añadir filtro por costo_desactualizado para badge de alerta.
+ */
 export async function fetchRecetas(
-  _client: ClienteSupabase,
-  _filtros?: FiltrosReceta
+  client: ClienteSupabase,
+  filtros?: FiltrosReceta
 ): Promise<Receta[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  let query = client
+    .from('recetas')
+    .select(`
+      *,
+      categoria:categorias_receta(id, restaurante_id, nombre, orden, activa)
+    `)
+    .eq('activa', true)
+    .order('nombre', { ascending: true })
+
+  if (filtros?.categoria_id) {
+    query = query.eq('categoria_id', filtros.categoria_id)
+  }
+
+  if (filtros?.en_carta !== undefined) {
+    query = query.eq('en_carta', filtros.en_carta)
+  }
+
+  if (filtros?.es_produccion !== undefined) {
+    query = query.eq('es_produccion', filtros.es_produccion)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/biblioteca] Error al cargar recetas: ${error.message}`
+    )
+  }
+
+  return (data ?? []) as Receta[]
 }
 
+/**
+ * Retorna una receta activa por ID con todas sus relaciones.
+ *
+ * RLS garantiza que solo se accede a recetas del restaurante autenticado.
+ *
+ * Relaciones cargadas:
+ * - categoria: categorias_receta — completa.
+ *   FK: recetas.categoria_id → categorias_receta.id
+ * - ingredientes: recetas_ingredientes con producto anidado.
+ *   FK: recetas_ingredientes.receta_id → recetas.id
+ *   FK: recetas_ingredientes.producto_id → productos.id
+ *
+ * Ordenación de ingredientes: por campo `orden` ASC.
+ * Se realiza en cliente tras recibir los datos, ya que la opción
+ * referencedTable de .order() no está disponible en supabase-js v2.
+ *
+ * @throws Error si la receta no existe, está inactiva o no pertenece
+ *         al restaurante autenticado.
+ */
 export async function fetchRecetaPorId(
-  _client: ClienteSupabase,
-  _id: string
+  client: ClienteSupabase,
+  id: string
 ): Promise<Receta> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const { data, error } = await client
+    .from('recetas')
+    .select(`
+      *,
+      categoria:categorias_receta(id, restaurante_id, nombre, orden, activa),
+      ingredientes:recetas_ingredientes(
+        id,
+        receta_id,
+        producto_id,
+        cantidad,
+        unidad_medida,
+        cantidad_gramos,
+        es_opcional,
+        orden,
+        notas,
+        producto:productos(
+          id,
+          nombre,
+          unidad_medida,
+          unidad_display,
+          costo_unitario_actual,
+          costo_por_gramo,
+          stock_actual,
+          stock_minimo,
+          activo
+        )
+      )
+    `)
+    .eq('id', id)
+    .eq('activa', true)
+    .single()
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/biblioteca] Error al cargar receta "${id}": ${error.message}`
+    )
+  }
+
+  if (!data) {
+    throw new Error(
+      `[ChefOS/biblioteca] Receta "${id}" no encontrada o no disponible.`
+    )
+  }
+
+  const receta = data as Receta
+
+  // Ordenar ingredientes por campo `orden` ASC en cliente.
+  if (receta.ingredientes) {
+    receta.ingredientes = [...receta.ingredientes].sort(
+      (a, b) => a.orden - b.orden
+    )
+  }
+
+  return receta
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -304,9 +430,9 @@ export async function fetchRecetaPorId(
  * - categoria_id (opcional)
  * - stock_bajo: cantidad_gramos <= stock_minimo_gramos (filtrado en cliente)
  *
- * Proveedor omitido en listado general — solo se carga en fetchProductoPorId.
+ * Proveedor omitido en listado general — solo en fetchProductoPorId.
  *
- * Ordenación: nombre ASC (alfabética)
+ * Ordenación: nombre ASC (alfabética).
  *
  * TODO (Fase 3.2 — iteración futura):
  * - Implementar paginación cuando el volumen lo requiera.
@@ -359,10 +485,6 @@ export async function fetchProductos(
  *   FK: productos.categoria_id → categorias_producto.id
  * - proveedor_principal: proveedores — completo.
  *   FK: productos.proveedor_principal_id → proveedores.id
- *
- * Comportamiento ante ausencia de datos:
- * - error Supabase (incluido PGRST116 de .single()) → lanza Error con mensaje.
- * - data null (RLS oculta la fila) → lanza Error descriptivo.
  *
  * @throws Error si el producto no existe, está inactivo o no pertenece
  *         al restaurante autenticado.
@@ -482,4 +604,4 @@ export async function fetchUsuarioPorId(
   _id: string
 ): Promise<Usuario> {
   throw new Error('TODO: implementar en Fase 3.2')
-  }
+    }
