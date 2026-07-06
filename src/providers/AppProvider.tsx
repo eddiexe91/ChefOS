@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
+import { inventarioKeys }          from '@/lib/queries'
 import type { AlertaSistema, Usuario, Restaurante } from '@/types'
 
 function crearQueryClient() {
@@ -66,7 +67,7 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
   useEffect(() => {
     const onOnline = () => {
       setEstaOnline(true)
-      queryClient.invalidateQueries({ queryKey: ['inventario'] })
+      queryClient.invalidateQueries({ queryKey: inventarioKeys.productos() })
       queryClient.invalidateQueries({ queryKey: ['produccion'] })
       queryClient.invalidateQueries({ queryKey: ['alertas'] })
     }
@@ -112,7 +113,7 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
           const nueva = payload.new as AlertaSistema
           setAlertasNoLeidas((prev) => [nueva, ...prev].slice(0, 20))
           if (nueva.tipo === 'stock_critico') {
-            queryClient.invalidateQueries({ queryKey: ['inventario'] })
+            queryClient.invalidateQueries({ queryKey: inventarioKeys.productos() })
           }
           if (nueva.tipo === 'merma_excesiva') {
             queryClient.invalidateQueries({ queryKey: ['analisis-consumo'] })
@@ -151,7 +152,7 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
           filter: `restaurante_id=eq.${usuario.restaurante_id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['inventario', usuario.restaurante_id] })
+          queryClient.invalidateQueries({ queryKey: inventarioKeys.productos() })
         }
       )
       .subscribe()
@@ -171,7 +172,14 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
           filter: `restaurante_id=eq.${usuario.restaurante_id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['produccion', usuario.restaurante_id] })
+          queryClient.invalidateQueries({ queryKey: ['produccion'] })
+          /**
+           * TODO (Fase 3.2 — Iteración 3):
+           * Reemplazar ['lote-activo', usuario.restaurante_id] por
+           * produccionKeys.loteActivo() cuando se implemente esa key.
+           * Actualmente esta invalidación no tiene query correspondiente
+           * y es inofensiva.
+           */
           queryClient.invalidateQueries({ queryKey: ['lote-activo', usuario.restaurante_id] })
         }
       )
