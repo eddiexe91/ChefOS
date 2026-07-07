@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
-import { inventarioKeys }          from '@/lib/queries'
+import { inventarioKeys, produccionKeys } from '@/lib/queries'
 import type { AlertaSistema, Usuario, Restaurante } from '@/types'
 
 function crearQueryClient() {
@@ -68,7 +68,7 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
     const onOnline = () => {
       setEstaOnline(true)
       queryClient.invalidateQueries({ queryKey: inventarioKeys.productos() })
-      queryClient.invalidateQueries({ queryKey: ['produccion'] })
+      queryClient.invalidateQueries({ queryKey: produccionKeys.lotes() })
       queryClient.invalidateQueries({ queryKey: ['alertas'] })
     }
     const onOffline = () => setEstaOnline(false)
@@ -172,15 +172,8 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
           filter: `restaurante_id=eq.${usuario.restaurante_id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['produccion'] })
-          /**
-           * TODO (Fase 3.2 — Iteración 3):
-           * Reemplazar ['lote-activo', usuario.restaurante_id] por
-           * produccionKeys.loteActivo() cuando se implemente esa key.
-           * Actualmente esta invalidación no tiene query correspondiente
-           * y es inofensiva.
-           */
-          queryClient.invalidateQueries({ queryKey: ['lote-activo', usuario.restaurante_id] })
+          queryClient.invalidateQueries({ queryKey: produccionKeys.lotes() })
+          queryClient.invalidateQueries({ queryKey: produccionKeys.loteActivo() })
         }
       )
       .subscribe()
