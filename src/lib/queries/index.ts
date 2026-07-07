@@ -11,9 +11,11 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO (Fase 3.2 — Iteración 2):
+ * ESTADO (Fase 3.2 — Iteración 3):
  * - fetchProductos y fetchProductoPorId: implementados (Iteración 1).
  * - fetchRecetas y fetchRecetaPorId: implementados (Iteración 2).
+ * - fetchLotesProduccion, fetchLoteProduccionPorId,
+ *   fetchRegistrosProduccion: implementados (Iteración 3).
  * - Demás fetchers: placeholders hasta iteraciones siguientes.
  *
  * TODO (Fase 3.2 — iteraciones siguientes):
@@ -117,7 +119,6 @@ export interface FiltrosProduccion extends FiltrosPaginacion {
   fecha_desde?: string
   fecha_hasta?: string
 }
-
 // ═══════════════════════════════════════════════════════════════
 // SECCIÓN 2 — Query Keys jerárquicos
 // ═══════════════════════════════════════════════════════════════
@@ -189,6 +190,12 @@ export const produccionKeys = {
     [...produccionKeys.lotes(), { filtros }] as const,
   lote: (id: string) =>
     [...produccionKeys.lotes(), { id }] as const,
+  /**
+   * Key para el lote activo del turno actual.
+   * Invalidado por AppProvider cuando llega un INSERT en produccion_registros.
+   */
+  loteActivo: () =>
+    [...produccionKeys.all, 'loteActivo'] as const,
   registros: (filtros?: FiltrosProduccion) =>
     [...produccionKeys.all, 'registros', { filtros }] as const,
   registro: (id: string) =>
@@ -343,9 +350,8 @@ export async function fetchRecetas(
  *   FK: recetas_ingredientes.receta_id → recetas.id
  *   FK: recetas_ingredientes.producto_id → productos.id
  *
- * Ordenación de ingredientes: por campo `orden` ASC.
- * Se realiza en cliente tras recibir los datos, ya que la opción
- * referencedTable de .order() no está disponible en supabase-js v2.
+ * Ordenación de ingredientes: por campo `orden` ASC en cliente.
+ * referencedTable no está disponible en supabase-js v2.
  *
  * @throws Error si la receta no existe, está inactiva o no pertenece
  *         al restaurante autenticado.
@@ -517,31 +523,159 @@ export async function fetchProductoPorId(
   }
 
   return data as Producto
-}
+  }
 
 // ─────────────────────────────────────────────────────────────
-// Producción — placeholder
+// Producción — IMPLEMENTADO (Fase 3.2 — Iteración 3)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna los lotes de producción del restaurante autenticado.
+ *
+ * RLS filtra automáticamente por restaurante via mi_restaurante_id().
+ *
+ * No existe columna `activo` en produccion_lotes — no hay filtro de activo.
+ * El estado del lote ('en_progreso' / 'completado' / 'cancelado') es el
+ * mecanismo de ciclo de vida, no un campo activo/inactivo.
+ *
+ * Relaciones cargadas:
+ * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
+ *   FK: produccion_lotes.responsable_id → usuarios.id
+ *
+ * Filtros opcionales (de FiltrosProduccion):
+ * - fecha_desde: filtra lotes desde esa fecha.
+ * - fecha_hasta: filtra lotes hasta esa fecha.
+ * (lote_id no aplica en listado de lotes — es para filtrar registros)
+ *
+ * Ordenación: fecha DESC (lotes más recientes primero).
+ *
+ * UNIQUE constraint (restaurante_id, fecha, turno) garantiza
+ * un solo lote por turno por día.
+ */
 export async function fetchLotesProduccion(
-  _client: ClienteSupabase,
-  _filtros?: FiltrosProduccion
+  client: ClienteSupabase,
+  filtros?: FiltrosProduccion
 ): Promise<ProduccionLote[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  let query = client
+    .from('produccion_lotes')
+    .select(`
+      *,
+      responsable:usuarios(id, nombre)
+    `)
+    .order('fecha', { ascending: false })
+
+  if (filtros?.fecha_desde) {
+    query = query.gte('fecha', filtros.fecha_desde)
+  }
+
+  if (filtros?.fecha_hasta) {
+    query = query.lte('fecha', filtros.fecha_hasta)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/produccion] Error al cargar lotes: ${error.message}`
+    )
+  }
+
+  return (data ?? []) as ProduccionLote[]
 }
 
+/**
+ * Retorna un lote de producción por ID.
+ *
+ * RLS garantiza que solo se accede a lotes del restaurante autenticado.
+ *
+ * Relaciones cargadas:
+ * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
+ *   FK: produccion_lotes.responsable_id → usuarios.id
+ *
+ * @throws Error si el lote no existe o no pertenece al restaurante autenticado.
+ */
 export async function fetchLoteProduccionPorId(
-  _client: ClienteSupabase,
-  _id: string
+  client: ClienteSupabase,
+  id: string
 ): Promise<ProduccionLote> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const { data, error } = await client
+    .from('produccion_lotes')
+    .select(`
+      *,
+      responsable:usuarios(id, nombre)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/produccion] Error al cargar lote "${id}": ${error.message}`
+    )
+  }
+
+  if (!data) {
+    throw new Error(
+      `[ChefOS/produccion] Lote "${id}" no encontrado o no disponible.`
+    )
+  }
+
+  return data as ProduccionLote
 }
 
+/**
+ * Retorna los registros de producción del restaurante autenticado.
+ *
+ * RLS sobre produccion_registros permite SELECT a todos los roles.
+ *
+ * Relaciones cargadas:
+ * - receta: recetas(id, nombre) — nombre de la receta producida.
+ *   FK: produccion_registros.receta_id → recetas.id
+ * - producto: productos(id, nombre, unidad_medida) — mise en place sin receta.
+ *   FK: produccion_registros.producto_id → productos.id
+ * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
+ *   FK: produccion_registros.responsable_id → usuarios.id
+ *
+ * Filtros opcionales (de FiltrosProduccion):
+ * - lote_id: filtra registros de un lote específico — uso principal.
+ * - fecha_desde / fecha_hasta: rango de fecha_produccion.
+ *
+ * Ordenación: fecha_produccion DESC (registros más recientes primero).
+ */
 export async function fetchRegistrosProduccion(
-  _client: ClienteSupabase,
-  _filtros?: FiltrosProduccion
+  client: ClienteSupabase,
+  filtros?: FiltrosProduccion
 ): Promise<ProduccionRegistro[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  let query = client
+    .from('produccion_registros')
+    .select(`
+      *,
+      receta:recetas(id, nombre),
+      producto:productos(id, nombre, unidad_medida),
+      responsable:usuarios(id, nombre)
+    `)
+    .order('fecha_produccion', { ascending: false })
+
+  if (filtros?.lote_id) {
+    query = query.eq('lote_id', filtros.lote_id)
+  }
+
+  if (filtros?.fecha_desde) {
+    query = query.gte('fecha_produccion', filtros.fecha_desde)
+  }
+
+  if (filtros?.fecha_hasta) {
+    query = query.lte('fecha_produccion', filtros.fecha_hasta)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/produccion] Error al cargar registros de producción: ${error.message}`
+    )
+  }
+
+  return (data ?? []) as ProduccionRegistro[]
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -604,4 +738,4 @@ export async function fetchUsuarioPorId(
   _id: string
 ): Promise<Usuario> {
   throw new Error('TODO: implementar en Fase 3.2')
-    }
+}
