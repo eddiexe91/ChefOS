@@ -11,11 +11,12 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO (Fase 3.2 — Iteración 3):
+ * ESTADO (Fase 3.2 — Iteración 4):
  * - fetchProductos y fetchProductoPorId: implementados (Iteración 1).
  * - fetchRecetas y fetchRecetaPorId: implementados (Iteración 2).
  * - fetchLotesProduccion, fetchLoteProduccionPorId,
  *   fetchRegistrosProduccion: implementados (Iteración 3).
+ * - fetchMermas: implementado (Iteración 4).
  * - Demás fetchers: placeholders hasta iteraciones siguientes.
  *
  * TODO (Fase 3.2 — iteraciones siguientes):
@@ -119,6 +120,7 @@ export interface FiltrosProduccion extends FiltrosPaginacion {
   fecha_desde?: string
   fecha_hasta?: string
 }
+
 // ═══════════════════════════════════════════════════════════════
 // SECCIÓN 2 — Query Keys jerárquicos
 // ═══════════════════════════════════════════════════════════════
@@ -523,7 +525,7 @@ export async function fetchProductoPorId(
   }
 
   return data as Producto
-  }
+      }
 
 // ─────────────────────────────────────────────────────────────
 // Producción — IMPLEMENTADO (Fase 3.2 — Iteración 3)
@@ -545,12 +547,8 @@ export async function fetchProductoPorId(
  * Filtros opcionales (de FiltrosProduccion):
  * - fecha_desde: filtra lotes desde esa fecha.
  * - fecha_hasta: filtra lotes hasta esa fecha.
- * (lote_id no aplica en listado de lotes — es para filtrar registros)
  *
  * Ordenación: fecha DESC (lotes más recientes primero).
- *
- * UNIQUE constraint (restaurante_id, fecha, turno) garantiza
- * un solo lote por turno por día.
  */
 export async function fetchLotesProduccion(
   client: ClienteSupabase,
@@ -628,18 +626,18 @@ export async function fetchLoteProduccionPorId(
  * RLS sobre produccion_registros permite SELECT a todos los roles.
  *
  * Relaciones cargadas:
- * - receta: recetas(id, nombre) — nombre de la receta producida.
+ * - receta: recetas(id, nombre)
  *   FK: produccion_registros.receta_id → recetas.id
- * - producto: productos(id, nombre, unidad_medida) — mise en place sin receta.
+ * - producto: productos(id, nombre, unidad_medida)
  *   FK: produccion_registros.producto_id → productos.id
  * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
  *   FK: produccion_registros.responsable_id → usuarios.id
  *
  * Filtros opcionales (de FiltrosProduccion):
- * - lote_id: filtra registros de un lote específico — uso principal.
+ * - lote_id: filtra registros de un lote específico.
  * - fecha_desde / fecha_hasta: rango de fecha_produccion.
  *
- * Ordenación: fecha_produccion DESC (registros más recientes primero).
+ * Ordenación: fecha_produccion DESC.
  */
 export async function fetchRegistrosProduccion(
   client: ClienteSupabase,
@@ -679,14 +677,72 @@ export async function fetchRegistrosProduccion(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Mermas — placeholder
+// Mermas — IMPLEMENTADO (Fase 3.2 — Iteración 4)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna las mermas del restaurante autenticado.
+ *
+ * RLS filtra automáticamente por restaurante via mi_restaurante_id().
+ * SELECT restringido a chefs+ (chef_cocina, chef_ejecutivo, administrador, dueño).
+ * Un cocinero puede registrar mermas (INSERT) pero no leerlas (SELECT).
+ * En ese caso, RLS retornará array vacío sin error.
+ *
+ * No existe columna `activo` en mermas — no hay filtro de activo.
+ * El trigger `trigger_costo_merma` calcula `costo_merma` en BEFORE INSERT;
+ * el campo ya viene calculado en SELECT.
+ *
+ * Relaciones cargadas:
+ * - producto: productos(id, nombre, unidad_medida, costo_unitario_actual, activo)
+ *   FK: mermas.producto_id → productos.id
+ * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
+ *   FK: mermas.responsable_id → usuarios.id
+ *
+ * Filtros opcionales (de FiltrosMerma):
+ * - producto_id: filtra mermas de un producto específico.
+ * - fecha_desde: filtra mermas registradas desde esa fecha (creado_en).
+ * - fecha_hasta: filtra mermas registradas hasta esa fecha (creado_en).
+ *
+ * Ordenación: creado_en DESC (mermas más recientes primero).
+ *
+ * TODO (Fase 3.2 — iteración futura):
+ * - Añadir canal Realtime en AppProvider cuando se implemente el módulo UI.
+ * - Implementar paginación cuando el volumen lo requiera.
+ */
 export async function fetchMermas(
-  _client: ClienteSupabase,
-  _filtros?: FiltrosMerma
+  client: ClienteSupabase,
+  filtros?: FiltrosMerma
 ): Promise<Merma[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  let query = client
+    .from('mermas')
+    .select(`
+      *,
+      producto:productos(id, nombre, unidad_medida, costo_unitario_actual, activo),
+      responsable:usuarios(id, nombre)
+    `)
+    .order('creado_en', { ascending: false })
+
+  if (filtros?.producto_id) {
+    query = query.eq('producto_id', filtros.producto_id)
+  }
+
+  if (filtros?.fecha_desde) {
+    query = query.gte('creado_en', filtros.fecha_desde)
+  }
+
+  if (filtros?.fecha_hasta) {
+    query = query.lte('creado_en', filtros.fecha_hasta)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/mermas] Error al cargar mermas: ${error.message}`
+    )
+  }
+
+  return (data ?? []) as Merma[]
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -738,4 +794,4 @@ export async function fetchUsuarioPorId(
   _id: string
 ): Promise<Usuario> {
   throw new Error('TODO: implementar en Fase 3.2')
-}
+    }
