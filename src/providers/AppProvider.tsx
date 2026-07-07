@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
-import { inventarioKeys, produccionKeys } from '@/lib/queries'
+import { inventarioKeys, produccionKeys, alertasKeys } from '@/lib/queries'
 import type { AlertaSistema, Usuario, Restaurante } from '@/types'
 
 function crearQueryClient() {
@@ -112,6 +112,7 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
         (payload) => {
           const nueva = payload.new as AlertaSistema
           setAlertasNoLeidas((prev) => [nueva, ...prev].slice(0, 20))
+          queryClient.invalidateQueries({ queryKey: alertasKeys.activas() })
           if (nueva.tipo === 'stock_critico') {
             queryClient.invalidateQueries({ queryKey: inventarioKeys.productos() })
           }
