@@ -11,12 +11,13 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO (Fase 3.2 — Iteración 4):
+ * ESTADO (Fase 3.2 — Iteración 5):
  * - fetchProductos y fetchProductoPorId: implementados (Iteración 1).
  * - fetchRecetas y fetchRecetaPorId: implementados (Iteración 2).
  * - fetchLotesProduccion, fetchLoteProduccionPorId,
  *   fetchRegistrosProduccion: implementados (Iteración 3).
  * - fetchMermas: implementado (Iteración 4).
+ * - fetchAlertasActivas: implementado (Iteración 5).
  * - Demás fetchers: placeholders hasta iteraciones siguientes.
  *
  * TODO (Fase 3.2 — iteraciones siguientes):
@@ -525,7 +526,7 @@ export async function fetchProductoPorId(
   }
 
   return data as Producto
-      }
+}
 
 // ─────────────────────────────────────────────────────────────
 // Producción — IMPLEMENTADO (Fase 3.2 — Iteración 3)
@@ -746,13 +747,47 @@ export async function fetchMermas(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Alertas — placeholder
+// Alertas — IMPLEMENTADO (Fase 3.2 — Iteración 5)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna todas las alertas no leídas del restaurante autenticado.
+ *
+ * RLS filtra automáticamente por restaurante via mi_restaurante_id().
+ * SELECT permitido a todos los roles del restaurante.
+ *
+ * No se carga ninguna relación — AlertaSistema es una interfaz plana.
+ * leida_por es un UUID FK almacenado como string en la interfaz,
+ * no se expande a Usuario.
+ *
+ * Filtro obligatorio:
+ * - leida = false → activa el índice partial:
+ *   idx_alertas_no_leidas ON alertas_sistema(restaurante_id, leida, severidad, creado_en DESC)
+ *   WHERE leida=false
+ *
+ * Ordenación: creado_en DESC (alertas más recientes primero).
+ * Consistente con el índice idx_alertas_no_leidas.
+ *
+ * TODO (Fase 3.2 — iteración futura):
+ * - Implementar paginación si el volumen lo requiere.
+ * - Considerar filtros por tipo o severidad cuando el módulo de alertas madure.
+ */
 export async function fetchAlertasActivas(
-  _client: ClienteSupabase
+  client: ClienteSupabase
 ): Promise<AlertaSistema[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const { data, error } = await client
+    .from('alertas_sistema')
+    .select('*')
+    .eq('leida', false)
+    .order('creado_en', { ascending: false })
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/alertas] Error al cargar alertas activas: ${error.message}`
+    )
+  }
+
+  return (data ?? []) as AlertaSistema[]
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -794,4 +829,4 @@ export async function fetchUsuarioPorId(
   _id: string
 ): Promise<Usuario> {
   throw new Error('TODO: implementar en Fase 3.2')
-    }
+}
