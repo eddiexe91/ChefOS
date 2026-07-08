@@ -11,17 +11,19 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO (Fase 3.2 — Iteración 5):
+ * ESTADO (Fase 3.2 — Iteración 6):
  * - fetchProductos y fetchProductoPorId: implementados (Iteración 1).
  * - fetchRecetas y fetchRecetaPorId: implementados (Iteración 2).
  * - fetchLotesProduccion, fetchLoteProduccionPorId,
  *   fetchRegistrosProduccion: implementados (Iteración 3).
  * - fetchMermas: implementado (Iteración 4).
  * - fetchAlertasActivas: implementado (Iteración 5).
+ * - fetchCompras y fetchCompraPorId: implementados (Iteración 6).
  * - Demás fetchers: placeholders hasta iteraciones siguientes.
  *
  * TODO (Fase 3.2 — iteraciones siguientes):
- * - Implementar fetchers restantes por orden de dependencia.
+ * - Implementar fetchMetricasDashboard, fetchRestaurante, fetchUsuarios,
+ *   fetchUsuarioPorId por orden de dependencia.
  * - Regenerar database.types.ts con Supabase CLI cuando esté disponible.
  */
 
@@ -791,21 +793,143 @@ export async function fetchAlertasActivas(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Compras — placeholder
+// Compras — IMPLEMENTADO (Fase 3.2 — Iteración 6)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna las compras del restaurante autenticado.
+ *
+ * RLS filtra automáticamente por restaurante via mi_restaurante_id().
+ * SELECT permitido a chefs+ (chef_cocina, chef_ejecutivo, administrador, dueño).
+ *
+ * No existe columna `activo` en compras — no hay filtro de activo.
+ * El estado ('borrador' / 'confirmada' / 'recibida' / 'anulada') es el
+ * mecanismo de ciclo de vida.
+ *
+ * Relaciones cargadas:
+ * - proveedor: proveedores — completo.
+ *   FK: compras.proveedor_id → proveedores.id
+ *
+ * Items NO cargados en listado general — costoso e innecesario.
+ * Se cargan únicamente en fetchCompraPorId.
+ *
+ * registrado_por almacenado como UUID string — no se expande a Usuario.
+ *
+ * Filtros opcionales (de FiltrosCompra):
+ * - proveedor_id: filtra compras de un proveedor específico.
+ * - estado: filtra por estado de la compra.
+ * - fecha_desde: filtra compras desde esa fecha (fecha_compra).
+ * - fecha_hasta: filtra compras hasta esa fecha (fecha_compra).
+ *
+ * Ordenación: fecha_compra DESC (compras más recientes primero).
+ *
+ * TODO (Fase 3.2 — iteración futura):
+ * - Implementar paginación cuando el volumen lo requiera.
+ */
 export async function fetchCompras(
-  _client: ClienteSupabase,
-  _filtros?: FiltrosCompra
+  client: ClienteSupabase,
+  filtros?: FiltrosCompra
 ): Promise<Compra[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  let query = client
+    .from('compras')
+    .select(`
+      *,
+      proveedor:proveedores(id, restaurante_id, nombre, contacto, telefono, email, ruc_nit, condiciones_pago, dias_entrega, activo, notas)
+    `)
+    .order('fecha_compra', { ascending: false })
+
+  if (filtros?.proveedor_id) {
+    query = query.eq('proveedor_id', filtros.proveedor_id)
+  }
+
+  if (filtros?.estado) {
+    query = query.eq('estado', filtros.estado)
+  }
+
+  if (filtros?.fecha_desde) {
+    query = query.gte('fecha_compra', filtros.fecha_desde)
+  }
+
+  if (filtros?.fecha_hasta) {
+    query = query.lte('fecha_compra', filtros.fecha_hasta)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/compras] Error al cargar compras: ${error.message}`
+    )
+  }
+
+  return (data ?? []) as Compra[]
 }
 
+/**
+ * Retorna una compra por ID con todas sus relaciones.
+ *
+ * RLS garantiza que solo se accede a compras del restaurante autenticado.
+ *
+ * Relaciones cargadas:
+ * - proveedor: proveedores — completo.
+ *   FK: compras.proveedor_id → proveedores.id
+ * - items: compras_items con producto anidado.
+ *   FK: compras_items.compra_id → compras.id (CASCADE)
+ *   FK: compras_items.producto_id → productos.id
+ *
+ * registrado_por almacenado como UUID string — no se expande a Usuario.
+ *
+ * Comportamiento ante ausencia de datos:
+ * - error Supabase (incluido PGRST116 de .single()) → lanza Error.
+ * - data null (RLS oculta la fila) → lanza Error descriptivo.
+ *
+ * @throws Error si la compra no existe o no pertenece al restaurante autenticado.
+ */
 export async function fetchCompraPorId(
-  _client: ClienteSupabase,
-  _id: string
+  client: ClienteSupabase,
+  id: string
 ): Promise<Compra> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const { data, error } = await client
+    .from('compras')
+    .select(`
+      *,
+      proveedor:proveedores(id, restaurante_id, nombre, contacto, telefono, email, ruc_nit, condiciones_pago, dias_entrega, activo, notas),
+      items:compras_items(
+        id,
+        compra_id,
+        producto_id,
+        cantidad,
+        unidad_medida,
+        cantidad_gramos,
+        precio_unitario,
+        precio_total,
+        notas,
+        producto:productos(
+          id,
+          nombre,
+          unidad_medida,
+          unidad_display,
+          costo_unitario_actual,
+          activo
+        )
+      )
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/compras] Error al cargar compra "${id}": ${error.message}`
+    )
+  }
+
+  if (!data) {
+    throw new Error(
+      `[ChefOS/compras] Compra "${id}" no encontrada o no disponible.`
+    )
+  }
+
+  return data as Compra
 }
 
 // ─────────────────────────────────────────────────────────────
