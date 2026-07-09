@@ -11,7 +11,7 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO (Fase 3.2 — Iteración 6):
+ * ESTADO (Fase 3.2 — Iteración 7):
  * - fetchProductos y fetchProductoPorId: implementados (Iteración 1).
  * - fetchRecetas y fetchRecetaPorId: implementados (Iteración 2).
  * - fetchLotesProduccion, fetchLoteProduccionPorId,
@@ -19,11 +19,11 @@
  * - fetchMermas: implementado (Iteración 4).
  * - fetchAlertasActivas: implementado (Iteración 5).
  * - fetchCompras y fetchCompraPorId: implementados (Iteración 6).
- * - Demás fetchers: placeholders hasta iteraciones siguientes.
+ * - fetchRestaurante, fetchUsuarios, fetchUsuarioPorId: implementados (Iteración 7).
+ * - fetchMetricasDashboard: placeholder — requiere validación de vistas Supabase.
  *
- * TODO (Fase 3.2 — iteraciones siguientes):
- * - Implementar fetchMetricasDashboard, fetchRestaurante, fetchUsuarios,
- *   fetchUsuarioPorId por orden de dependencia.
+ * TODO (Fase 3.2 — iteración siguiente):
+ * - Evaluar fetchMetricasDashboard según disponibilidad de vistas o RPCs.
  * - Regenerar database.types.ts con Supabase CLI cuando esté disponible.
  */
 
@@ -677,7 +677,7 @@ export async function fetchRegistrosProduccion(
   }
 
   return (data ?? []) as ProduccionRegistro[]
-}
+      }
 
 // ─────────────────────────────────────────────────────────────
 // Mermas — IMPLEMENTADO (Fase 3.2 — Iteración 4)
@@ -879,10 +879,6 @@ export async function fetchCompras(
  *
  * registrado_por almacenado como UUID string — no se expande a Usuario.
  *
- * Comportamiento ante ausencia de datos:
- * - error Supabase (incluido PGRST116 de .single()) → lanza Error.
- * - data null (RLS oculta la fila) → lanza Error descriptivo.
- *
  * @throws Error si la compra no existe o no pertenece al restaurante autenticado.
  */
 export async function fetchCompraPorId(
@@ -933,24 +929,101 @@ export async function fetchCompraPorId(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Configuración — placeholder
+// Configuración — IMPLEMENTADO (Fase 3.2 — Iteración 7)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna el restaurante del usuario autenticado.
+ *
+ * RLS retorna exactamente el restaurante propio via mi_restaurante_id().
+ * No se necesita filtro explícito — .single() consume el único resultado.
+ *
+ * Sin joins — Restaurante es una interfaz plana sin relaciones expandidas.
+ *
+ * @throws Error si el usuario no está asociado a ningún restaurante,
+ *         o si la sesión no está activa (PGRST116).
+ */
 export async function fetchRestaurante(
-  _client: ClienteSupabase
+  client: ClienteSupabase
 ): Promise<Restaurante> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const { data, error } = await client
+    .from('restaurantes')
+    .select('*')
+    .single()
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/configuracion] Error al cargar restaurante: ${error.message}`
+    )
+  }
+
+  if (!data) {
+    throw new Error(
+      `[ChefOS/configuracion] Restaurante no encontrado para el usuario autenticado.`
+    )
+  }
+
+  return data as Restaurante
 }
 
+/**
+ * Retorna todos los usuarios del restaurante autenticado.
+ *
+ * RLS filtra automáticamente por restaurante via mi_restaurante_id().
+ * SELECT permitido a todos los roles del restaurante.
+ *
+ * Sin filtro de activo — retorna usuarios activos e inactivos.
+ * Sin joins — Usuario es una interfaz plana sin relaciones expandidas.
+ *
+ * Ordenación: nombre ASC (alfabética).
+ */
 export async function fetchUsuarios(
-  _client: ClienteSupabase
+  client: ClienteSupabase
 ): Promise<Usuario[]> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const { data, error } = await client
+    .from('usuarios')
+    .select('*')
+    .order('nombre', { ascending: true })
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/configuracion] Error al cargar usuarios: ${error.message}`
+    )
+  }
+
+  return (data ?? []) as Usuario[]
 }
 
+/**
+ * Retorna un usuario por ID dentro del restaurante autenticado.
+ *
+ * RLS garantiza que solo se accede a usuarios del mismo restaurante.
+ * Sin filtro de activo — permite cargar usuarios inactivos por ID.
+ * Sin joins — Usuario es una interfaz plana sin relaciones expandidas.
+ *
+ * @throws Error si el usuario no existe o no pertenece al restaurante autenticado.
+ */
 export async function fetchUsuarioPorId(
-  _client: ClienteSupabase,
-  _id: string
+  client: ClienteSupabase,
+  id: string
 ): Promise<Usuario> {
-  throw new Error('TODO: implementar en Fase 3.2')
-}
+  const { data, error } = await client
+    .from('usuarios')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/configuracion] Error al cargar usuario "${id}": ${error.message}`
+    )
+  }
+
+  if (!data) {
+    throw new Error(
+      `[ChefOS/configuracion] Usuario "${id}" no encontrado o no disponible.`
+    )
+  }
+
+  return data as Usuario
+  }
