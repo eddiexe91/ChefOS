@@ -8,24 +8,40 @@
  * Responsabilidades:
  * - Consumir useLotesProduccion() para acceder a los lotes del día.
  * - Consumir useApp() para reflejar el estado offline en la UI.
+ * - Navegar al detalle de cada lote.
  * - Manejar los cuatro estados posibles de la query de forma explícita.
  *
- * ESTADO ACTUAL (Fase 3.1):
- * fetchLotesProduccion lanza un error placeholder.
- * La pantalla lo captura y muestra un aviso informativo no bloqueante.
- * El estado offline se muestra de forma independiente a la query.
- *
- * TODO (Fase 3.2):
- * - Implementar fetchLotesProduccion con queries reales a Supabase.
- * - Integrar src/lib/offline/cola.ts para registro offline.
- * - Reemplazar los estados placeholder por componentes reales:
- *   - Tarjeta de lote activo
- *   - Registro de producción por receta
- *   - Historial de lotes del turno
+ * ESTADO ACTUAL (Fase 3.3):
+ * La lista de lotes navega a /produccion/[id].
+ * El registro de producción ocurre en el detalle del lote.
  */
 
+import Link                from 'next/link'
+import { ChevronRight }    from 'lucide-react'
 import { useLotesProduccion } from '@/hooks/useDominio'
 import { useApp }             from '@/providers/AppProvider'
+
+// ─────────────────────────────────────────────────────────────
+// Constantes
+// ─────────────────────────────────────────────────────────────
+
+const ETIQUETAS_TURNO: Record<string, string> = {
+  mañana: 'Mañana',
+  tarde:  'Tarde',
+  noche:  'Noche',
+}
+
+const ETIQUETAS_ESTADO: Record<string, string> = {
+  en_progreso: 'En progreso',
+  completado:  'Completado',
+  cancelado:   'Cancelado',
+}
+
+const CLASES_ESTADO: Record<string, string> = {
+  en_progreso: 'bg-advertencia-suave text-advertencia-texto',
+  completado:  'bg-exito-suave text-exito-texto',
+  cancelado:   'bg-fondo-hover text-texto-apagado',
+}
 
 // ─────────────────────────────────────────────────────────────
 // Componente
@@ -87,7 +103,7 @@ export default function ProduccionCliente() {
         </section>
       )}
 
-      {/* ── Estado: error (placeholder Fase 3.1) ─────────── */}
+      {/* ── Estado: error ────────────────────────────────── */}
       {isError && (
         <section className="rounded-xl bg-info-suave border border-info-borde px-4 py-4">
           <p className="text-xs font-sans font-medium text-info-texto">
@@ -116,32 +132,35 @@ export default function ProduccionCliente() {
       {/* ── Estado: con lotes ────────────────────────────── */}
       {isSuccess && data.length > 0 && (
         <section className="space-y-3">
-          {/*
-           * TODO (Fase 3.2):
-           * Reemplazar por componente <TarjetaLote> con:
-           * - Turno y fecha del lote
-           * - Estado (en_progreso / completado / cancelado)
-           * - Responsable
-           * - Ítems producidos y costo total
-           * - Acceso al detalle del lote
-           */}
           {data.map((lote) => (
-            <div
+            <Link
               key={lote.id}
-              className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-3"
+              href={`/produccion/${lote.id}`}
+              className="flex items-center justify-between gap-3
+                         rounded-xl bg-fondo-elevado border border-fondo-borde
+                         px-4 py-3 active:bg-fondo-hover transition-colors"
             >
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-sans font-medium text-texto-primario">
-                  {lote.turno.charAt(0).toUpperCase() + lote.turno.slice(1)}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-sm font-sans font-medium text-texto-primario">
+                    {ETIQUETAS_TURNO[lote.turno] ?? lote.turno}
+                  </p>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-2xs font-sans font-medium
+                                ${CLASES_ESTADO[lote.estado] ?? 'bg-fondo-hover text-texto-apagado'}`}
+                  >
+                    {ETIQUETAS_ESTADO[lote.estado] ?? lote.estado}
+                  </span>
+                </div>
+                <p className="text-2xs font-sans text-texto-apagado">
+                  {lote.fecha}
+                  {lote.items_producidos > 0 && (
+                    <> · {lote.items_producidos} ítem{lote.items_producidos !== 1 ? 's' : ''}</>
+                  )}
                 </p>
-                <span className="text-2xs font-sans text-texto-apagado">
-                  {lote.estado}
-                </span>
               </div>
-              <p className="text-2xs font-sans text-texto-apagado mt-0.5">
-                {lote.fecha}
-              </p>
-            </div>
+              <ChevronRight size={16} className="text-texto-apagado flex-shrink-0" />
+            </Link>
           ))}
         </section>
       )}
