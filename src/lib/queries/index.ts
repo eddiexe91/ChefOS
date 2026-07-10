@@ -11,7 +11,7 @@
  * Los fetchers están diseñados para ejecutarse exclusivamente en el cliente.
  * Nunca importar desde Server Components, Route Handlers ni Server Actions.
  *
- * ESTADO (Fase 3.2 — Iteración 7):
+ * ESTADO (Fase 3.2 — Iteración 8 — COMPLETA):
  * - fetchProductos y fetchProductoPorId: implementados (Iteración 1).
  * - fetchRecetas y fetchRecetaPorId: implementados (Iteración 2).
  * - fetchLotesProduccion, fetchLoteProduccionPorId,
@@ -20,11 +20,14 @@
  * - fetchAlertasActivas: implementado (Iteración 5).
  * - fetchCompras y fetchCompraPorId: implementados (Iteración 6).
  * - fetchRestaurante, fetchUsuarios, fetchUsuarioPorId: implementados (Iteración 7).
- * - fetchMetricasDashboard: placeholder — requiere validación de vistas Supabase.
+ * - fetchMetricasDashboard: implementado (Iteración 8).
  *
- * TODO (Fase 3.2 — iteración siguiente):
- * - Evaluar fetchMetricasDashboard según disponibilidad de vistas o RPCs.
- * - Regenerar database.types.ts con Supabase CLI cuando esté disponible.
+ * NOTA ARQUITECTÓNICA (Iteración 8):
+ * fetchMetricasDashboard consulta exclusivamente la tabla `briefings`.
+ * MetricasDashboard.cierre retorna null porque la tabla `cierres_diarios`
+ * no existe en el esquema actual (DATABASE_SPEC Sprint 3).
+ * MetricasDashboard.resumen retorna null pendiente de especificación.
+ * Ambos campos se activarán en una fase posterior cuando el esquema lo soporte.
  */
 
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
@@ -61,18 +64,14 @@ type ClienteSupabase = ReturnType<typeof obtenerClienteNavegador>
 /**
  * Métricas del dashboard.
  *
- * TODO (Fase 3.2):
- * El campo `resumen` debe ser reemplazado por una interfaz
- * concreta una vez validadas las vistas o queries de agregación en Supabase.
+ * ESTADO ACTUAL:
+ * - briefing: implementado — tabla `briefings` disponible en Supabase.
+ * - cierre: null permanente — tabla `cierres_diarios` no existe en el esquema actual.
+ * - resumen: null permanente — pendiente de especificación y migración futura.
  */
 export interface MetricasDashboard {
   briefing: Briefing | null
   cierre: CierreDiario | null
-  /**
-   * TODO (Fase 3.2):
-   * Reemplazar por interfaz de agregaciones reales:
-   * totales de ventas, producción, mermas, alertas activas, etc.
-   */
   resumen: unknown
 }
 
@@ -268,13 +267,62 @@ export const configuracionKeys = {
 // ═══════════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────
-// Dashboard — placeholder
+// Dashboard — IMPLEMENTADO (Fase 3.2 — Iteración 8)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Retorna las métricas del dashboard para el día actual.
+ *
+ * IMPLEMENTACIÓN ACTUAL:
+ * Consulta exclusivamente la tabla `briefings` filtrando por la fecha
+ * de hoy. Retorna el briefing más reciente del día (último turno generado).
+ *
+ * Se usa .maybeSingle() porque puede no existir briefing para el día actual
+ * — la IA lo genera bajo demanda, no automáticamente al inicio del día.
+ * A diferencia de .single(), .maybeSingle() retorna null sin error cuando
+ * no hay filas, lo que es el comportamiento correcto aquí.
+ *
+ * CAMPOS NO IMPLEMENTADOS:
+ * - cierre: null permanente.
+ *   La tabla `cierres_diarios` no existe en el esquema actual (Sprint 3).
+ *   Se activará en una fase posterior cuando la migración correspondiente
+ *   esté disponible.
+ * - resumen: null permanente.
+ *   Pendiente de especificación. Agregará totales de ventas, producción
+ *   y mermas del día cuando las vistas o RPCs necesarios sean creados.
+ *
+ * RLS: SELECT permitido a todos los roles — "todos" en tabla briefings.
+ *
+ * Índice utilizado:
+ * idx_briefings_fecha ON briefings(restaurante_id, fecha DESC, turno)
+ * Marcado en DATABASE_SPEC como "query más crítica del sistema".
+ *
+ * @returns MetricasDashboard con briefing del día o null si no existe.
+ */
 export async function fetchMetricasDashboard(
-  _client: ClienteSupabase
+  client: ClienteSupabase
 ): Promise<MetricasDashboard> {
-  throw new Error('TODO: implementar en Fase 3.2')
+  const hoy = new Date().toISOString().split('T')[0]
+
+  const { data, error } = await client
+    .from('briefings')
+    .select('*')
+    .eq('fecha', hoy)
+    .order('creado_en', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/dashboard] Error al cargar briefing del día: ${error.message}`
+    )
+  }
+
+  return {
+    briefing: data as Briefing | null,
+    cierre:   null,
+    resumen:  null,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -303,7 +351,7 @@ export async function fetchMetricasDashboard(
  *
  * Ordenación: nombre ASC (alfabética).
  *
- * TODO (Fase 3.2 — iteración futura):
+ * TODO (fase futura):
  * - Implementar paginación cuando el volumen lo requiera.
  * - Añadir filtro por costo_desactualizado para badge de alerta.
  */
@@ -411,7 +459,6 @@ export async function fetchRecetaPorId(
 
   const receta = data as Receta
 
-  // Ordenar ingredientes por campo `orden` ASC en cliente.
   if (receta.ingredientes) {
     receta.ingredientes = [...receta.ingredientes].sort(
       (a, b) => a.orden - b.orden
@@ -429,11 +476,6 @@ export async function fetchRecetaPorId(
  * Retorna todos los productos activos del restaurante autenticado.
  *
  * RLS filtra automáticamente por restaurante via mi_restaurante_id().
- * No se necesita .eq('restaurante_id', ...) explícito.
- *
- * Relaciones cargadas:
- * - categoria: categorias_producto — necesaria para display en lista.
- *   FK: productos.categoria_id → categorias_producto.id
  *
  * Filtros aplicados:
  * - activo = true (obligatorio — activa índices partial idx_productos_stock
@@ -441,12 +483,11 @@ export async function fetchRecetaPorId(
  * - categoria_id (opcional)
  * - stock_bajo: cantidad_gramos <= stock_minimo_gramos (filtrado en cliente)
  *
- * Proveedor omitido en listado general — solo en fetchProductoPorId.
+ * Relaciones cargadas:
+ * - categoria: categorias_producto — necesaria para display en lista.
+ *   FK: productos.categoria_id → categorias_producto.id
  *
  * Ordenación: nombre ASC (alfabética).
- *
- * TODO (Fase 3.2 — iteración futura):
- * - Implementar paginación cuando el volumen lo requiera.
  */
 export async function fetchProductos(
   client: ClienteSupabase,
@@ -489,16 +530,11 @@ export async function fetchProductos(
 /**
  * Retorna un producto activo por ID con todas sus relaciones.
  *
- * RLS garantiza que solo se accede a productos del restaurante autenticado.
- *
  * Relaciones cargadas:
  * - categoria: categorias_producto — completa.
- *   FK: productos.categoria_id → categorias_producto.id
  * - proveedor_principal: proveedores — completo.
- *   FK: productos.proveedor_principal_id → proveedores.id
  *
- * @throws Error si el producto no existe, está inactivo o no pertenece
- *         al restaurante autenticado.
+ * @throws Error si el producto no existe o no pertenece al restaurante.
  */
 export async function fetchProductoPorId(
   client: ClienteSupabase,
@@ -528,7 +564,7 @@ export async function fetchProductoPorId(
   }
 
   return data as Producto
-}
+  }
 
 // ─────────────────────────────────────────────────────────────
 // Producción — IMPLEMENTADO (Fase 3.2 — Iteración 3)
@@ -537,21 +573,13 @@ export async function fetchProductoPorId(
 /**
  * Retorna los lotes de producción del restaurante autenticado.
  *
- * RLS filtra automáticamente por restaurante via mi_restaurante_id().
- *
  * No existe columna `activo` en produccion_lotes — no hay filtro de activo.
- * El estado del lote ('en_progreso' / 'completado' / 'cancelado') es el
- * mecanismo de ciclo de vida, no un campo activo/inactivo.
  *
  * Relaciones cargadas:
  * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
- *   FK: produccion_lotes.responsable_id → usuarios.id
  *
- * Filtros opcionales (de FiltrosProduccion):
- * - fecha_desde: filtra lotes desde esa fecha.
- * - fecha_hasta: filtra lotes hasta esa fecha.
- *
- * Ordenación: fecha DESC (lotes más recientes primero).
+ * Filtros opcionales: fecha_desde, fecha_hasta.
+ * Ordenación: fecha DESC.
  */
 export async function fetchLotesProduccion(
   client: ClienteSupabase,
@@ -587,13 +615,7 @@ export async function fetchLotesProduccion(
 /**
  * Retorna un lote de producción por ID.
  *
- * RLS garantiza que solo se accede a lotes del restaurante autenticado.
- *
- * Relaciones cargadas:
- * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
- *   FK: produccion_lotes.responsable_id → usuarios.id
- *
- * @throws Error si el lote no existe o no pertenece al restaurante autenticado.
+ * @throws Error si el lote no existe.
  */
 export async function fetchLoteProduccionPorId(
   client: ClienteSupabase,
@@ -626,20 +648,8 @@ export async function fetchLoteProduccionPorId(
 /**
  * Retorna los registros de producción del restaurante autenticado.
  *
- * RLS sobre produccion_registros permite SELECT a todos los roles.
- *
- * Relaciones cargadas:
- * - receta: recetas(id, nombre)
- *   FK: produccion_registros.receta_id → recetas.id
- * - producto: productos(id, nombre, unidad_medida)
- *   FK: produccion_registros.producto_id → productos.id
- * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
- *   FK: produccion_registros.responsable_id → usuarios.id
- *
- * Filtros opcionales (de FiltrosProduccion):
- * - lote_id: filtra registros de un lote específico.
- * - fecha_desde / fecha_hasta: rango de fecha_produccion.
- *
+ * Relaciones cargadas: receta, producto, responsable.
+ * Filtros opcionales: lote_id, fecha_desde, fecha_hasta.
  * Ordenación: fecha_produccion DESC.
  */
 export async function fetchRegistrosProduccion(
@@ -677,7 +687,7 @@ export async function fetchRegistrosProduccion(
   }
 
   return (data ?? []) as ProduccionRegistro[]
-      }
+}
 
 // ─────────────────────────────────────────────────────────────
 // Mermas — IMPLEMENTADO (Fase 3.2 — Iteración 4)
@@ -686,31 +696,12 @@ export async function fetchRegistrosProduccion(
 /**
  * Retorna las mermas del restaurante autenticado.
  *
- * RLS filtra automáticamente por restaurante via mi_restaurante_id().
- * SELECT restringido a chefs+ (chef_cocina, chef_ejecutivo, administrador, dueño).
- * Un cocinero puede registrar mermas (INSERT) pero no leerlas (SELECT).
- * En ese caso, RLS retornará array vacío sin error.
+ * RLS SELECT restringido a chefs+. Un cocinero puede registrar (INSERT)
+ * pero no leer (SELECT) — RLS retornará array vacío sin error.
  *
- * No existe columna `activo` en mermas — no hay filtro de activo.
- * El trigger `trigger_costo_merma` calcula `costo_merma` en BEFORE INSERT;
- * el campo ya viene calculado en SELECT.
- *
- * Relaciones cargadas:
- * - producto: productos(id, nombre, unidad_medida, costo_unitario_actual, activo)
- *   FK: mermas.producto_id → productos.id
- * - responsable: usuarios(id, nombre) — Pick<Usuario, 'id'|'nombre'>
- *   FK: mermas.responsable_id → usuarios.id
- *
- * Filtros opcionales (de FiltrosMerma):
- * - producto_id: filtra mermas de un producto específico.
- * - fecha_desde: filtra mermas registradas desde esa fecha (creado_en).
- * - fecha_hasta: filtra mermas registradas hasta esa fecha (creado_en).
- *
- * Ordenación: creado_en DESC (mermas más recientes primero).
- *
- * TODO (Fase 3.2 — iteración futura):
- * - Añadir canal Realtime en AppProvider cuando se implemente el módulo UI.
- * - Implementar paginación cuando el volumen lo requiera.
+ * Relaciones cargadas: producto, responsable.
+ * Filtros opcionales: producto_id, fecha_desde, fecha_hasta (sobre creado_en).
+ * Ordenación: creado_en DESC.
  */
 export async function fetchMermas(
   client: ClienteSupabase,
@@ -755,24 +746,9 @@ export async function fetchMermas(
 /**
  * Retorna todas las alertas no leídas del restaurante autenticado.
  *
- * RLS filtra automáticamente por restaurante via mi_restaurante_id().
- * SELECT permitido a todos los roles del restaurante.
- *
- * No se carga ninguna relación — AlertaSistema es una interfaz plana.
- * leida_por es un UUID FK almacenado como string en la interfaz,
- * no se expande a Usuario.
- *
- * Filtro obligatorio:
- * - leida = false → activa el índice partial:
- *   idx_alertas_no_leidas ON alertas_sistema(restaurante_id, leida, severidad, creado_en DESC)
- *   WHERE leida=false
- *
- * Ordenación: creado_en DESC (alertas más recientes primero).
- * Consistente con el índice idx_alertas_no_leidas.
- *
- * TODO (Fase 3.2 — iteración futura):
- * - Implementar paginación si el volumen lo requiere.
- * - Considerar filtros por tipo o severidad cuando el módulo de alertas madure.
+ * Filtro obligatorio: leida = false
+ * Activa el índice: idx_alertas_no_leidas WHERE leida=false
+ * Ordenación: creado_en DESC.
  */
 export async function fetchAlertasActivas(
   client: ClienteSupabase
@@ -799,32 +775,13 @@ export async function fetchAlertasActivas(
 /**
  * Retorna las compras del restaurante autenticado.
  *
- * RLS filtra automáticamente por restaurante via mi_restaurante_id().
- * SELECT permitido a chefs+ (chef_cocina, chef_ejecutivo, administrador, dueño).
+ * RLS SELECT permitido a chefs+.
+ * Items NO cargados en listado — solo en fetchCompraPorId.
+ * registrado_por es UUID string — no se expande a Usuario.
  *
- * No existe columna `activo` en compras — no hay filtro de activo.
- * El estado ('borrador' / 'confirmada' / 'recibida' / 'anulada') es el
- * mecanismo de ciclo de vida.
- *
- * Relaciones cargadas:
- * - proveedor: proveedores — completo.
- *   FK: compras.proveedor_id → proveedores.id
- *
- * Items NO cargados en listado general — costoso e innecesario.
- * Se cargan únicamente en fetchCompraPorId.
- *
- * registrado_por almacenado como UUID string — no se expande a Usuario.
- *
- * Filtros opcionales (de FiltrosCompra):
- * - proveedor_id: filtra compras de un proveedor específico.
- * - estado: filtra por estado de la compra.
- * - fecha_desde: filtra compras desde esa fecha (fecha_compra).
- * - fecha_hasta: filtra compras hasta esa fecha (fecha_compra).
- *
- * Ordenación: fecha_compra DESC (compras más recientes primero).
- *
- * TODO (Fase 3.2 — iteración futura):
- * - Implementar paginación cuando el volumen lo requiera.
+ * Relaciones cargadas: proveedor (completo).
+ * Filtros opcionales: proveedor_id, estado, fecha_desde, fecha_hasta.
+ * Ordenación: fecha_compra DESC.
  */
 export async function fetchCompras(
   client: ClienteSupabase,
@@ -868,18 +825,9 @@ export async function fetchCompras(
 /**
  * Retorna una compra por ID con todas sus relaciones.
  *
- * RLS garantiza que solo se accede a compras del restaurante autenticado.
+ * Relaciones cargadas: proveedor completo + items con producto anidado.
  *
- * Relaciones cargadas:
- * - proveedor: proveedores — completo.
- *   FK: compras.proveedor_id → proveedores.id
- * - items: compras_items con producto anidado.
- *   FK: compras_items.compra_id → compras.id (CASCADE)
- *   FK: compras_items.producto_id → productos.id
- *
- * registrado_por almacenado como UUID string — no se expande a Usuario.
- *
- * @throws Error si la compra no existe o no pertenece al restaurante autenticado.
+ * @throws Error si la compra no existe o no pertenece al restaurante.
  */
 export async function fetchCompraPorId(
   client: ClienteSupabase,
@@ -935,13 +883,11 @@ export async function fetchCompraPorId(
 /**
  * Retorna el restaurante del usuario autenticado.
  *
- * RLS retorna exactamente el restaurante propio via mi_restaurante_id().
- * No se necesita filtro explícito — .single() consume el único resultado.
+ * RLS retorna exactamente el restaurante propio.
+ * Sin filtros explícitos — .single() consume el único resultado.
+ * Sin joins — Restaurante es interfaz plana.
  *
- * Sin joins — Restaurante es una interfaz plana sin relaciones expandidas.
- *
- * @throws Error si el usuario no está asociado a ningún restaurante,
- *         o si la sesión no está activa (PGRST116).
+ * @throws Error si el usuario no está asociado a ningún restaurante.
  */
 export async function fetchRestaurante(
   client: ClienteSupabase
@@ -969,13 +915,10 @@ export async function fetchRestaurante(
 /**
  * Retorna todos los usuarios del restaurante autenticado.
  *
- * RLS filtra automáticamente por restaurante via mi_restaurante_id().
- * SELECT permitido a todos los roles del restaurante.
- *
- * Sin filtro de activo — retorna usuarios activos e inactivos.
- * Sin joins — Usuario es una interfaz plana sin relaciones expandidas.
- *
- * Ordenación: nombre ASC (alfabética).
+ * RLS filtra automáticamente por restaurante.
+ * Sin filtro de activo — retorna todos (activos e inactivos).
+ * Sin joins — Usuario es interfaz plana.
+ * Ordenación: nombre ASC.
  */
 export async function fetchUsuarios(
   client: ClienteSupabase
@@ -999,9 +942,9 @@ export async function fetchUsuarios(
  *
  * RLS garantiza que solo se accede a usuarios del mismo restaurante.
  * Sin filtro de activo — permite cargar usuarios inactivos por ID.
- * Sin joins — Usuario es una interfaz plana sin relaciones expandidas.
+ * Sin joins — Usuario es interfaz plana.
  *
- * @throws Error si el usuario no existe o no pertenece al restaurante autenticado.
+ * @throws Error si el usuario no existe o no pertenece al restaurante.
  */
 export async function fetchUsuarioPorId(
   client: ClienteSupabase,
@@ -1026,4 +969,4 @@ export async function fetchUsuarioPorId(
   }
 
   return data as Usuario
-  }
+}
