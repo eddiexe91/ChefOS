@@ -3,68 +3,194 @@
 /**
  * src/components/produccion/ProduccionCliente.tsx
  *
- * Contenedor principal del módulo de Producción de ChefOS.
+ * Lista de lotes de producción con filtros en cliente.
  *
- * Responsabilidades:
- * - Consumir useLotesProduccion() para acceder a los lotes del día.
- * - Consumir useApp() para reflejar el estado offline en la UI.
- * - Navegar al detalle de cada lote.
- * - Manejar los cuatro estados posibles de la query de forma explícita.
- *
- * ESTADO ACTUAL (Fase 3.3):
- * La lista de lotes navega a /produccion/[id].
- * El registro de producción ocurre en el detalle del lote.
+ * Tipos verificados:
+ * - ProduccionLote: id, fecha, turno, estado, items_producidos,
+ *   costo_total_lote?, responsable?, creado_en — confirmados.
+ * - TurnoServicio: 'mañana' | 'tarde' | 'noche' — usado en Record.
+ * - Estado de lote: 'en_progreso' | 'completado' | 'cancelado' — usado en Record.
  */
 
-import Link                from 'next/link'
-import { ChevronRight }    from 'lucide-react'
-import { useLotesProduccion } from '@/hooks/useDominio'
-import { useApp }             from '@/providers/AppProvider'
+import { useState, useMemo }                from 'react'
+import Link                                 from 'next/link'
+import { ChevronRight, X }                  from 'lucide-react'
+import { useLotesProduccion }               from '@/hooks/useDominio'
+import { useApp }                           from '@/providers/AppProvider'
+import type { ProduccionLote, TurnoServicio } from '@/types/index'
 
 // ─────────────────────────────────────────────────────────────
-// Constantes
+// Tipo auxiliar para estado de lote
 // ─────────────────────────────────────────────────────────────
 
-const ETIQUETAS_TURNO: Record<string, string> = {
+type EstadoLote = 'en_progreso' | 'completado' | 'cancelado'
+
+// ─────────────────────────────────────────────────────────────
+// Constantes tipadas con tipos reales del dominio
+// ─────────────────────────────────────────────────────────────
+
+const ETIQUETAS_TURNO: Record<TurnoServicio, string> = {
   mañana: 'Mañana',
   tarde:  'Tarde',
   noche:  'Noche',
 }
 
-const ETIQUETAS_ESTADO: Record<string, string> = {
+const ETIQUETAS_ESTADO: Record<EstadoLote, string> = {
   en_progreso: 'En progreso',
   completado:  'Completado',
   cancelado:   'Cancelado',
 }
 
-const CLASES_ESTADO: Record<string, string> = {
+const CLASES_ESTADO: Record<EstadoLote, string> = {
   en_progreso: 'bg-advertencia-suave text-advertencia-texto',
   completado:  'bg-exito-suave text-exito-texto',
   cancelado:   'bg-fondo-hover text-texto-apagado',
 }
 
 // ─────────────────────────────────────────────────────────────
-// Componente
+// Subcomponente: skeletons
+// ─────────────────────────────────────────────────────────────
+
+function SkeletonLotes() {
+  return (
+    <div className="space-y-3">
+      {[...Array(4)].map((_, i) => (
+        <div
+          key={i}
+          className="rounded-xl bg-fondo-elevado border border-fondo-borde p-4 space-y-2"
+        >
+          <div className="flex justify-between gap-3">
+            <div className="space-y-1.5 flex-1">
+              <div className="h-3 rounded-full bg-fondo-hover animate-pulse w-1/3" />
+              <div className="h-2.5 rounded-full bg-fondo-hover animate-pulse w-1/2" />
+            </div>
+            <div className="h-5 w-20 rounded-full bg-fondo-hover animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// Subcomponente: tarjeta de lote
+// ─────────────────────────────────────────────────────────────
+
+function TarjetaLote({ lote }: { lote: ProduccionLote }) {
+  const fechaFormateada = new Date(lote.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
+    weekday: 'short',
+    day:     'numeric',
+    month:   'short',
+  })
+
+  // Acceso seguro a ETIQUETAS y CLASES: lote.estado y lote.turno
+  // son los tipos exactos de EstadoLote y TurnoServicio — sin fallback necesario.
+  const etiquetaTurno  = ETIQUETAS_TURNO[lote.turno]
+  const etiquetaEstado = ETIQUETAS_ESTADO[lote.estado]
+  const clasesEstado   = CLASES_ESTADO[lote.estado]
+
+  return (
+    <Link
+      href={`/produccion/${lote.id}`}
+      className="flex items-center justify-between gap-3
+                 rounded-xl bg-fondo-elevado border border-fondo-borde
+                 px-4 py-3 active:bg-fondo-hover transition-colors"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-sans font-medium text-texto-primario">
+            {etiquetaTurno}
+          </p>
+          <span className={`px-2 py-0.5 rounded-full text-2xs font-sans font-medium ${clasesEstado}`}>
+            {etiquetaEstado}
+          </span>
+        </div>
+
+        <p className="text-2xs font-sans text-texto-apagado mt-0.5">
+          {fechaFormateada}
+          {lote.items_producidos > 0 && (
+            <> · {lote.items_producidos} ítem{lote.items_producidos !== 1 ? 's' : ''}</>
+          )}
+          {lote.costo_total_lote !== undefined && lote.costo_total_lote !== null && (
+            <> · ${lote.costo_total_lote.toLocaleString('es-CL')}</>
+          )}
+        </p>
+
+        {lote.responsable?.nombre && (
+          <p className="text-2xs font-sans text-texto-apagado mt-0.5">
+            {lote.responsable.nombre}
+          </p>
+        )}
+      </div>
+
+      <ChevronRight size={16} className="text-texto-apagado flex-shrink-0" />
+    </Link>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tipos de filtro
+// ─────────────────────────────────────────────────────────────
+
+type FiltroTurno  = 'todos' | TurnoServicio
+type FiltroEstado = 'todos' | EstadoLote
+
+// ─────────────────────────────────────────────────────────────
+// Componente principal
 // ─────────────────────────────────────────────────────────────
 
 export default function ProduccionCliente() {
   const { estaOnline, accionesPendientes } = useApp()
+
+  const [filtroTurno,  setFiltroTurno]  = useState<FiltroTurno>('todos')
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos')
+
   const { isPending, isError, isSuccess, data } = useLotesProduccion()
 
+  const lotes: ProduccionLote[] = data ?? []
+
+  const lotesFiltrados = useMemo(() => {
+    let resultado = lotes
+    if (filtroTurno !== 'todos') {
+      resultado = resultado.filter((l) => l.turno === filtroTurno)
+    }
+    if (filtroEstado !== 'todos') {
+      resultado = resultado.filter((l) => l.estado === filtroEstado)
+    }
+    return resultado
+  }, [lotes, filtroTurno, filtroEstado])
+
+  const hayFiltros = filtroTurno !== 'todos' || filtroEstado !== 'todos'
+
+  const limpiarFiltros = () => {
+    setFiltroTurno('todos')
+    setFiltroEstado('todos')
+  }
+
   return (
-    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto">
 
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>
-        <h1 className="text-xl font-display font-bold text-texto-primario leading-tight">
-          Producción
-        </h1>
+        <div className="flex items-baseline justify-between gap-3">
+          <h1 className="text-xl font-display font-bold text-texto-primario leading-tight">
+            Producción
+          </h1>
+          {isSuccess && (
+            <p className="text-xs font-sans text-texto-apagado flex-shrink-0">
+              {hayFiltros
+                ? `${lotesFiltrados.length} de ${lotes.length}`
+                : `${lotes.length} lote${lotes.length !== 1 ? 's' : ''}`
+              }
+            </p>
+          )}
+        </div>
         <p className="text-xs font-sans text-texto-apagado mt-0.5">
           Lotes y registros del turno
         </p>
       </section>
 
-      {/* ── Estado offline ───────────────────────────────── */}
+      {/* ── Banner offline ───────────────────────────────── */}
       {(!estaOnline || accionesPendientes > 0) && (
         <section
           className={
@@ -88,37 +214,100 @@ export default function ProduccionCliente() {
         </section>
       )}
 
-      {/* ── Estado: cargando ─────────────────────────────── */}
-      {isPending && (
-        <section className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="rounded-xl bg-fondo-elevado border border-fondo-borde p-4 space-y-2"
+      {/* ── Filtros ──────────────────────────────────────── */}
+      {isSuccess && lotes.length > 0 && (
+        <section className="space-y-2">
+
+          {/* Filtro por turno */}
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {(['todos', 'mañana', 'tarde', 'noche'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setFiltroTurno(t)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full
+                            text-2xs font-sans font-medium border transition-colors
+                            ${filtroTurno === t
+                              ? 'bg-acento text-white border-acento'
+                              : 'bg-fondo-elevado text-texto-apagado border-fondo-borde active:bg-fondo-hover'
+                            }`}
+              >
+                {t === 'todos' ? 'Todos los turnos' : ETIQUETAS_TURNO[t]}
+              </button>
+            ))}
+          </div>
+
+          {/* Filtro por estado */}
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {(['todos', 'en_progreso', 'completado', 'cancelado'] as const).map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => setFiltroEstado(e)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full
+                            text-2xs font-sans font-medium border transition-colors
+                            ${filtroEstado === e
+                              ? 'bg-acento text-white border-acento'
+                              : 'bg-fondo-elevado text-texto-apagado border-fondo-borde active:bg-fondo-hover'
+                            }`}
+              >
+                {e === 'todos' ? 'Todos los estados' : ETIQUETAS_ESTADO[e]}
+              </button>
+            ))}
+          </div>
+
+          {/* Limpiar filtros */}
+          {hayFiltros && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="flex items-center gap-1.5 text-2xs font-sans
+                         text-acento active:text-acento/70 transition-colors"
             >
-              <div className="h-3 rounded-full bg-fondo-hover animate-pulse w-1/2" />
-              <div className="h-3 rounded-full bg-fondo-hover animate-pulse w-1/3" />
-            </div>
-          ))}
+              <X size={11} />
+              Limpiar filtros
+            </button>
+          )}
         </section>
       )}
+
+      {/* ── Estado: cargando ─────────────────────────────── */}
+      {isPending && <SkeletonLotes />}
 
       {/* ── Estado: error ────────────────────────────────── */}
       {isError && (
         <section className="rounded-xl bg-info-suave border border-info-borde px-4 py-4">
           <p className="text-xs font-sans font-medium text-info-texto">
-            Lotes de producción no disponibles en esta fase
+            No se pudieron cargar los lotes de producción
           </p>
           <p className="text-2xs font-sans text-info-texto/70 mt-1 leading-relaxed">
-            El módulo de producción estará operativo en Fase 3.2,
-            cuando los fetchers de dominio sean implementados con
-            las queries reales a Supabase.
+            Verifica tu conexión e intenta nuevamente.
           </p>
         </section>
       )}
 
-      {/* ── Estado: sin lotes ────────────────────────────── */}
-      {isSuccess && data.length === 0 && (
+      {/* ── Sin resultados de filtro ─────────────────────── */}
+      {isSuccess && lotesFiltrados.length === 0 && hayFiltros && (
+        <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
+          <p className="text-sm font-sans font-medium text-texto-secundario">
+            Sin resultados
+          </p>
+          <p className="text-xs font-sans text-texto-apagado mt-1">
+            Ningún lote coincide con los filtros aplicados.
+          </p>
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="mt-3 text-xs font-sans font-medium text-acento
+                       active:text-acento/70 transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        </section>
+      )}
+
+      {/* ── Sin lotes en BD ──────────────────────────────── */}
+      {isSuccess && lotes.length === 0 && (
         <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
           <p className="text-sm font-sans font-medium text-texto-secundario">
             No hay lotes activos
@@ -129,42 +318,15 @@ export default function ProduccionCliente() {
         </section>
       )}
 
-      {/* ── Estado: con lotes ────────────────────────────── */}
-      {isSuccess && data.length > 0 && (
+      {/* ── Lista de lotes ───────────────────────────────── */}
+      {isSuccess && lotesFiltrados.length > 0 && (
         <section className="space-y-3">
-          {data.map((lote) => (
-            <Link
-              key={lote.id}
-              href={`/produccion/${lote.id}`}
-              className="flex items-center justify-between gap-3
-                         rounded-xl bg-fondo-elevado border border-fondo-borde
-                         px-4 py-3 active:bg-fondo-hover transition-colors"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-sm font-sans font-medium text-texto-primario">
-                    {ETIQUETAS_TURNO[lote.turno] ?? lote.turno}
-                  </p>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-2xs font-sans font-medium
-                                ${CLASES_ESTADO[lote.estado] ?? 'bg-fondo-hover text-texto-apagado'}`}
-                  >
-                    {ETIQUETAS_ESTADO[lote.estado] ?? lote.estado}
-                  </span>
-                </div>
-                <p className="text-2xs font-sans text-texto-apagado">
-                  {lote.fecha}
-                  {lote.items_producidos > 0 && (
-                    <> · {lote.items_producidos} ítem{lote.items_producidos !== 1 ? 's' : ''}</>
-                  )}
-                </p>
-              </div>
-              <ChevronRight size={16} className="text-texto-apagado flex-shrink-0" />
-            </Link>
+          {lotesFiltrados.map((lote) => (
+            <TarjetaLote key={lote.id} lote={lote} />
           ))}
         </section>
       )}
 
     </div>
   )
-}
+          }
