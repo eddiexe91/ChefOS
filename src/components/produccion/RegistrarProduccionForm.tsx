@@ -14,7 +14,7 @@
  * cuando la API Route esté implementada.
  */
 
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
 
 // ─────────────────────────────────────────────────────────────
 // Tipos internos
@@ -59,13 +59,13 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
   const [campos, setCampos] = useState<CamposForm>(ESTADO_INICIAL)
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     setCampos((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  const handleSubmit = (e: React.FormEvent<HTMLDivElement>) => {
-    e.preventDefault()
+  const handleSubmit = () => {
+    const cantidad = Number(campos.cantidad_producida)
 
     /**
      * TODO (Fase 3.3 — API Routes):
@@ -79,7 +79,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
     console.log('[ChefOS/produccion] Datos del formulario:', {
       lote_id:            loteId,
       receta_id:          campos.receta_id || null,
-      cantidad_producida: Number(campos.cantidad_producida),
+      cantidad_producida: cantidad,
       unidad:             campos.unidad,
       notas:              campos.notas || null,
     })
@@ -91,12 +91,8 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
     campos.unidad !== ''
 
   return (
-    <div
-      role="form"
-      aria-label="Registrar producción"
-      onSubmit={handleSubmit}
-      className="space-y-4"
-    >
+    <div className="space-y-4">
+
       {/* Selector de receta — placeholder */}
       <div className="space-y-1.5">
         <label
@@ -112,15 +108,9 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
           onChange={handleChange}
           className="w-full rounded-lg bg-fondo-base border border-fondo-borde
                      px-3 py-2.5 text-sm font-sans text-texto-primario
-                     focus:outline-none focus:border-acento
-                     transition-colors"
+                     focus:outline-none focus:border-acento transition-colors"
         >
           <option value="">
-            {/*
-             * TODO (Fase 3.3 — API Routes):
-             * Reemplazar por opciones reales desde useRecetas()
-             * filtradas por es_produccion=true.
-             */}
             Seleccionar receta...
           </option>
         </select>
@@ -150,8 +140,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
           className="w-full rounded-lg bg-fondo-base border border-fondo-borde
                      px-3 py-2.5 text-sm font-sans text-texto-primario
                      placeholder:text-texto-apagado
-                     focus:outline-none focus:border-acento
-                     transition-colors"
+                     focus:outline-none focus:border-acento transition-colors"
         />
       </div>
 
@@ -170,8 +159,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
           onChange={handleChange}
           className="w-full rounded-lg bg-fondo-base border border-fondo-borde
                      px-3 py-2.5 text-sm font-sans text-texto-primario
-                     focus:outline-none focus:border-acento
-                     transition-colors"
+                     focus:outline-none focus:border-acento transition-colors"
         >
           {UNIDADES_COMUNES.map((u) => (
             <option key={u} value={u}>
@@ -199,8 +187,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
           className="w-full rounded-lg bg-fondo-base border border-fondo-borde
                      px-3 py-2.5 text-sm font-sans text-texto-primario
                      placeholder:text-texto-apagado resize-none
-                     focus:outline-none focus:border-acento
-                     transition-colors"
+                     focus:outline-none focus:border-acento transition-colors"
         />
       </div>
 
@@ -208,9 +195,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
       <button
         type="button"
         disabled={!esValido}
-        onClick={(e) => {
-          handleSubmit(e as unknown as React.FormEvent<HTMLDivElement>)
-        }}
+        onClick={handleSubmit}
         className="w-full rounded-xl bg-acento text-white
                    py-3 px-4 text-sm font-sans font-medium
                    active:bg-acento/90 transition-colors
@@ -218,6 +203,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
       >
         Registrar producción
       </button>
+
     </div>
   )
 }
