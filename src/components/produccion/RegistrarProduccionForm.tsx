@@ -5,15 +5,23 @@
  *
  * Formulario de registro de producción dentro de un lote activo.
  *
- * Conectado a POST /api/produccion.
- * Formato de respuesta esperado: { data: unknown | null, error: string | null }
+ * Conectado a POST /api/produccion mediante useMutation de React Query v5.
+ *
+ * Invalida tras éxito:
+ * - produccionKeys.lotes()           → ['produccion', 'lotes']
+ * - ['produccion', 'registros']      → prefijo de todos los registros
+ *
+ * El parseo de la respuesta es defensivo: nunca lanza por intentar parsear
+ * JSON sobre respuestas con Content-Type incorrecto, vacías o de error.
  *
  * TODO:
- * Cuando se implemente React Query Mutation, reemplazar el fetch
- * manual por useMutation() e invalidar produccionKeys.lotes() tras éxito.
+ * Extraer la mutationFn a un hook personalizado cuando se necesite
+ * reutilizar este registro en otras pantallas.
  */
 
-import { useState, type ChangeEvent } from 'react'
+import { useState, type ChangeEvent }  from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { produccionKeys }              from '@/lib/queries'
 
 // ─────────────────────────────────────────────────────────────
 // Tipos internos
@@ -24,6 +32,14 @@ interface CamposForm {
   cantidad_producida: string
   unidad:             string
   notas:              string
+}
+
+interface BodyProduccion {
+  lote_id:            string
+  receta_id:          string | null
+  cantidad_producida: number
+  unidad:             string
+  notas:              string | null
 }
 
 interface RespuestaAPI {
@@ -60,74 +76,91 @@ interface Props {
 // ─────────────────────────────────────────────────────────────
 
 export default function RegistrarProduccionForm({ loteId }: Props) {
-  const [campos,      setCampos]      = useState<CamposForm>(ESTADO_INICIAL)
-  const [enviando,    setEnviando]    = useState(false)
-  const [errorEnvio,  setErrorEnvio]  = useState<string | null>(null)
-  const [exitoso,     setExitoso]     = useState(false)
+  const queryClient = useQueryClient()
+  const [campos, setCampos] = useState<CamposForm>(ESTADO_INICIAL)
 
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    // Limpiar mensajes previos al editar
-    if (errorEnvio !== null) setErrorEnvio(null)
-    if (exitoso)             setExitoso(false)
-    setCampos((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-  }
-
-  const handleSubmit = async () => {
-    if (enviando) return
-
-    setEnviando(true)
-    setErrorEnvio(null)
-    setExitoso(false)
-
-    try {
+  const mutacion = useMutation<RespuestaAPI, Error, BodyProduccion>({
+    mutationFn: async (body: BodyProduccion): Promise<RespuestaAPI> => {
       const response = await fetch('/api/produccion', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          lote_id:            loteId,
-          // receta_id vacío se envía como null — la API lo acepta como campo opcional
-          receta_id:          campos.receta_id.trim() !== ''
-                                ? campos.receta_id.trim()
-                                : null,
-          // cantidad_producida se convierte a number antes de enviar
-          cantidad_producida: Number(campos.cantidad_producida),
-          unidad:             campos.unidad,
-          notas:              campos.notas.trim() !== ''
-                                ? campos.notas.trim()
-                                : null,
-        }),
+        body:    JSON.stringify(body),
       })
 
-      const json: RespuestaAPI = await response.json() as RespuestaAPI
+      // Parseo defensivo: nunca lanzar por intentar parsear JSON.
+      // Soporta: JSON válido, respuesta vacía, HTML, texto plano,
+      // cualquier Content-Type inesperado.
+      let json: RespuestaAPI = { data: null, error: null }
+      try {
+        const texto = await response.text()
+        if (texto.trim() !== '') {
+          const parseado: unknown = JSON.parse(texto)
+          if (
+            typeof parseado === 'object' &&
+            parseado !== null &&
+            'error' in parseado
+          ) {
+            json = parseado as RespuestaAPI
+          }
+        }
+      } catch {
+        // El cuerpo no era JSON válido — json permanece con valores por defecto.
+        // La validación de response.ok a continuación producirá el error correcto.
+      }
 
       if (!response.ok || json.error !== null) {
-        // Usar el mensaje de error de la API si está disponible
-        setErrorEnvio(
+        throw new Error(
           typeof json.error === 'string' && json.error.trim() !== ''
             ? json.error
             : `Error ${response.status} — intenta nuevamente.`
         )
-        return
       }
 
-      // Éxito: limpiar formulario y mostrar confirmación
-      setCampos(ESTADO_INICIAL)
-      setExitoso(true)
+      return json
+    },
 
-    } catch {
-      // Error de red — fetch lanzó antes de recibir respuesta
-      setErrorEnvio('Sin conexión. Verifica tu red e intenta nuevamente.')
-    } finally {
-      setEnviando(false)
+    onSuccess: () => {
+      // Invalidar queries de producción para refrescar la UI
+      void queryClient.invalidateQueries({ queryKey: produccionKeys.lotes() })
+      // Prefijo común a todos los registros — invalida cualquier combinación de filtros.
+      // React Query v5 hace matching por prefijo: ['produccion', 'registros'] cubre
+      // produccionKeys.registros({ lote_id: ... }) y produccionKeys.registro(id).
+      void queryClient.invalidateQueries({ queryKey: ['produccion', 'registros'] })
+      // Resetear formulario tras éxito
+      setCampos(ESTADO_INICIAL)
+    },
+  })
+
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    // Limpiar estado de mutación al editar tras un intento
+    if (mutacion.isError || mutacion.isSuccess) {
+      mutacion.reset()
     }
+    setCampos((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleSubmit = () => {
+    mutacion.mutate({
+      lote_id:            loteId,
+      receta_id:          campos.receta_id.trim() !== ''
+                            ? campos.receta_id.trim()
+                            : null,
+      cantidad_producida: Number(campos.cantidad_producida),
+      unidad:             campos.unidad,
+      notas:              campos.notas.trim() !== ''
+                            ? campos.notas.trim()
+                            : null,
+    })
   }
 
   const esValido =
     campos.cantidad_producida !== '' &&
     Number(campos.cantidad_producida) > 0 &&
     campos.unidad !== ''
+
+  const enviando = mutacion.isPending
 
   return (
     <div className="space-y-4">
@@ -239,16 +272,19 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
       </div>
 
       {/* Mensaje de error */}
-      {errorEnvio !== null && (
+      {mutacion.isError && (
         <div className="rounded-lg bg-peligro-suave border border-peligro-borde px-3 py-2.5">
           <p className="text-xs font-sans font-medium text-peligro-texto">
-            {errorEnvio}
+            {mutacion.error instanceof Error
+              ? mutacion.error.message
+              : 'Error al registrar. Intenta nuevamente.'
+            }
           </p>
         </div>
       )}
 
       {/* Mensaje de éxito */}
-      {exitoso && (
+      {mutacion.isSuccess && (
         <div className="rounded-lg bg-exito-suave border border-exito-borde px-3 py-2.5">
           <p className="text-xs font-sans font-medium text-exito-texto">
             Producción registrada correctamente.
@@ -260,7 +296,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
       <button
         type="button"
         disabled={!esValido || enviando}
-        onClick={() => { void handleSubmit() }}
+        onClick={handleSubmit}
         className="w-full rounded-xl bg-acento text-white
                    py-3 px-4 text-sm font-sans font-medium
                    active:bg-acento/90 transition-colors
