@@ -5,23 +5,17 @@
  *
  * Formulario de registro de producción dentro de un lote activo.
  *
- * Conectado a POST /api/produccion mediante useMutation de React Query v5.
+ * La lógica de React Query está completamente encapsulada en:
+ * src/hooks/useRegistrarProduccion.ts
  *
- * Invalida tras éxito:
- * - produccionKeys.lotes()           → ['produccion', 'lotes']
- * - ['produccion', 'registros']      → prefijo de todos los registros
- *
- * El parseo de la respuesta es defensivo: nunca lanza por intentar parsear
- * JSON sobre respuestas con Content-Type incorrecto, vacías o de error.
- *
- * TODO:
- * Extraer la mutationFn a un hook personalizado cuando se necesite
- * reutilizar este registro en otras pantallas.
+ * Este componente es responsable únicamente de:
+ * - mantener el estado visual del formulario
+ * - renderizar la interfaz
+ * - llamar al hook
  */
 
-import { useState, type ChangeEvent }  from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { produccionKeys }              from '@/lib/queries'
+import { useState, type ChangeEvent }                    from 'react'
+import { useRegistrarProduccion, type BodyProduccion }   from '@/hooks/useRegistrarProduccion'
 
 // ─────────────────────────────────────────────────────────────
 // Tipos internos
@@ -32,19 +26,6 @@ interface CamposForm {
   cantidad_producida: string
   unidad:             string
   notas:              string
-}
-
-interface BodyProduccion {
-  lote_id:            string
-  receta_id:          string | null
-  cantidad_producida: number
-  unidad:             string
-  notas:              string | null
-}
-
-interface RespuestaAPI {
-  data:  unknown | null
-  error: string | null
 }
 
 const ESTADO_INICIAL: CamposForm = {
@@ -76,59 +57,10 @@ interface Props {
 // ─────────────────────────────────────────────────────────────
 
 export default function RegistrarProduccionForm({ loteId }: Props) {
-  const queryClient = useQueryClient()
   const [campos, setCampos] = useState<CamposForm>(ESTADO_INICIAL)
 
-  const mutacion = useMutation<RespuestaAPI, Error, BodyProduccion>({
-    mutationFn: async (body: BodyProduccion): Promise<RespuestaAPI> => {
-      const response = await fetch('/api/produccion', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
-      })
-
-      // Parseo defensivo: nunca lanzar por intentar parsear JSON.
-      // Soporta: JSON válido, respuesta vacía, HTML, texto plano,
-      // cualquier Content-Type inesperado.
-      let json: RespuestaAPI = { data: null, error: null }
-      try {
-        const texto = await response.text()
-        if (texto.trim() !== '') {
-          const parseado: unknown = JSON.parse(texto)
-          if (
-            typeof parseado === 'object' &&
-            parseado !== null &&
-            'error' in parseado
-          ) {
-            json = parseado as RespuestaAPI
-          }
-        }
-      } catch {
-        // El cuerpo no era JSON válido — json permanece con valores por defecto.
-        // La validación de response.ok a continuación producirá el error correcto.
-      }
-
-      if (!response.ok || json.error !== null) {
-        throw new Error(
-          typeof json.error === 'string' && json.error.trim() !== ''
-            ? json.error
-            : `Error ${response.status} — intenta nuevamente.`
-        )
-      }
-
-      return json
-    },
-
-    onSuccess: () => {
-      // Invalidar queries de producción para refrescar la UI
-      void queryClient.invalidateQueries({ queryKey: produccionKeys.lotes() })
-      // Prefijo común a todos los registros — invalida cualquier combinación de filtros.
-      // React Query v5 hace matching por prefijo: ['produccion', 'registros'] cubre
-      // produccionKeys.registros({ lote_id: ... }) y produccionKeys.registro(id).
-      void queryClient.invalidateQueries({ queryKey: ['produccion', 'registros'] })
-      // Resetear formulario tras éxito
-      setCampos(ESTADO_INICIAL)
-    },
+  const mutacion = useRegistrarProduccion({
+    onSuccess: () => setCampos(ESTADO_INICIAL),
   })
 
   const handleChange = (
@@ -142,7 +74,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
   }
 
   const handleSubmit = () => {
-    mutacion.mutate({
+    const body: BodyProduccion = {
       lote_id:            loteId,
       receta_id:          campos.receta_id.trim() !== ''
                             ? campos.receta_id.trim()
@@ -152,7 +84,8 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
       notas:              campos.notas.trim() !== ''
                             ? campos.notas.trim()
                             : null,
-    })
+    }
+    mutacion.registrar(body)
   }
 
   const esValido =
