@@ -5,24 +5,15 @@
  *
  * Vista de detalle de un lote de producción.
  *
- * Tipos verificados:
- * - ProduccionLote: id, fecha, turno, estado, items_producidos,
- *   costo_total_lote?, responsable?, notas? — todos confirmados.
- * - ProduccionRegistro: id, cantidad_producida, unidad, costo_real?,
- *   costo_produccion?, porciones_reales?, receta?.nombre,
- *   producto?.nombre — todos opcionales correctamente manejados.
- *
- * Riesgos corregidos:
- * - data de useQuery desestructurada puede ser undefined.
- *   Se usa guard `lote &&` antes de acceder a sus propiedades.
- * - costo_total_lote, costo_real, costo_produccion son opcionales.
- *   Se usan guards explícitos antes de mostrar.
+ * Responsabilidad exclusiva: presentación.
+ * La orquestación de queries está encapsulada en:
+ * src/hooks/useLoteDetalle.ts
  */
 
-import Link                                           from 'next/link'
-import { ChevronLeft, Package, ClipboardList }        from 'lucide-react'
-import { useLoteProduccion, useRegistrosProduccion }  from '@/hooks/useDominio'
-import RegistrarProduccionForm                        from '@/components/produccion/RegistrarProduccionForm'
+import Link                    from 'next/link'
+import { ChevronLeft, Package, ClipboardList } from 'lucide-react'
+import { useLoteDetalle }      from '@/hooks/useLoteDetalle'
+import RegistrarProduccionForm from '@/components/produccion/RegistrarProduccionForm'
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -59,22 +50,7 @@ interface Props {
 // ─────────────────────────────────────────────────────────────
 
 export default function LoteDetalleCliente({ loteId }: Props) {
-  const {
-    isPending:  lotePending,
-    isError:    loteError,
-    isSuccess:  loteSuccess,
-    data:       lote,
-  } = useLoteProduccion(loteId)
-
-  const {
-    isPending:  registrosPending,
-    isError:    registrosError,
-    isSuccess:  registrosSuccess,
-    data:       registros,
-  } = useRegistrosProduccion({ lote_id: loteId })
-
-  // registros puede ser undefined — base segura
-  const listaRegistros = registros ?? []
+  const { lote, registros } = useLoteDetalle(loteId)
 
   return (
     <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
@@ -90,7 +66,7 @@ export default function LoteDetalleCliente({ loteId }: Props) {
       </Link>
 
       {/* ── Estado: cargando lote ────────────────────────── */}
-      {lotePending && (
+      {lote.isPending && (
         <section className="space-y-4">
           <div className="space-y-2">
             <div className="h-5 rounded-full bg-fondo-hover animate-pulse w-1/3" />
@@ -111,7 +87,7 @@ export default function LoteDetalleCliente({ loteId }: Props) {
       )}
 
       {/* ── Estado: error lote ───────────────────────────── */}
-      {loteError && (
+      {lote.isError && (
         <section className="rounded-xl bg-info-suave border border-info-borde px-4 py-4">
           <p className="text-xs font-sans font-medium text-info-texto">
             No se pudo cargar el lote de producción.
@@ -123,18 +99,17 @@ export default function LoteDetalleCliente({ loteId }: Props) {
       )}
 
       {/* ── Detalle del lote ─────────────────────────────── */}
-      {/* Guard explícito `lote &&`: data puede ser undefined aunque isSuccess=true al desestructurar */}
-      {loteSuccess && lote && (
+      {lote.isSuccess && lote.data && (
         <>
           {/* Encabezado */}
           <section>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h1 className="text-xl font-display font-bold text-texto-primario leading-tight">
-                  Turno {ETIQUETAS_TURNO[lote.turno] ?? lote.turno}
+                  Turno {ETIQUETAS_TURNO[lote.data.turno] ?? lote.data.turno}
                 </h1>
                 <p className="text-xs font-sans text-texto-apagado mt-0.5">
-                  {new Date(lote.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
+                  {new Date(lote.data.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
                     weekday: 'long',
                     day:     'numeric',
                     month:   'long',
@@ -144,9 +119,9 @@ export default function LoteDetalleCliente({ loteId }: Props) {
               <span
                 className={`px-2.5 py-1 rounded-full text-2xs font-sans font-medium
                             flex-shrink-0 mt-1
-                            ${CLASES_ESTADO[lote.estado] ?? 'bg-fondo-hover text-texto-apagado'}`}
+                            ${CLASES_ESTADO[lote.data.estado] ?? 'bg-fondo-hover text-texto-apagado'}`}
               >
-                {ETIQUETAS_ESTADO[lote.estado] ?? lote.estado}
+                {ETIQUETAS_ESTADO[lote.data.estado] ?? lote.data.estado}
               </span>
             </div>
           </section>
@@ -158,7 +133,7 @@ export default function LoteDetalleCliente({ loteId }: Props) {
                 Ítems producidos
               </p>
               <p className="text-2xl font-display font-bold text-texto-primario">
-                {lote.items_producidos}
+                {lote.data.items_producidos}
               </p>
             </div>
 
@@ -167,8 +142,8 @@ export default function LoteDetalleCliente({ loteId }: Props) {
                 Costo total
               </p>
               <p className="text-2xl font-display font-bold text-texto-primario">
-                {lote.costo_total_lote !== undefined && lote.costo_total_lote !== null
-                  ? `$${lote.costo_total_lote.toLocaleString('es-CL')}`
+                {lote.data.costo_total_lote !== undefined && lote.data.costo_total_lote !== null
+                  ? `$${lote.data.costo_total_lote.toLocaleString('es-CL')}`
                   : '—'
                 }
               </p>
@@ -176,21 +151,21 @@ export default function LoteDetalleCliente({ loteId }: Props) {
           </section>
 
           {/* Responsable y notas */}
-          {(lote.responsable?.nombre ?? lote.notas) && (
+          {(lote.data.responsable?.nombre ?? lote.data.notas) && (
             <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-3 space-y-2">
-              {lote.responsable?.nombre && (
+              {lote.data.responsable?.nombre && (
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-sans text-texto-apagado">Responsable</p>
                   <p className="text-xs font-sans font-medium text-texto-secundario">
-                    {lote.responsable.nombre}
+                    {lote.data.responsable.nombre}
                   </p>
                 </div>
               )}
-              {lote.notas && (
+              {lote.data.notas && (
                 <div>
                   <p className="text-2xs font-sans text-texto-apagado mb-0.5">Notas</p>
                   <p className="text-xs font-sans text-texto-secundario leading-relaxed">
-                    {lote.notas}
+                    {lote.data.notas}
                   </p>
                 </div>
               )}
@@ -198,7 +173,7 @@ export default function LoteDetalleCliente({ loteId }: Props) {
           )}
 
           {/* Formulario de registro — solo si lote en progreso */}
-          {lote.estado === 'en_progreso' && (
+          {lote.data.estado === 'en_progreso' && (
             <section className="rounded-xl bg-fondo-elevado border border-fondo-borde overflow-hidden">
               <div className="px-4 py-3 border-b border-fondo-borde flex items-center gap-2">
                 <Package size={14} className="text-texto-apagado" />
@@ -226,7 +201,7 @@ export default function LoteDetalleCliente({ loteId }: Props) {
         <div className="px-4 py-3">
 
           {/* Cargando */}
-          {registrosPending && (
+          {registros.isPending && (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="flex justify-between gap-3">
@@ -241,30 +216,28 @@ export default function LoteDetalleCliente({ loteId }: Props) {
           )}
 
           {/* Error */}
-          {registrosError && (
+          {registros.isError && (
             <p className="text-xs font-sans text-texto-apagado py-2">
               No se pudieron cargar los registros de este lote.
             </p>
           )}
 
           {/* Sin registros */}
-          {registrosSuccess && listaRegistros.length === 0 && (
+          {registros.isSuccess && registros.data.length === 0 && (
             <p className="text-xs font-sans text-texto-apagado text-center py-4">
               Sin registros en este turno todavía.
             </p>
           )}
 
           {/* Lista de registros */}
-          {registrosSuccess && listaRegistros.length > 0 && (
+          {registros.isSuccess && registros.data.length > 0 && (
             <div className="space-y-3">
-              {listaRegistros.map((registro) => {
-                // Nombre: preferir receta, luego producto, luego fallback
+              {registros.data.map((registro) => {
                 const nombre =
                   registro.receta?.nombre ??
                   registro.producto?.nombre ??
                   'Sin nombre'
 
-                // Costo: preferir costo_real, luego costo_produccion
                 const costo = registro.costo_real ?? registro.costo_produccion
 
                 return (
