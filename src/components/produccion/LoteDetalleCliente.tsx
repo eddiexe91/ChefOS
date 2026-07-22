@@ -6,14 +6,20 @@
  * Vista de detalle de un lote de producción.
  *
  * Responsabilidad exclusiva: presentación.
- * La orquestación de queries está encapsulada en:
- * src/hooks/useLoteDetalle.ts
+ *
+ * Lógica de orquestación de queries:
+ *   src/hooks/useLoteDetalle.ts
+ *
+ * Lógica de transformación de datos de dominio:
+ *   src/lib/produccion.ts → prepararRegistros()
  */
 
-import Link                    from 'next/link'
+import { useMemo }                             from 'react'
+import Link                                    from 'next/link'
 import { ChevronLeft, Package, ClipboardList } from 'lucide-react'
-import { useLoteDetalle }      from '@/hooks/useLoteDetalle'
-import RegistrarProduccionForm from '@/components/produccion/RegistrarProduccionForm'
+import { useLoteDetalle }                      from '@/hooks/useLoteDetalle'
+import { prepararRegistros }                   from '@/lib/produccion'
+import RegistrarProduccionForm                 from '@/components/produccion/RegistrarProduccionForm'
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -51,6 +57,11 @@ interface Props {
 
 export default function LoteDetalleCliente({ loteId }: Props) {
   const { lote, registros } = useLoteDetalle(loteId)
+
+  const registrosPreparados = useMemo(
+    () => prepararRegistros(registros.data),
+    [registros.data]
+  )
 
   return (
     <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
@@ -223,55 +234,45 @@ export default function LoteDetalleCliente({ loteId }: Props) {
           )}
 
           {/* Sin registros */}
-          {registros.isSuccess && registros.data.length === 0 && (
+          {registros.isSuccess && registrosPreparados.length === 0 && (
             <p className="text-xs font-sans text-texto-apagado text-center py-4">
               Sin registros en este turno todavía.
             </p>
           )}
 
           {/* Lista de registros */}
-          {registros.isSuccess && registros.data.length > 0 && (
+          {registros.isSuccess && registrosPreparados.length > 0 && (
             <div className="space-y-3">
-              {registros.data.map((registro) => {
-                const nombre =
-                  registro.receta?.nombre ??
-                  registro.producto?.nombre ??
-                  'Sin nombre'
-
-                const costo = registro.costo_real ?? registro.costo_produccion
-
-                return (
-                  <div
-                    key={registro.id}
-                    className="flex items-start justify-between gap-3 py-2.5
-                               border-b border-fondo-borde last:border-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-sans font-medium text-texto-primario truncate">
-                        {nombre}
-                      </p>
-                      <p className="text-2xs font-sans text-texto-apagado mt-0.5">
-                        {registro.cantidad_producida} {registro.unidad}
-                        {registro.porciones_reales !== undefined &&
-                         registro.porciones_reales !== null && (
-                          <> · {registro.porciones_reales} porción{registro.porciones_reales !== 1 ? 'es' : ''}</>
-                        )}
-                      </p>
-                      {registro.responsable?.nombre && (
-                        <p className="text-2xs font-sans text-texto-apagado mt-0.5">
-                          {registro.responsable.nombre}
-                        </p>
+              {registrosPreparados.map((registro) => (
+                <div
+                  key={registro.id}
+                  className="flex items-start justify-between gap-3 py-2.5
+                             border-b border-fondo-borde last:border-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-sans font-medium text-texto-primario truncate">
+                      {registro.nombre}
+                    </p>
+                    <p className="text-2xs font-sans text-texto-apagado mt-0.5">
+                      {registro.cantidad} {registro.unidad}
+                      {registro.porciones !== null && (
+                        <> · {registro.porciones} porción{registro.porciones !== 1 ? 'es' : ''}</>
                       )}
-                    </div>
-
-                    {costo !== undefined && costo !== null && (
-                      <p className="text-xs font-sans font-medium text-texto-secundario flex-shrink-0">
-                        ${costo.toLocaleString('es-CL')}
+                    </p>
+                    {registro.responsable !== null && (
+                      <p className="text-2xs font-sans text-texto-apagado mt-0.5">
+                        {registro.responsable}
                       </p>
                     )}
                   </div>
-                )
-              })}
+
+                  {registro.costo !== undefined && registro.costo !== null && (
+                    <p className="text-xs font-sans font-medium text-texto-secundario flex-shrink-0">
+                      ${registro.costo.toLocaleString('es-CL')}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
