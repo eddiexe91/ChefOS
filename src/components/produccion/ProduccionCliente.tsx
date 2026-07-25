@@ -5,47 +5,26 @@
  *
  * Lista de lotes de producción con filtros en cliente.
  *
- * Tipos verificados:
- * - ProduccionLote: id, fecha, turno, estado, items_producidos,
- *   costo_total_lote?, responsable?, creado_en — confirmados.
- * - TurnoServicio: 'mañana' | 'tarde' | 'noche' — usado en Record.
- * - Estado de lote: 'en_progreso' | 'completado' | 'cancelado' — usado en Record.
+ * Dominio puro:       src/lib/produccion.ts
+ * Presentación:       src/lib/produccionUI.ts
  */
 
-import { useState, useMemo }                from 'react'
-import Link                                 from 'next/link'
-import { ChevronRight, X }                  from 'lucide-react'
-import { useLotesProduccion }               from '@/hooks/useDominio'
-import { useApp }                           from '@/providers/AppProvider'
+import { useState, useMemo }   from 'react'
+import Link                    from 'next/link'
+import { ChevronRight, X }     from 'lucide-react'
+import { useLotesProduccion }  from '@/hooks/useDominio'
+import { useApp }              from '@/providers/AppProvider'
+import { parsearFechaLocal }   from '@/lib/produccion'
+import { ETIQUETAS_TURNO, ETIQUETAS_ESTADO, CLASES_ESTADO } from '@/lib/produccionUI'
 import type { ProduccionLote, TurnoServicio } from '@/types/index'
 
 // ─────────────────────────────────────────────────────────────
-// Tipo auxiliar para estado de lote
+// Tipos de filtro
 // ─────────────────────────────────────────────────────────────
 
-type EstadoLote = 'en_progreso' | 'completado' | 'cancelado'
-
-// ─────────────────────────────────────────────────────────────
-// Constantes tipadas con tipos reales del dominio
-// ─────────────────────────────────────────────────────────────
-
-const ETIQUETAS_TURNO: Record<TurnoServicio, string> = {
-  mañana: 'Mañana',
-  tarde:  'Tarde',
-  noche:  'Noche',
-}
-
-const ETIQUETAS_ESTADO: Record<EstadoLote, string> = {
-  en_progreso: 'En progreso',
-  completado:  'Completado',
-  cancelado:   'Cancelado',
-}
-
-const CLASES_ESTADO: Record<EstadoLote, string> = {
-  en_progreso: 'bg-advertencia-suave text-advertencia-texto',
-  completado:  'bg-exito-suave text-exito-texto',
-  cancelado:   'bg-fondo-hover text-texto-apagado',
-}
+type EstadoLote   = ProduccionLote['estado']
+type FiltroTurno  = 'todos' | TurnoServicio
+type FiltroEstado = 'todos' | EstadoLote
 
 // ─────────────────────────────────────────────────────────────
 // Subcomponente: skeletons
@@ -77,14 +56,12 @@ function SkeletonLotes() {
 // ─────────────────────────────────────────────────────────────
 
 function TarjetaLote({ lote }: { lote: ProduccionLote }) {
-  const fechaFormateada = new Date(lote.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
+  const fechaFormateada = parsearFechaLocal(lote.fecha).toLocaleDateString('es-CL', {
     weekday: 'short',
     day:     'numeric',
     month:   'short',
   })
 
-  // Acceso seguro a ETIQUETAS y CLASES: lote.estado y lote.turno
-  // son los tipos exactos de EstadoLote y TurnoServicio — sin fallback necesario.
   const etiquetaTurno  = ETIQUETAS_TURNO[lote.turno]
   const etiquetaEstado = ETIQUETAS_ESTADO[lote.estado]
   const clasesEstado   = CLASES_ESTADO[lote.estado]
@@ -127,13 +104,6 @@ function TarjetaLote({ lote }: { lote: ProduccionLote }) {
     </Link>
   )
 }
-
-// ─────────────────────────────────────────────────────────────
-// Tipos de filtro
-// ─────────────────────────────────────────────────────────────
-
-type FiltroTurno  = 'todos' | TurnoServicio
-type FiltroEstado = 'todos' | EstadoLote
 
 // ─────────────────────────────────────────────────────────────
 // Componente principal
@@ -329,4 +299,4 @@ export default function ProduccionCliente() {
 
     </div>
   )
-          }
+}
