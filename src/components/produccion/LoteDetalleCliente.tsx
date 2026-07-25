@@ -7,41 +7,18 @@
  *
  * Responsabilidad exclusiva: presentación.
  *
- * Lógica de orquestación de queries:
- *   src/hooks/useLoteDetalle.ts
- *
- * Lógica de transformación de datos de dominio:
- *   src/lib/produccion.ts → prepararRegistros()
+ * Orquestación de queries:    src/hooks/useLoteDetalle.ts
+ * Transformación de dominio:  src/lib/produccion.ts
+ * Constantes de presentación: src/lib/produccionUI.ts
  */
 
 import { useMemo }                             from 'react'
 import Link                                    from 'next/link'
 import { ChevronLeft, Package, ClipboardList } from 'lucide-react'
 import { useLoteDetalle }                      from '@/hooks/useLoteDetalle'
-import { prepararRegistros }                   from '@/lib/produccion'
+import { prepararRegistros, parsearFechaLocal } from '@/lib/produccion'
+import { ETIQUETAS_TURNO, ETIQUETAS_ESTADO, CLASES_ESTADO } from '@/lib/produccionUI'
 import RegistrarProduccionForm                 from '@/components/produccion/RegistrarProduccionForm'
-
-// ─────────────────────────────────────────────────────────────
-// Constantes
-// ─────────────────────────────────────────────────────────────
-
-const ETIQUETAS_TURNO: Record<string, string> = {
-  mañana: 'Mañana',
-  tarde:  'Tarde',
-  noche:  'Noche',
-}
-
-const ETIQUETAS_ESTADO: Record<string, string> = {
-  en_progreso: 'En progreso',
-  completado:  'Completado',
-  cancelado:   'Cancelado',
-}
-
-const CLASES_ESTADO: Record<string, string> = {
-  en_progreso: 'bg-advertencia-suave text-advertencia-texto',
-  completado:  'bg-exito-suave text-exito-texto',
-  cancelado:   'bg-fondo-hover text-texto-apagado',
-}
 
 // ─────────────────────────────────────────────────────────────
 // Props
@@ -117,10 +94,10 @@ export default function LoteDetalleCliente({ loteId }: Props) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h1 className="text-xl font-display font-bold text-texto-primario leading-tight">
-                  Turno {ETIQUETAS_TURNO[lote.data.turno] ?? lote.data.turno}
+                  Turno {ETIQUETAS_TURNO[lote.data.turno]}
                 </h1>
                 <p className="text-xs font-sans text-texto-apagado mt-0.5">
-                  {new Date(lote.data.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
+                  {parsearFechaLocal(lote.data.fecha).toLocaleDateString('es-CL', {
                     weekday: 'long',
                     day:     'numeric',
                     month:   'long',
@@ -130,9 +107,9 @@ export default function LoteDetalleCliente({ loteId }: Props) {
               <span
                 className={`px-2.5 py-1 rounded-full text-2xs font-sans font-medium
                             flex-shrink-0 mt-1
-                            ${CLASES_ESTADO[lote.data.estado] ?? 'bg-fondo-hover text-texto-apagado'}`}
+                            ${CLASES_ESTADO[lote.data.estado]}`}
               >
-                {ETIQUETAS_ESTADO[lote.data.estado] ?? lote.data.estado}
+                {ETIQUETAS_ESTADO[lote.data.estado]}
               </span>
             </div>
           </section>
