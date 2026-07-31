@@ -610,6 +610,13 @@ export interface FormNuevaMerma {
   notas?: string
 }
 
+export interface FormAjusteInventario {
+  producto_id: string
+  cantidad_fisica: number
+  unidad_medida: UnidadEntrada
+  motivo?: string
+}
+
 export interface FormNuevaCompra {
   proveedor_id?: string
   fecha_compra: string
@@ -693,4 +700,5 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
 
 export function tienePermiso(rol: RolUsuario, permiso: Permiso): boolean {
   return PERMISOS_POR_ROL[rol]?.includes(permiso) ?? false
-                                    }
+  }
+  
