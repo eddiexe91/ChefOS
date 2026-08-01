@@ -18,11 +18,18 @@
  * src/components/mermas/MermaFormCliente.tsx, sin pasos (el ROADMAP no
  * documenta un wizard para el ajuste de inventario).
  *
+ * Prop opcional productoId — mismo patrón que
+ * RegistrarProduccionForm({ loteId }): cuando se provee, el componente se usa
+ * embebido en una vista de detalle de producto ya determinado (oculta el
+ * selector, no depende de useProductos() para validar, usa productoId
+ * directamente como producto_id del body). Cuando no se provee, conserva el
+ * comportamiento standalone original sin cambios.
+ *
  * Nota: el tipo FormAjusteInventario (src/types/index.ts) se importa con
  * alias porque coincide con el nombre de este archivo/componente.
  */
 
-import { useState, type ChangeEvent }                        from 'react'
+import { useState, useEffect, type ChangeEvent }              from 'react'
 import { useAjustarInventario }                               from '@/hooks/useAjustarInventario'
 import { useProductos }                                       from '@/hooks/useDominio'
 import type { FormAjusteInventario as CuerpoAjusteInventario, UnidadEntrada } from '@/types/index'
@@ -52,11 +59,30 @@ const UNIDADES_AJUSTE: readonly UnidadEntrada[] = [
 ]
 
 // ─────────────────────────────────────────────────────────────
+// Props
+// ─────────────────────────────────────────────────────────────
+
+interface Props {
+  productoId?: string
+}
+
+// ─────────────────────────────────────────────────────────────
 // Componente
 // ─────────────────────────────────────────────────────────────
 
-export default function FormAjusteInventario() {
-  const [campos, setCampos] = useState<CamposForm>(ESTADO_INICIAL)
+export default function FormAjusteInventario({ productoId }: Props = {}) {
+  const estadoInicialConProducto: CamposForm = {
+    ...ESTADO_INICIAL,
+    producto_id: productoId ?? '',
+  }
+
+  const [campos, setCampos] = useState<CamposForm>(estadoInicialConProducto)
+
+  useEffect(() => {
+    if (productoId !== undefined) {
+      setCampos((prev) => ({ ...prev, producto_id: productoId }))
+    }
+  }, [productoId])
 
   const {
     data:      productos,
@@ -66,7 +92,10 @@ export default function FormAjusteInventario() {
 
   const mutacion = useAjustarInventario({
     onSuccess: () => {
-      setCampos(ESTADO_INICIAL)
+      setCampos({
+        ...ESTADO_INICIAL,
+        producto_id: productoId ?? '',
+      })
     },
   })
 
@@ -82,10 +111,12 @@ export default function FormAjusteInventario() {
 
   const cantidadNumerica = Number(campos.cantidad_fisica)
 
+  const productoValido = productoId
+    ? true
+    : campos.producto_id !== '' && !cargandoProductos && !errorProductos
+
   const esValido =
-    campos.producto_id !== '' &&
-    !cargandoProductos &&
-    !errorProductos &&
+    productoValido &&
     campos.cantidad_fisica !== '' &&
     !Number.isNaN(cantidadNumerica) &&
     cantidadNumerica >= 0 &&
@@ -99,7 +130,7 @@ export default function FormAjusteInventario() {
     }
 
     const body: CuerpoAjusteInventario = {
-      producto_id:     campos.producto_id,
+      producto_id:     productoId ?? campos.producto_id,
       cantidad_fisica: cantidadNumerica,
       unidad_medida:   campos.unidad_medida as UnidadEntrada,
       ...(campos.motivo.trim() !== '' ? { motivo: campos.motivo.trim() } : {}),
@@ -110,55 +141,57 @@ export default function FormAjusteInventario() {
   return (
     <div className="space-y-4">
 
-      {/* ── Producto ──────────────────────────────────────── */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor="producto_id"
-          className="text-xs font-sans font-medium text-texto-secundario"
-        >
-          Producto <span className="text-peligro">*</span>
-        </label>
-
-        {cargandoProductos && (
-          <p className="text-xs font-sans text-texto-apagado">
-            Cargando productos...
-          </p>
-        )}
-
-        {errorProductos && (
-          <div className="rounded-xl bg-info-suave border border-info-borde px-4 py-4">
-            <p className="text-xs font-sans font-medium text-info-texto">
-              No se pudieron cargar los productos
-            </p>
-            <p className="text-2xs font-sans text-info-texto/70 mt-1 leading-relaxed">
-              Verifica tu conexión e intenta nuevamente.
-            </p>
-          </div>
-        )}
-
-        {!cargandoProductos && !errorProductos && (
-          <select
-            id="producto_id"
-            name="producto_id"
-            value={campos.producto_id}
-            onChange={handleChange}
-            disabled={enviando}
-            className="w-full rounded-lg bg-fondo-base border border-fondo-borde
-                       px-3 py-2.5 text-sm font-sans text-texto-primario
-                       focus:outline-none focus:border-acento transition-colors
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+      {/* ── Producto (oculto cuando productoId ya viene dado) ── */}
+      {!productoId && (
+        <div className="space-y-1.5">
+          <label
+            htmlFor="producto_id"
+            className="text-xs font-sans font-medium text-texto-secundario"
           >
-            <option value="">
-              Seleccionar producto...
-            </option>
-            {(productos ?? []).map((producto) => (
-              <option key={producto.id} value={producto.id}>
-                {producto.nombre}
+            Producto <span className="text-peligro">*</span>
+          </label>
+
+          {cargandoProductos && (
+            <p className="text-xs font-sans text-texto-apagado">
+              Cargando productos...
+            </p>
+          )}
+
+          {errorProductos && (
+            <div className="rounded-xl bg-info-suave border border-info-borde px-4 py-4">
+              <p className="text-xs font-sans font-medium text-info-texto">
+                No se pudieron cargar los productos
+              </p>
+              <p className="text-2xs font-sans text-info-texto/70 mt-1 leading-relaxed">
+                Verifica tu conexión e intenta nuevamente.
+              </p>
+            </div>
+          )}
+
+          {!cargandoProductos && !errorProductos && (
+            <select
+              id="producto_id"
+              name="producto_id"
+              value={campos.producto_id}
+              onChange={handleChange}
+              disabled={enviando}
+              className="w-full rounded-lg bg-fondo-base border border-fondo-borde
+                         px-3 py-2.5 text-sm font-sans text-texto-primario
+                         focus:outline-none focus:border-acento transition-colors
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                Seleccionar producto...
               </option>
-            ))}
-          </select>
-        )}
-      </div>
+              {(productos ?? []).map((producto) => (
+                <option key={producto.id} value={producto.id}>
+                  {producto.nombre}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       {/* ── Cantidad física ──────────────────────────────── */}
       <div className="space-y-1.5">
