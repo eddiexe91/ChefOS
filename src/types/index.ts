@@ -266,7 +266,7 @@ export interface MovimientoInventario {
   registrado_por?: string
   creado_en: string
   producto?: Producto
-  registrado_por_usuario?: Usuario
+  registrado_por_usuario?: Pick<Usuario, 'id' | 'nombre'>
 }
 
 export interface Receta {
