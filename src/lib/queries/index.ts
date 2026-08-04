@@ -35,6 +35,7 @@ import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
 import type {
   Receta,
   Producto,
+  MovimientoInventario,
   AlertaSistema,
   Merma,
   Compra,
@@ -565,6 +566,36 @@ export async function fetchProductoPorId(
 
   return data as Producto
   }
+
+/**
+ * Retorna el historial de movimientos de inventario de un producto.
+ *
+ * Relaciones cargadas: producto, registrado_por_usuario.
+ * Filtro obligatorio: producto_id.
+ * Ordenación: creado_en DESC.
+ */
+export async function fetchMovimientos(
+  client: ClienteSupabase,
+  producto_id: string
+): Promise<MovimientoInventario[]> {
+  const { data, error } = await client
+    .from('inventario_movimientos')
+    .select(`
+      *,
+      producto:productos(id, nombre, unidad_medida, costo_unitario_actual, activo),
+      registrado_por_usuario:usuarios(id, nombre)
+    `)
+    .eq('producto_id', producto_id)
+    .order('creado_en', { ascending: false })
+
+  if (error) {
+    throw new Error(
+      `[ChefOS/inventario] Error al cargar movimientos del producto "${producto_id}": ${error.message}`
+    )
+  }
+
+  return (data ?? []) as MovimientoInventario[]
+}
 
 // ─────────────────────────────────────────────────────────────
 // Producción — IMPLEMENTADO (Fase 3.2 — Iteración 3)
