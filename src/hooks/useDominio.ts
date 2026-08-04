@@ -38,6 +38,7 @@ import {
   fetchRecetaPorId,
   fetchProductos,
   fetchProductoPorId,
+  fetchMovimientos,
   fetchLotesProduccion,
   fetchLoteProduccionPorId,
   fetchRegistrosProduccion,
@@ -107,6 +108,14 @@ export function useProducto(id: string) {
     queryKey: inventarioKeys.producto(id),
     queryFn: () => fetchProductoPorId(obtenerClienteNavegador(), id),
     enabled: Boolean(id),
+  })
+}
+
+export function useMovimientosInventario(producto_id: string) {
+  return useQuery({
+    queryKey: inventarioKeys.movimientos(producto_id),
+    queryFn: () => fetchMovimientos(obtenerClienteNavegador(), producto_id),
+    enabled: Boolean(producto_id),
   })
 }
 
