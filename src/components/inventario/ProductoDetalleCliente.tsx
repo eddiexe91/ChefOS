@@ -7,18 +7,22 @@
  *
  * Responsabilidad exclusiva: presentación.
  *
- * Orquestación de queries: useProducto() (src/hooks/useDominio.ts) — consulta
- * única. A diferencia de LoteDetalleCliente.tsx (que orquesta dos queries vía
- * useLoteDetalle.ts), aquí no existe un hook combinador dedicado porque no hay
- * una segunda fuente de datos implementada todavía: no existe fetchMovimientos()
- * en src/lib/queries/index.ts ni un hook de historial en useDominio.ts. La
- * sección de historial de movimientos queda fuera de esta iteración.
+ * Orquestación de queries: useProducto() + useMovimientosInventario()
+ * (src/hooks/useDominio.ts) — dos queries independientes, sin hook
+ * combinador dedicado (a diferencia de useLoteDetalle.ts), ya que no hay
+ * necesidad de derivar datos entre ambas fuentes.
+ *
+ * Decisión documentada: la sección de historial se ubica DESPUÉS de la
+ * sección de ajuste. No existe un precedente verificable en
+ * LoteDetalleCliente.tsx para este orden específico (no se tuvo acceso a
+ * la sección que renderiza `registros` en ese archivo) — es una inferencia
+ * estructural, no una réplica confirmada.
  */
 
-import Link                    from 'next/link'
-import { ChevronLeft, Package } from 'lucide-react'
-import { useProducto }          from '@/hooks/useDominio'
-import FormAjusteInventario     from '@/components/inventario/FormAjusteInventario'
+import Link                        from 'next/link'
+import { ChevronLeft, Package, ClipboardList } from 'lucide-react'
+import { useProducto, useMovimientosInventario } from '@/hooks/useDominio'
+import FormAjusteInventario         from '@/components/inventario/FormAjusteInventario'
 
 // ─────────────────────────────────────────────────────────────
 // Props
@@ -34,6 +38,7 @@ interface Props {
 
 export default function ProductoDetalleCliente({ productoId }: Props) {
   const producto = useProducto(productoId)
+  const movimientos = useMovimientosInventario(productoId)
 
   return (
     <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
@@ -144,6 +149,64 @@ export default function ProductoDetalleCliente({ productoId }: Props) {
               </div>
             </section>
           )}
+
+          {/* Historial de movimientos */}
+          <section className="rounded-xl bg-fondo-elevado border border-fondo-borde overflow-hidden">
+            <div className="px-4 py-3 border-b border-fondo-borde flex items-center gap-2">
+              <ClipboardList size={14} className="text-texto-apagado" />
+              <p className="text-xs font-sans font-medium text-texto-secundario uppercase tracking-wide">
+                Historial de movimientos
+              </p>
+            </div>
+
+            {movimientos.isPending && (
+              <div className="px-4 py-4">
+                <p className="text-xs font-sans text-texto-apagado">
+                  Cargando historial...
+                </p>
+              </div>
+            )}
+
+            {movimientos.isError && (
+              <div className="px-4 py-4">
+                <p className="text-xs font-sans text-texto-apagado">
+                  No se pudo cargar el historial.
+                </p>
+              </div>
+            )}
+
+            {movimientos.isSuccess && movimientos.data.length === 0 && (
+              <div className="px-4 py-4">
+                <p className="text-xs font-sans text-texto-apagado">
+                  Sin movimientos registrados todavía.
+                </p>
+              </div>
+            )}
+
+            {movimientos.isSuccess && movimientos.data.length > 0 && (
+              <div className="divide-y divide-fondo-borde">
+                {movimientos.data.map((movimiento) => (
+                  <div
+                    key={movimiento.id}
+                    className="px-4 py-3 flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <p className="text-xs font-sans font-medium text-texto-primario capitalize">
+                        {movimiento.tipo}
+                      </p>
+                      <p className="text-2xs font-sans text-texto-apagado mt-0.5">
+                        {new Date(movimiento.creado_en).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <p className="text-sm font-sans font-medium text-texto-primario">
+                      {movimiento.cantidad >= 0 ? '+' : ''}
+                      {movimiento.cantidad} {producto.data.unidad_display ?? producto.data.unidad_medida}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </>
       )}
 
