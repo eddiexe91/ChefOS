@@ -136,23 +136,25 @@ export function useRegistrarReceta(opciones?: OpcionesHook) {
         }
       }
 
-      const esValido = esRespuestaAPIValida(parseado)
-
       // HTTP no exitoso: usar el mensaje del servidor solo si es realmente
-      // un string no vacío; nunca confiar en el cast, siempre en el
-      // resultado del type guard.
+      // un string no vacío; nunca confiar en un cast, siempre en el
+      // resultado directo del type guard (necesario para que TypeScript
+      // estreche 'parseado' de 'unknown' a RespuestaAPI).
       if (!response.ok) {
-        const mensaje =
-          esValido && typeof parseado.error === 'string' && parseado.error.trim() !== ''
-            ? parseado.error
-            : `Error ${response.status} — intenta nuevamente.`
-        throw new Error(mensaje)
+        if (esRespuestaAPIValida(parseado)) {
+          const mensaje =
+            typeof parseado.error === 'string' && parseado.error.trim() !== ''
+              ? parseado.error
+              : `Error ${response.status} — intenta nuevamente.`
+          throw new Error(mensaje)
+        }
+        throw new Error(`Error ${response.status} — intenta nuevamente.`)
       }
 
       // HTTP exitoso pero estructura inválida/inesperada (body vacío, JSON
       // malformado, objeto sin 'data'/'error', o 'error' con tipo incorrecto)
       // — nunca se trata como éxito silencioso.
-      if (!esValido) {
+      if (!esRespuestaAPIValida(parseado)) {
         throw new Error('Respuesta inesperada del servidor. Intenta nuevamente.')
       }
 
