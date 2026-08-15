@@ -27,13 +27,6 @@
  * actual en el array al construir el body — nunca se guardan como estado
  * propio de cada fila — para que agregar/eliminar/reordenar nunca pueda
  * dejarlos duplicados o desincronizados.
- *
- * precio_venta, tiempo_preparacion (generales) y duracion_min/temperatura_c
- * (por paso): opcionales, permitidos vacíos. Cuando están informados, se
- * validan con Number.isFinite() (y Number.isInteger() donde route.ts lo
- * exige) antes de habilitar el envío, replicando exactamente el mismo
- * criterio que aplica src/app/api/biblioteca/recetas/route.ts del lado
- * del servidor.
  */
 
 import { useState, type ChangeEvent }  from 'react'
@@ -168,11 +161,11 @@ export default function RecetaForm() {
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     limpiarEstadoMutacion()
-    const { name, value } = e.target
-    if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
-      setCampos((prev) => ({ ...prev, [name]: e.target.checked }))
+    const target = e.target
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+      setCampos((prev) => ({ ...prev, [target.name]: target.checked }))
     } else {
-      setCampos((prev) => ({ ...prev, [name]: value }))
+      setCampos((prev) => ({ ...prev, [target.name]: target.value }))
     }
   }
 
