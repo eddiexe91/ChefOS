@@ -268,7 +268,7 @@ export default function BibliotecaCliente() {
         </section>
       )}
 
-      {isSuccess && recetas.length === 0 && (
+      {isSuccess && recetas.length === 0 && !hayFiltros && (
         <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
           <p className="text-sm font-sans font-medium text-texto-secundario">
             No hay recetas todavía
