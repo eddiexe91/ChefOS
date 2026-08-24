@@ -3,9 +3,15 @@
 /**
  * src/components/biblioteca/BibliotecaCliente.tsx
  *
- * Listado de recetas de la biblioteca culinaria.
- * Incluye búsqueda y filtros en cliente sobre useRecetas(),
- * además de manejo explícito de carga, error, vacío y datos.
+ * Contenedor principal del módulo de Biblioteca culinaria de ChefOS.
+ *
+ * Responsabilidades:
+ * - Consumir useRecetas() para acceder al catálogo de recetas.
+ * - Buscar recetas por nombre.
+ * - Filtrar recetas por categoría.
+ * - Filtrar recetas marcadas "En carta".
+ * - Mostrar estados de carga, error, vacío y resultados.
+ * - Permitir acceder a la creación de nuevas recetas.
  */
 
 import Link from 'next/link'
@@ -88,15 +94,18 @@ export default function BibliotecaCliente() {
   const [soloEnCarta, setSoloEnCarta] = useState(false)
 
   const { isPending, isError, isSuccess, data } = useRecetas()
+
   const recetas: Receta[] = data ?? []
 
   const categorias = useMemo(() => {
     const mapa = new Map<string, string>()
+
     for (const receta of recetas) {
       if (receta.categoria?.id && receta.categoria.nombre) {
         mapa.set(receta.categoria.id, receta.categoria.nombre)
       }
     }
+
     return Array.from(mapa.entries()).map(([id, nombre]) => ({ id, nombre }))
   }, [recetas])
 
@@ -252,22 +261,6 @@ export default function BibliotecaCliente() {
         </section>
       )}
 
-      {isSuccess && recetasFiltradas.length === 0 && hayFiltros && (
-        <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
-          <p className="text-sm font-sans font-medium text-texto-secundario">
-            No se encontraron recetas con estos filtros
-          </p>
-          <button
-            type="button"
-            onClick={limpiarFiltros}
-            className="mt-3 text-xs font-sans font-medium text-acento
-                       active:text-acento/70 transition-colors"
-          >
-            Limpiar filtros
-          </button>
-        </section>
-      )}
-
       {isSuccess && recetas.length === 0 && !hayFiltros && (
         <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
           <p className="text-sm font-sans font-medium text-texto-secundario">
@@ -283,6 +276,22 @@ export default function BibliotecaCliente() {
           >
             + Nueva receta
           </Link>
+        </section>
+      )}
+
+      {isSuccess && recetas.length > 0 && recetasFiltradas.length === 0 && hayFiltros && (
+        <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
+          <p className="text-sm font-sans font-medium text-texto-secundario">
+            No se encontraron recetas con estos filtros
+          </p>
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="mt-3 text-xs font-sans font-medium text-acento
+                       active:text-acento/70 transition-colors"
+          >
+            Limpiar filtros
+          </button>
         </section>
       )}
 
