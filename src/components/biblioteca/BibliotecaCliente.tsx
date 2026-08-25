@@ -1,36 +1,65 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import Link from 'next/link'
-import { useRecetas } from '@/hooks/useDominio'
+/**
+ * src/components/biblioteca/BibliotecaCliente.tsx
+ *
+ * Contenedor principal del módulo de Biblioteca culinaria de ChefOS.
+ *
+ * Responsabilidades:
+ * - Consumir useRecetas() para listar el catálogo de recetas.
+ * - Búsqueda por nombre (client-side).
+ * - Filtro por categoría (derivada dinámicamente de los datos).
+ * - Filtro "En carta" (toggle booleano).
+ * - Tarjeta de receta con nombre, categoría, costo/porción y badges.
+ * - Enlace a /biblioteca/nueva para crear recetas.
+ * - Manejar los cuatro estados de la query: pending, error, vacío, datos.
+ */
+
+import { useState, useMemo }  from 'react'
+import Link                    from 'next/link'
+import { Search, Filter, X }   from 'lucide-react'
+import { useRecetas }          from '@/hooks/useDominio'
+import type { Receta }         from '@/types/index'
+
+// ─────────────────────────────────────────────────────────────
+// Componente
+// ─────────────────────────────────────────────────────────────
 
 export default function BibliotecaCliente() {
+  const [busqueda,        setBusqueda]        = useState('')
+  const [categoriaActiva, setCategoriaActiva] = useState<string>('todas')
+  const [soloEnCarta,     setSoloEnCarta]     = useState(false)
+
   const { isPending, isError, isSuccess, data } = useRecetas()
 
-  const [busqueda, setBusqueda] = useState('')
-  const [categoriaActiva, setCategoriaActiva] = useState<string>('todas')
-  const [soloEnCarta, setSoloEnCarta] = useState(false)
+  const recetas: Receta[] = data ?? []
 
+  // Categorías derivadas dinámicamente de los datos
   const categorias = useMemo(() => {
-    if (!data) return []
-    const nombres = new Set<string>()
-    data.forEach((r) => {
-      if (r.categoria?.nombre) nombres.add(r.categoria.nombre)
+    const mapa = new Map<string, string>()
+    recetas.forEach((r) => {
+      if (r.categoria) {
+        mapa.set(r.categoria.id, r.categoria.nombre)
+      }
     })
-    return Array.from(nombres).sort()
-  }, [data])
+    return Array.from(mapa.entries()).map(([id, nombre]) => ({ id, nombre }))
+  }, [recetas])
 
+  // Filtrado client-side
   const recetasFiltradas = useMemo(() => {
-    if (!data) return []
-    return data.filter((receta) => {
+    return recetas.filter((receta) => {
       if (busqueda && !receta.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false
       if (soloEnCarta && !receta.en_carta) return false
-      if (categoriaActiva !== 'todas' && receta.categoria?.nombre !== categoriaActiva) return false
+      if (categoriaActiva !== 'todas' && receta.categoria_id !== categoriaActiva) return false
       return true
     })
-  }, [data, busqueda, categoriaActiva, soloEnCarta])
+  }, [recetas, busqueda, categoriaActiva, soloEnCarta])
 
   const hayFiltrosActivos = busqueda !== '' || categoriaActiva !== 'todas' || soloEnCarta
+
+  // ─────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────
 
   return (
     <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
@@ -84,13 +113,16 @@ export default function BibliotecaCliente() {
       {isSuccess && (
         <>
           {/* Buscador */}
-          <input
-            type="text"
-            placeholder="Buscar receta…"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full rounded-lg bg-fondo-elevado border border-fondo-borde px-3 py-2 text-sm font-sans text-texto-primario placeholder:text-texto-apagado focus:outline-none focus:border-acento"
-          />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-texto-apagado" />
+            <input
+              type="text"
+              placeholder="Buscar receta…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full rounded-lg bg-fondo-elevado border border-fondo-borde pl-9 pr-3 py-2 text-sm font-sans text-texto-primario placeholder:text-texto-apagado focus:outline-none focus:border-acento"
+            />
+          </div>
 
           {/* Chips de categoría */}
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -117,22 +149,23 @@ export default function BibliotecaCliente() {
                   : 'bg-fondo-elevado text-texto-apagado border-fondo-borde'
               }`}
             >
+              <Filter className="inline-block w-3 h-3 mr-1 -mt-px" />
               En carta
             </button>
 
             {/* Chips: categorías dinámicas */}
             {categorias.map((cat) => (
               <button
-                key={cat}
+                key={cat.id}
                 type="button"
-                onClick={() => setCategoriaActiva(cat)}
+                onClick={() => setCategoriaActiva(cat.id)}
                 className={`shrink-0 rounded-full border px-3 py-1 text-xs font-sans font-medium transition-colors ${
-                  categoriaActiva === cat
+                  categoriaActiva === cat.id
                     ? 'bg-acento text-white border-acento'
                     : 'bg-fondo-elevado text-texto-apagado border-fondo-borde'
                 }`}
               >
-                {cat}
+                {cat.nombre}
               </button>
             ))}
           </div>
@@ -146,14 +179,15 @@ export default function BibliotecaCliente() {
                 setCategoriaActiva('todas')
                 setSoloEnCarta(false)
               }}
-              className="text-xs font-sans text-acento font-medium"
+              className="inline-flex items-center gap-1 text-xs font-sans text-acento font-medium"
             >
+              <X className="w-3 h-3" />
               Limpiar filtros
             </button>
           )}
 
           {/* Estado vacío sin filtros */}
-          {data.length === 0 && (
+          {recetas.length === 0 && (
             <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
               <p className="text-sm font-sans font-medium text-texto-secundario">
                 No hay recetas todavía
@@ -165,7 +199,7 @@ export default function BibliotecaCliente() {
           )}
 
           {/* Estado vacío con filtros */}
-          {data.length > 0 && recetasFiltradas.length === 0 && (
+          {recetas.length > 0 && recetasFiltradas.length === 0 && (
             <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
               <p className="text-sm font-sans font-medium text-texto-secundario">
                 Sin resultados
