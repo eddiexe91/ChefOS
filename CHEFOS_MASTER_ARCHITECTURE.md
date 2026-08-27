@@ -1,7 +1,17 @@
 # CHEFOS — ARQUITECTURA MAESTRA
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
-**Última actualización:** Mayo 2025
+**Última actualización:** Agosto 2026 (sincronización post-auditoría de Biblioteca)
+
+---
+
+## ESTADO DE VERIFICABILIDAD (POST-AUDITORÍA)
+
+- **A) IMPLEMENTADO Y VERIFICADO ESTÁTICAMENTE:** `/biblioteca`, `/biblioteca/nueva`, `BibliotecaCliente`, `RecetaForm`, `useRecetas`, `fetchRecetas`, `useRegistrarReceta`, `POST /api/biblioteca/recetas`.
+- **B) IMPLEMENTADO PERO NO VERIFICADO EN RUNTIME:** ejecución real contra Supabase, alta E2E de recetas, comportamiento real de filtros/búsqueda en navegador.
+- **C) NO IMPLEMENTADO:** `/biblioteca/[id]`, `/biblioteca/[id]/editar`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx`, `/api/biblioteca/recetas/[id]/costo`, `/api/biblioteca/recetas/[id]/escalar`.
+- **D) NO DETERMINABLE CON LA EVIDENCIA ACTUAL:** estado real de migraciones y políticas RLS desplegadas (el repositorio auditado no contiene `supabase/migrations`).
+- **E) PLANIFICADO/FUTURO:** detalle/edición/escalado de recetas y validación runtime integral.
 
 ---
 
@@ -40,7 +50,7 @@ Al abrir ChefOS a las 08:00 AM el chef debe saber: qué producir, qué comprar, 
 ### Backend
 - **Supabase** (PostgreSQL + Auth + Storage + Realtime + Edge Functions)
 - **`@supabase/supabase-js`** v2 + **`@supabase/ssr`** para SSR
-- Row Level Security en **todas** las tablas sin excepción
+- Row Level Security documentado como estrategia objetivo en **todas** las tablas; verificación efectiva en este repositorio: **NO DETERMINABLE CON LA EVIDENCIA ACTUAL**
 
 ### IA
 - **Claude API** (Anthropic) como proveedor primario
@@ -98,7 +108,8 @@ RETURNS UUID AS $$
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 ```
 
-Todas las políticas RLS usan esta función. Un bug en el código **nunca** puede filtrar datos entre restaurantes porque la BD los bloquea.
+Todas las políticas RLS están documentadas para usar esta función.  
+**Estado de verificación en este repositorio:** **NO DETERMINABLE CON LA EVIDENCIA ACTUAL** (no hay migraciones/policies ejecutables en el árbol auditado).
 
 ---
 
@@ -195,8 +206,6 @@ Cuando clasificación es `moderada` o `critica`: trigger genera alerta automáti
 /dashboard             → Chef Briefing — pantalla principal
 /biblioteca            → Lista de recetas
 /biblioteca/nueva      → Crear receta
-/biblioteca/[id]       → Detalle de receta
-/biblioteca/[id]/editar → Editar receta
 /produccion            → Lote activo / abrir lote
 /produccion/[loteId]   → Detalle del lote
 /inventario            → Lista de productos
@@ -211,6 +220,10 @@ Cuando clasificación es `moderada` o `critica`: trigger genera alerta automáti
 /ventas                → Solo admin/dueño
 /ventas/importar       → Importar archivo de ventas
 ```
+
+**No implementado actualmente (C):**
+- `/biblioteca/[id]`
+- `/biblioteca/[id]/editar`
 
 ### Bottom Navigation (5 ítems)
 1. **Inicio** (`/dashboard`) — LayoutDashboard
@@ -349,9 +362,12 @@ Todas las API Routes verifican autenticación con `crearClienteServidor()` y val
 | POST | `/api/produccion/lotes/[id]/cerrar` | Cambiar estado a 'completado' |
 | POST | `/api/mermas` | Registrar merma + movimiento inventario |
 | POST | `/api/inventario/movimientos` | Ajuste manual de stock |
-| POST | `/api/biblioteca/recetas/[id]/costo` | Llama `recalcular_costo_receta()` SQL |
-| POST | `/api/biblioteca/recetas/[id]/escalar` | Llama `escalar_receta()` SQL |
-| GET  | `/api/biblioteca/recetas` | Lista de recetas con filtros |
+| POST | `/api/biblioteca/recetas` | Crear receta completa + ingredientes + pasos + mapa afectados + RPC `recalcular_costo_receta()` |
+
+**Referencias históricas no implementadas en el repo actual (C):**
+- `POST /api/biblioteca/recetas/[id]/costo`
+- `POST /api/biblioteca/recetas/[id]/escalar`
+- `GET /api/biblioteca/recetas` como API Route (la lectura actual de recetas se hace vía `fetchRecetas()` desde cliente).
 
 ---
 
@@ -359,18 +375,13 @@ Todas las API Routes verifican autenticación con `crearClienteServidor()` y val
 
 ```
 CREAR RECETA
-  RecetaForm → Supabase INSERT recetas
-             → Supabase INSERT recetas_ingredientes (con cantidad_gramos)
-             → Supabase INSERT recetas_pasos
-             → fetch POST /api/biblioteca/recetas/[id]/costo
-               → rpc('recalcular_costo_receta')
-               → UPDATE recetas (costo_total, costo_porcion, margen)
-             → INSERT recetas_productos_afectados (mapa de ingredientes)
-
-ESCALAR RECETA
-  EscaladoModal → fetch POST /api/biblioteca/recetas/[id]/escalar
-                → rpc('escalar_receta', { porciones_objetivo })
-                → retorna ingredientes escalados en gramos + display + costo
+  RecetaForm → fetch POST /api/biblioteca/recetas
+             → INSERT recetas
+             → INSERT recetas_ingredientes (con cantidad_gramos)
+             → INSERT recetas_pasos
+             → INSERT recetas_productos_afectados (mapa agregado por producto_id)
+             → rpc('recalcular_costo_receta')
+             → SELECT receta actualizada (respuesta 201)
 
 REGISTRAR PRODUCCIÓN
   ProduccionCliente → fetch POST /api/produccion
@@ -401,6 +412,8 @@ VER ALERTAS
                        → setAlertasNoLeidas([nueva, ...prev])
                        → badge actualizado en HeaderApp y BottomNav
 ```
+
+**Limitación de validación:** flujo implementado y compilable, **no verificado en runtime end-to-end** en esta auditoría.
 
 ---
 
@@ -454,3 +467,5 @@ Las siguientes correcciones se aplicaron durante la auditoría del Sprint 3 y de
 13. **`/dashboard`** — redirect raíz corregido en middleware y callback
 14. **Dependencias eliminadas**: `@radix-ui/*`, `zod`, `react-hook-form`, `tailwind-merge`, `date-fns-tz`
 15. **Migración 005** — corrección del trigger `costo_por_gramo` (usaba stock en lugar de factor de unidad)
+
+16. **`src/components/ui/index.tsx`** — archivo desalineado con el contrato documental anterior de “catálogo UI”; actualmente contiene código de hooks de dominio.
