@@ -5,6 +5,18 @@
 
 ---
 
+## ESTADO DE EVIDENCIA (POST-AUDITORÍA)
+
+Este documento describe el **contrato arquitectónico esperado** de base de datos.
+
+- **Implementado y verificable en código del repo:** validaciones de pertenencia por `restaurante_id` en API `POST /api/biblioteca/recetas` y uso de sesión autenticada Supabase.
+- **No determinable con la evidencia actual:** estado real de migraciones SQL y políticas RLS desplegadas, porque el repositorio auditado **no contiene** carpeta `supabase/migrations`.
+
+Cuando se requiera afirmación de RLS efectivo en entorno real, usar la frase:
+**"NO DETERMINABLE CON LA EVIDENCIA ACTUAL"** hasta contar con evidencia ejecutable.
+
+---
+
 ## EXTENSIONES REQUERIDAS
 
 ```sql
@@ -24,6 +36,8 @@ pgcrypto   -- gen_random_uuid() (incluido en Supabase)
 | 003 | `003_arquitectura_decisiones.sql` | Sistema de gramos, costos desactualizados, consumo teórico vs real |
 | 004 | `004_biblioteca_culinaria.sql` | Módulo recetas, producción por lotes, escalado |
 | 005 | `005_correccion_costo_por_gramo.sql` | Fix crítico: costo_por_gramo usa factor de unidad, no stock |
+
+**Verificación en este repositorio:** **NO DETERMINABLE CON LA EVIDENCIA ACTUAL** (archivos de migración no presentes en el árbol auditado).
 
 ---
 
@@ -649,7 +663,14 @@ Calcula consumo teórico vs real para todos los productos. Inserta en `analisis_
 
 ## RLS — POLÍTICAS POR TABLA
 
-**Principio:** Toda tabla tiene RLS habilitado. Ninguna excepción. El filtro siempre usa `mi_restaurante_id()`.
+**Principio arquitectónico documentado:** toda tabla debe operar con RLS y usar `mi_restaurante_id()` para aislamiento por tenant.
+
+**Estado de verificación en este repositorio:** **NO DETERMINABLE CON LA EVIDENCIA ACTUAL**.
+
+Distinción explícita:
+- **Aislamiento implementado en código:** validaciones por `restaurante_id` en rutas API y contexto de sesión autenticada.
+- **Aislamiento esperado por RLS:** definido en esta especificación.
+- **Aislamiento realmente verificable en despliegue:** no demostrable desde este repositorio sin migraciones/policies ejecutables.
 
 | Tabla | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|

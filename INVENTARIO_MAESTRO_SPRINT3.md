@@ -2,6 +2,13 @@ INVENTARIO MAESTRO DE RECONSTRUCCIÓN — ChefOS Sprint 3
 
 ---
 
+> **Sincronización post-auditoría (commit `9fd9b8544371c9a93322211dc53e686bc23a8f00`):**
+> - **A) Implementado y verificado estáticamente:** rutas `/biblioteca` y `/biblioteca/nueva`, `BibliotecaCliente`, `RecetaForm`, `useRecetas`, `fetchRecetas`, `useRegistrarReceta`, `POST /api/biblioteca/recetas`.
+> - **B) Implementado pero no verificado en runtime:** funcionamiento real contra Supabase, creación E2E de receta, comportamiento real de filtros/búsqueda en navegador.
+> - **C) No implementado:** `/biblioteca/[id]`, `/biblioteca/[id]/editar`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx`, APIs `/api/biblioteca/recetas/[id]/costo` y `/api/biblioteca/recetas/[id]/escalar`.
+> - **D) No determinable con la evidencia actual:** políticas RLS realmente desplegadas (no existe `supabase/migrations` en este repositorio auditado).
+> - **E) Planificado/futuro:** detalle/edición/escalado de recetas y endurecimiento transaccional del alta de recetas.
+
 SECCIÓN 1 — MIGRACIONES SQL
 
 | Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
@@ -130,7 +137,7 @@ SECCIÓN 3 — TIPOS TYPESCRIPT
 
 | Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
 |---|---|---|---|---|
-| `index.tsx` | `src/components/ui/` | Exports: GramInput, StockBadge, BarraStock, MarginBadge, KPICard, SkeletonCard, SkeletonLista, EmptyState, ErrorInline, PullToRefresh | clsx, lucide-react, src/types/index.ts | **CRÍTICO** |
+| `index.tsx` | `src/components/ui/` | **Estado real actual:** archivo desalineado; contiene código de hooks de dominio en lugar de catálogo UI exportable. **B — IMPLEMENTADO PERO NO VALIDADO ARQUITECTÓNICAMENTE** | @tanstack/react-query, src/lib/queries, src/lib/supabase/navegador | **ALTO** |
 
 ---
 
@@ -147,10 +154,10 @@ SECCIÓN 3 — TIPOS TYPESCRIPT
 
 | Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
 |---|---|---|---|---|
-| `page.tsx` | `src/app/(autenticado)/biblioteca/` | Carga categorías y recetas iniciales | crearClienteServidor, BibliotecaCliente | **CRÍTICO** |
-| `page.tsx` | `src/app/(autenticado)/biblioteca/nueva/` | Guard de roles y carga de productos/categorías | crearClienteServidor, RecetaForm | **CRÍTICO** |
-| `page.tsx` | `src/app/(autenticado)/biblioteca/[id]/` | Carga receta, ingredientes, pasos y fotos ordenadas | crearClienteServidor, RecetaDetalleCliente | **CRÍTICO** |
-| `page.tsx` | `src/app/(autenticado)/biblioteca/[id]/editar/` | Guard de rol y carga de receta para edición | crearClienteServidor, RecetaForm | **CRÍTICO** |
+| `page.tsx` | `src/app/(autenticado)/biblioteca/` | Monta `<BibliotecaCliente />` (wrapper server simple). **A — IMPLEMENTADO Y VERIFICADO ESTÁTICAMENTE** | BibliotecaCliente | **CRÍTICO** |
+| `page.tsx` | `src/app/(autenticado)/biblioteca/nueva/` | Monta `<RecetaForm />` (wrapper server simple, sin guard de rol explícito). **A/B** | RecetaForm | **CRÍTICO** |
+| `page.tsx` | `src/app/(autenticado)/biblioteca/[id]/` | **C — NO IMPLEMENTADO** (referencia histórica, archivo no existe en el repo actual) | — | **ALTO** |
+| `page.tsx` | `src/app/(autenticado)/biblioteca/[id]/editar/` | **C — NO IMPLEMENTADO** (referencia histórica, archivo no existe en el repo actual) | — | **ALTO** |
 
 ---
 
@@ -158,10 +165,10 @@ SECCIÓN 3 — TIPOS TYPESCRIPT
 
 | Archivo | Ubicación | Estado esperado | Dependencias | Prioridad |
 |---|---|---|---|---|
-| `BibliotecaCliente.tsx` | `src/components/biblioteca/` | Búsqueda local, filtros y FAB nueva receta | useRecetas, AppProvider | **CRÍTICO** |
-| `RecetaDetalleCliente.tsx` | `src/components/biblioteca/` | Escalado de porciones, costos y producción | useApp, QK, EscaladoModal | **CRÍTICO** |
-| `RecetaForm.tsx` | `src/components/biblioteca/` | Formulario de creación y edición de recetas | Supabase, AppProvider, GramInput | **CRÍTICO** |
-| `EscaladoModal.tsx` | `src/components/biblioteca/` | Escalado de recetas con validación de stock | lucide-react, src/types | **CRÍTICO** |
+| `BibliotecaCliente.tsx` | `src/components/biblioteca/` | Listado con búsqueda client-side por nombre, filtros (`Todas`, `En carta`, categorías dinámicas), contador y estados pending/error/vacío/sin resultados. **A/B** | useRecetas, React | **CRÍTICO** |
+| `RecetaDetalleCliente.tsx` | `src/components/biblioteca/` | **C — NO IMPLEMENTADO** (referencia histórica, archivo no existe) | — | **ALTO** |
+| `RecetaForm.tsx` | `src/components/biblioteca/` | Formulario de creación con ingredientes/pasos + `useRegistrarReceta`. Soporte interno para `categoria_id` y `foto_url` sin UI completa actual. **A/B** | useProductos, useRegistrarReceta | **CRÍTICO** |
+| `EscaladoModal.tsx` | `src/components/biblioteca/` | **C — NO IMPLEMENTADO** (referencia histórica, archivo no existe) | — | **ALTO** |
 
 ---
 
@@ -222,9 +229,9 @@ SECCIÓN 3 — TIPOS TYPESCRIPT
 | `route.ts` | `src/app/api/produccion/lotes/[id]/cerrar/` | Cierre de lotes | crearClienteServidor | **CRÍTICO** |
 | `route.ts` | `src/app/api/mermas/` | Registro de mermas y movimientos | crearClienteServidor, convertirAGramos | **CRÍTICO** |
 | `route.ts` | `src/app/api/inventario/movimientos/` | Ajustes manuales de stock | crearClienteServidor | **CRÍTICO** |
-| `route.ts` | `src/app/api/biblioteca/recetas/` | Consulta de recetas con filtros | crearClienteServidor | **IMPORTANTE** |
-| `route.ts` | `src/app/api/biblioteca/recetas/[id]/costo/` | Recalcular costo receta | crearClienteServidor | **CRÍTICO** |
-| `route.ts` | `src/app/api/biblioteca/recetas/[id]/escalar/` | Escalado de recetas | crearClienteServidor | **CRÍTICO** |
+| `route.ts` | `src/app/api/biblioteca/recetas/` | **POST** crear receta completa (receta + ingredientes + pasos + productos afectados + RPC `recalcular_costo_receta`). Validaciones de payload y pertenencia de tenant. Flujo secuencial sin transacción atómica explícita. **A/B** | crearClienteServidor, tipos dominio | **CRÍTICO** |
+| `route.ts` | `src/app/api/biblioteca/recetas/[id]/costo/` | **C — NO IMPLEMENTADO** (referencia histórica) | — | **ALTO** |
+| `route.ts` | `src/app/api/biblioteca/recetas/[id]/escalar/` | **C — NO IMPLEMENTADO** (referencia histórica) | — | **ALTO** |
 
 ---
 

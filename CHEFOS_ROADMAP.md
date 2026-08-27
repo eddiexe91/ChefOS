@@ -1,7 +1,7 @@
 # CHEFOS — ROADMAP MAESTRO
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
-**Última actualización:** Mayo 2025
+**Última actualización:** Agosto 2026 (sincronización post-auditoría de Biblioteca)
 
 ---
 
@@ -10,7 +10,7 @@
 ### Sprint 0 — Arquitectura ✅ COMPLETADO
 ### Sprint 1 — Fundación Backend ✅ COMPLETADO  
 ### Sprint 2 — Motor Gastronómico ✅ COMPLETADO  
-### Sprint 3 — Frontend Operacional ✅ COMPLETADO (con auditoría)  
+### Sprint 3 — Frontend Operacional ⚠️ IMPLEMENTADO PARCIALMENTE / REQUIERE VALIDACIÓN  
 ### Sprint 4 — Briefing IA → PENDIENTE  
 ### Sprint 5 — Ventas e Importación → PENDIENTE  
 ### Sprint 6 — Multi-restaurante → PENDIENTE  
@@ -119,7 +119,14 @@
 
 ---
 
-## SPRINT 3 — FRONTEND OPERACIONAL ✅
+## SPRINT 3 — FRONTEND OPERACIONAL ⚠️
+
+### Estado de validación de Biblioteca (post-auditoría)
+
+- **A) Implementado y verificado estáticamente:** `/biblioteca`, `/biblioteca/nueva`, `BibliotecaCliente`, `RecetaForm`, `useRecetas`, `fetchRecetas`, `useRegistrarReceta`, `POST /api/biblioteca/recetas`.
+- **B) Implementado pero no verificado en runtime:** flujo real con Supabase, creación E2E de receta, filtros/búsqueda en navegador.
+- **C) No implementado:** `/biblioteca/[id]`, `/biblioteca/[id]/editar`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx`, APIs `/api/biblioteca/recetas/[id]/costo` y `/api/biblioteca/recetas/[id]/escalar`.
+- **D) No determinable con la evidencia actual:** RLS efectivamente desplegado (no hay `supabase/migrations` en el repositorio auditado).
 
 ### Entregables completados
 
@@ -143,12 +150,12 @@
 **Biblioteca Culinaria:**
 - `src/app/(autenticado)/biblioteca/page.tsx`
 - `src/app/(autenticado)/biblioteca/nueva/page.tsx`
-- `src/app/(autenticado)/biblioteca/[id]/page.tsx`
-- `src/app/(autenticado)/biblioteca/[id]/editar/page.tsx`
 - `src/components/biblioteca/BibliotecaCliente.tsx` — lista con filtros y búsqueda
-- `src/components/biblioteca/RecetaDetalleCliente.tsx` — detalle completo
 - `src/components/biblioteca/RecetaForm.tsx` — crear/editar con ingredientes y pasos
-- `src/components/biblioteca/EscaladoModal.tsx` — escalado a N porciones
+- (**NO IMPLEMENTADO**) `src/app/(autenticado)/biblioteca/[id]/page.tsx`
+- (**NO IMPLEMENTADO**) `src/app/(autenticado)/biblioteca/[id]/editar/page.tsx`
+- (**NO IMPLEMENTADO**) `src/components/biblioteca/RecetaDetalleCliente.tsx`
+- (**NO IMPLEMENTADO**) `src/components/biblioteca/EscaladoModal.tsx`
 
 **Producción:**
 - `src/app/(autenticado)/produccion/page.tsx`
@@ -174,7 +181,7 @@
 - `src/components/configuracion/PerfilCliente.tsx`
 
 **UI Components:**
-- `src/components/ui/index.tsx` — GramInput, StockBadge, BarraStock, MarginBadge, KPICard, SkeletonCard, SkeletonLista, EmptyState, ErrorInline, PullToRefresh
+- `src/components/ui/index.tsx` — **desalineado respecto al contrato documental previo**; actualmente contiene código de hooks de dominio, no un catálogo UI consolidado
 
 **API Routes:**
 - `src/app/api/produccion/route.ts`
@@ -182,9 +189,9 @@
 - `src/app/api/produccion/lotes/[id]/cerrar/route.ts`
 - `src/app/api/mermas/route.ts`
 - `src/app/api/inventario/movimientos/route.ts`
-- `src/app/api/biblioteca/recetas/route.ts`
-- `src/app/api/biblioteca/recetas/[id]/costo/route.ts`
-- `src/app/api/biblioteca/recetas/[id]/escalar/route.ts`
+- `src/app/api/biblioteca/recetas/route.ts` — **POST** creación de receta completa
+- (**NO IMPLEMENTADO**) `src/app/api/biblioteca/recetas/[id]/costo/route.ts`
+- (**NO IMPLEMENTADO**) `src/app/api/biblioteca/recetas/[id]/escalar/route.ts`
 
 **Estilos:**
 - `src/styles/globals.css` — variables CSS, componentes base, utilidades
@@ -215,14 +222,31 @@ Ver sección completa en `CHEFOS_MASTER_ARCHITECTURE.md` §18
 ## FLUJO PRINCIPAL — ESTADO COMPLETO
 
 ```
-crear receta      → RecetaForm → Supabase → recalcular_costo_receta()      ✅
-escalar receta    → EscaladoModal → /api/escalar → escalar_receta() SQL    ✅
+crear receta      → RecetaForm → POST /api/biblioteca/recetas → RPC costo   ✅ (ESTÁTICO)
+escalar receta    → EscaladoModal → /api/escalar → escalar_receta() SQL    ❌ NO IMPLEMENTADO
 registrar prod.   → ProduccionCliente → /api/produccion → SQL atómica      ✅
 descontar stock   → registrar_produccion_completa() → inventario_movimientos ✅
 ver inventario    → InventarioCliente → useInventario() → Realtime          ✅
 registrar merma   → MermaFormCliente → /api/mermas → movimiento + alerta    ✅
 ver alertas       → AlertasCliente → AppProvider Realtime → badge            ✅
 ```
+
+## BIBLIOTECA — CRITERIO DE CIERRE (PENDIENTE)
+
+Antes de cerrar Biblioteca como completada se requiere validar:
+
+1. runtime real de `/biblioteca`
+2. runtime real de `/biblioteca/nueva`
+3. creación real de receta
+4. persistencia real en Supabase
+5. relectura de la receta creada
+6. búsqueda y filtros en navegador
+7. comportamiento de errores
+8. aislamiento multi-tenant/RLS con evidencia real
+9. ausencia de regresiones
+10. decisión sobre deuda técnica de transacciones en `POST /api/biblioteca/recetas`
+
+Ningún punto anterior se marca como completado en esta actualización.
 
 ---
 
@@ -369,42 +393,60 @@ npx supabase gen types typescript --project-id TU_PROJECT_ID > src/types/databas
 **2. Módulo de compras sin frontend**  
 Los hooks `useCompras()` y `useProveedores()` existen pero las páginas de compras no están implementadas en Sprint 3. El inventario no se actualiza al recibir una compra hasta que se construya el módulo.
 
-**3. Supabase Cron Jobs no configurados**  
+**3. Biblioteca sin validación runtime integral**  
+El listado y la creación están implementados y compilan, pero no hay evidencia E2E/runtime suficiente en esta auditoría.
+
+**4. `POST /api/biblioteca/recetas` sin transacción atómica explícita**  
+La creación de receta inserta en varias tablas de forma secuencial; existe riesgo de estado parcial ante fallas intermedias.
+
+**5. Verificación de RLS no determinable desde el repo actual**  
+No existe carpeta `supabase/migrations` en el árbol auditado; no se puede demostrar despliegue real de políticas.
+
+**6. `src/components/ui/index.tsx` desalineado con contrato documental**  
+El archivo no funciona como barrel UI; contiene lógica de hooks de dominio.
+
+**7. BibliotecaCliente con warnings estáticos**  
+Warnings por dependencias de `useMemo` y uso de `<img>` detectados en build.
+
+**8. Autorización por rol no explícita en creación de recetas**  
+Existe autenticación y validación de pertenencia de tenant, pero no guard de rol explícito en `POST /api/biblioteca/recetas`.
+
+**9. Supabase Cron Jobs no configurados**  
 Los briefings matutinos (06:00) y cierres nocturnos (23:00) no tienen cron configurado. Requiere plan Pro de Supabase o implementación manual con pg_cron.
 
-**4. Storage buckets no creados**  
+**10. Storage buckets no creados**  
 Crear en Supabase Dashboard:
 - `recetas-imagenes` (público)
 - `recetas-videos` (público)
 - `facturas` (privado)
 - `importaciones` (privado)
 
-**5. Push Notifications no implementadas**  
+**11. Push Notifications no implementadas**  
 El Service Worker y el manifest.json están configurados pero las notificaciones push para alertas críticas no están implementadas.
 
 ### Media prioridad
 
-**6. Onboarding no implementado**  
+**12. Onboarding no implementado**  
 El flujo de 5 pasos para nuevos restaurantes (importar recetas/inventario con IA) no está construido.
 
-**7. `useAuth.ts` y `sincronizador.ts` son dead code**  
+**13. `useAuth.ts` y `sincronizador.ts` son dead code**  
 Archivos creados pero nunca importados. No rompen el build pero son confusos. Eliminar en Sprint 4.
 
-**8. `compras_items.cantidad_gramos` nunca se popula**  
+**14. `compras_items.cantidad_gramos` nunca se popula**  
 La API de compras no está implementada, así que este campo siempre es NULL.
 
-**9. Tema claro no implementado**  
+**15. Tema claro no implementado**  
 El sistema de diseño tiene tokens preparados para dark mode únicamente. El campo `preferencias.tema` en usuarios existe pero no hay toggle en UI.
 
 ### Baja prioridad
 
-**10. `analisis_consumo` no tiene UI**  
+**16. `analisis_consumo` no tiene UI**  
 La función SQL `calcular_analisis_consumo()` existe y funciona pero no hay pantalla para visualizarlo. Solo se ven las alertas generadas.
 
-**11. `inventario_snapshots` no tiene UI**  
+**17. `inventario_snapshots` no tiene UI**  
 La tabla existe para el cálculo de consumo real pero no hay flujo para que el chef registre conteos físicos.
 
-**12. Historial de versiones de receta sin UI**  
+**18. Historial de versiones de receta sin UI**  
 `recetas_versiones` se popula correctamente por el trigger pero no hay componente para visualizar el historial completo.
 
 ---
