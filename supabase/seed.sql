@@ -1,0 +1,2 @@
+-- ChefOS no inserta datos de negocio automáticamente.
+-- Crea el restaurante y el usuario mediante el flujo de onboarding después de Auth.

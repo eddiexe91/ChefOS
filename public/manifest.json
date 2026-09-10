@@ -1,0 +1,22 @@
+{
+  "name": "ChefOS",
+  "short_name": "ChefOS",
+  "description": "Sistema operativo gastronómico para restaurantes.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080808",
+  "theme_color": "#080808",
+  "categories": ["business", "productivity", "food"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

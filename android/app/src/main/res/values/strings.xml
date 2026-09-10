@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ChefOS</string>
+    <string name="title_activity_main">ChefOS</string>
+    <string name="package_name">com.chefos.app</string>
+    <string name="custom_url_scheme">com.chefos.app</string>
+</resources>

@@ -1,0 +1,36 @@
+project_id = "chefos"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[functions.generar-briefing]
+verify_jwt = true
+
+[functions.chat-ia]
+verify_jwt = true
+
+[functions.cierre-diario]
+verify_jwt = true
