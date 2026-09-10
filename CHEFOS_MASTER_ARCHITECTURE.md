@@ -1,16 +1,40 @@
 # CHEFOS — ARQUITECTURA MAESTRA
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
-**Última actualización:** Agosto 2026 (sincronización post-auditoría de Biblioteca)
+**Última actualización:** 09 de septiembre de 2026 (sincronización operativa y APK)
+
+## ACTUALIZACIÓN DE CONTROL — 10-09-2026
+
+- Supabase real: migraciones, Storage, Edge Functions y `pg_cron` activos.
+- `chat-ia`, `generar-briefing` y `cierre-diario` publicados y probados con HTTP 200.
+- Bloqueo actual: `/api/auth/session` todavía no consigue establecer las cookies SSR que necesita el middleware de Next.js después del login. El flujo Android/WebView queda pendiente.
+- La APK entregada anteriormente no contiene todavía el último puente de sesión; debe reconstruirse después de resolver el bloqueo.
+- La URL de backend sigue siendo un túnel HTTPS temporal.
+
+## ESTADO ACTUAL DEL REPOSITORIO — 09-09-2026
+
+La auditoría histórica de Sprint 3 que aparece debajo de esta nota ya no describe completamente el árbol actual. Actualmente existen el detalle y escalado de recetas, sus API, Chef IA básico sin coste, integración opcional con Claude, briefing manual, revisión avanzada de ventas, onboarding, snapshots, analítica, panel multi-restaurante, migraciones 001–005 y Edge Functions. La base de datos y Storage fueron desplegados y verificados contra el proyecto Supabase real de ChefOS; el despliegue remoto de Edge Functions y la activación de cron siguen siendo tareas externas.
+
+### Handoff operativo vigente
+
+- Proyecto Supabase: `nipovuqpxvsgeqdrszuq` — `https://nipovuqpxvsgeqdrszuq.supabase.co`.
+- Migraciones `001_schema_base.sql` a `005_registro_inicial.sql`: aplicadas remotamente el 08-09-2026.
+- Tablas principales y cuatro buckets de Storage verificados; `auth.users` está actualmente vacío.
+- `005_registro_inicial.sql` crea restaurante, usuario propietario, relación y datos iniciales al registrarse un usuario nuevo.
+- Chef IA básico no requiere `ANTHROPIC_API_KEY`; la clave es opcional para modo avanzado.
+- Pendiente externo: desplegar las tres Edge Functions, ejecutar cron, crear el primer usuario y probar un flujo real.
+- La APK debug actual está generada y apunta al túnel HTTPS temporal; para producción debe apuntar al backend HTTPS permanente. Ver `GITHUB_HANDOFF.md`.
 
 ---
 
 ## ESTADO DE VERIFICABILIDAD (POST-AUDITORÍA)
 
+Las categorías históricas de esta sección se conservan para trazabilidad. Para el estado operativo actual prevalece “Handoff operativo vigente” y la verificación remota descrita allí.
+
 - **A) IMPLEMENTADO Y VERIFICADO ESTÁTICAMENTE:** `/biblioteca`, `/biblioteca/nueva`, `BibliotecaCliente`, `RecetaForm`, `useRecetas`, `fetchRecetas`, `useRegistrarReceta`, `POST /api/biblioteca/recetas`.
 - **B) IMPLEMENTADO PERO NO VERIFICADO EN RUNTIME:** ejecución real contra Supabase, alta E2E de recetas, comportamiento real de filtros/búsqueda en navegador.
-- **C) NO IMPLEMENTADO:** `/biblioteca/[id]`, `/biblioteca/[id]/editar`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx`, `/api/biblioteca/recetas/[id]/costo`, `/api/biblioteca/recetas/[id]/escalar`.
-- **D) NO DETERMINABLE CON LA EVIDENCIA ACTUAL:** estado real de migraciones y políticas RLS desplegadas (el repositorio auditado no contiene `supabase/migrations`).
+- **C) Implementado en el estado actual:** `/biblioteca/[id]`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx` y las APIs de costo/escalado; la edición dedicada y la validación E2E siguen pendientes.
+- **D) Verificación externa pendiente:** las migraciones y políticas RLS están en `supabase/migrations` y se aplicaron al proyecto real; falta dejar una prueba E2E de aislamiento multi-tenant.
 - **E) PLANIFICADO/FUTURO:** detalle/edición/escalado de recetas y validación runtime integral.
 
 ---

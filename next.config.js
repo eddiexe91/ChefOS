@@ -11,7 +11,9 @@ const nextConfig = {
     ],
     formats: ['image/avif', 'image/webp'],
   },
-  serverExternalPackages: ['@supabase/supabase-js'],
+  experimental: {
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+  },
 }
 
 let exportConfig = nextConfig

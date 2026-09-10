@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.tools/
+.android-tools/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/*.keystore
+.env.local
+.env*.local
+public/sw.js
+public/workbox-*.js
+public/_next/

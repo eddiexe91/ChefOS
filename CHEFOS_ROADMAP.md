@@ -1,7 +1,30 @@
 # CHEFOS — ROADMAP MAESTRO
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
-**Última actualización:** Agosto 2026 (sincronización post-auditoría de Biblioteca)
+**Última actualización:** 09 de septiembre de 2026 (sincronización operativa y APK)
+
+## Actualización de ejecución — 10-09-2026
+
+Completado en Supabase real: Edge Functions (`chat-ia`, `generar-briefing`, `cierre-diario`) publicadas y cron jobs activos. Pendiente crítico antes de cerrar Android: resolver la sincronización de sesión SSR en `/api/auth/session`, repetir el login E2E y reconstruir la APK con la corrección validada. Chef IA básico sigue siendo el modo operativo actual; Anthropic continúa opcional.
+
+## ESTADO ACTUAL DE IMPLEMENTACIÓN (09-09-2026)
+
+El repositorio contiene la implementación local de los módulos operativos, Chef IA básico sin coste, integración opcional con Claude, revisión de ventas, onboarding, snapshots/analítica, grupos de restaurantes, Storage y Edge Functions. `type-check`, `lint` y `build` pasan con las herramientas locales del proyecto. Las migraciones 001–005 están aplicadas en el proyecto Supabase real `nipovuqpxvsgeqdrszuq` y los cuatro buckets de Storage fueron verificados. El despliegue de Edge Functions y los cron reales sigue dependiendo de ejecutarlo desde Supabase; Chef IA básico funciona sin `ANTHROPIC_API_KEY`. Ver `GITHUB_HANDOFF.md` y `supabase/DEPLOYMENT.md`.
+
+### Addendum operativo actual
+
+- Chef IA básico está activo por reglas y contexto real (stock, alertas, ventas y mermas); `ANTHROPIC_API_KEY` es opcional.
+- La importación de ventas calcula coincidencias normalizadas y marca para revisión todo resultado bajo 0,85.
+- El briefing Edge usa Claude cuando existe la clave y mantiene un fallback por reglas cuando no existe.
+- La APK debug instalable se genera en `artifacts/ChefOS-debug.apk`; para un teléfono físico necesita una URL HTTPS pública del backend Next.js.
+- La clave de Anthropic nunca debe guardarse en GitHub ni enviarse por el chat.
+
+### Estado de entrega y continuación en GitHub
+
+- Código local implementado; comprobaciones estáticas y build pasadas.
+- Backend Supabase aplicado: esquema, RLS, funciones SQL, Storage y trigger de registro.
+- Sin datos de negocio todavía: usuarios y restaurantes comienzan vacíos.
+- Siguiente secuencia: secretos fuera de Git → Edge Functions → cron → primer usuario → pruebas de importación, ventas, briefing y APK HTTPS.
 
 ---
 
@@ -10,10 +33,10 @@
 ### Sprint 0 — Arquitectura ✅ COMPLETADO
 ### Sprint 1 — Fundación Backend ✅ COMPLETADO  
 ### Sprint 2 — Motor Gastronómico ✅ COMPLETADO  
-### Sprint 3 — Frontend Operacional ⚠️ IMPLEMENTADO PARCIALMENTE / REQUIERE VALIDACIÓN  
-### Sprint 4 — Briefing IA → PENDIENTE  
-### Sprint 5 — Ventas e Importación → PENDIENTE  
-### Sprint 6 — Multi-restaurante → PENDIENTE  
+### Sprint 3 — Frontend Operacional ✅ IMPLEMENTADO / REQUIERE VALIDACIÓN E2E CON DATOS
+### Sprint 4 — Briefing IA ✅ FALLBACK BÁSICO / CLAUDE OPCIONAL / CRON EXTERNO PENDIENTE
+### Sprint 5 — Ventas e Importación ✅ IMPLEMENTADO / REQUIERE VALIDACIÓN E2E
+### Sprint 6 — Compras y Multi-restaurante ✅ IMPLEMENTADO EN MVP / REQUIERE VALIDACIÓN E2E
 
 ---
 
@@ -125,7 +148,7 @@
 
 - **A) Implementado y verificado estáticamente:** `/biblioteca`, `/biblioteca/nueva`, `BibliotecaCliente`, `RecetaForm`, `useRecetas`, `fetchRecetas`, `useRegistrarReceta`, `POST /api/biblioteca/recetas`.
 - **B) Implementado pero no verificado en runtime:** flujo real con Supabase, creación E2E de receta, filtros/búsqueda en navegador.
-- **C) No implementado:** `/biblioteca/[id]`, `/biblioteca/[id]/editar`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx`, APIs `/api/biblioteca/recetas/[id]/costo` y `/api/biblioteca/recetas/[id]/escalar`.
+- **C) Implementado en el estado actual:** `/biblioteca/[id]`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx`, APIs de costo y escalado; la edición dedicada y la validación E2E siguen siendo deuda de producto.
 - **D) No determinable con la evidencia actual:** RLS efectivamente desplegado (no hay `supabase/migrations` en el repositorio auditado).
 
 ### Entregables completados
@@ -152,10 +175,9 @@
 - `src/app/(autenticado)/biblioteca/nueva/page.tsx`
 - `src/components/biblioteca/BibliotecaCliente.tsx` — lista con filtros y búsqueda
 - `src/components/biblioteca/RecetaForm.tsx` — crear/editar con ingredientes y pasos
-- (**NO IMPLEMENTADO**) `src/app/(autenticado)/biblioteca/[id]/page.tsx`
-- (**NO IMPLEMENTADO**) `src/app/(autenticado)/biblioteca/[id]/editar/page.tsx`
-- (**NO IMPLEMENTADO**) `src/components/biblioteca/RecetaDetalleCliente.tsx`
-- (**NO IMPLEMENTADO**) `src/components/biblioteca/EscaladoModal.tsx`
+- `src/app/(autenticado)/biblioteca/[id]/page.tsx` — implementado
+- `src/components/biblioteca/RecetaDetalleCliente.tsx` — implementado
+- `src/components/biblioteca/EscaladoModal.tsx` — implementado
 
 **Producción:**
 - `src/app/(autenticado)/produccion/page.tsx`
@@ -190,8 +212,8 @@
 - `src/app/api/mermas/route.ts`
 - `src/app/api/inventario/movimientos/route.ts`
 - `src/app/api/biblioteca/recetas/route.ts` — **POST** creación de receta completa
-- (**NO IMPLEMENTADO**) `src/app/api/biblioteca/recetas/[id]/costo/route.ts`
-- (**NO IMPLEMENTADO**) `src/app/api/biblioteca/recetas/[id]/escalar/route.ts`
+- `src/app/api/biblioteca/recetas/[id]/costo/route.ts` — implementado
+- `src/app/api/biblioteca/recetas/[id]/escalar/route.ts` — implementado
 
 **Estilos:**
 - `src/styles/globals.css` — variables CSS, componentes base, utilidades
@@ -223,7 +245,7 @@ Ver sección completa en `CHEFOS_MASTER_ARCHITECTURE.md` §18
 
 ```
 crear receta      → RecetaForm → POST /api/biblioteca/recetas → RPC costo   ✅ (ESTÁTICO)
-escalar receta    → EscaladoModal → /api/escalar → escalar_receta() SQL    ❌ NO IMPLEMENTADO
+escalar receta    → EscaladoModal → /api/escalar → escalar_receta() SQL    ✅
 registrar prod.   → ProduccionCliente → /api/produccion → SQL atómica      ✅
 descontar stock   → registrar_produccion_completa() → inventario_movimientos ✅
 ver inventario    → InventarioCliente → useInventario() → Realtime          ✅
@@ -250,7 +272,7 @@ Ningún punto anterior se marca como completado en esta actualización.
 
 ---
 
-## SPRINT 4 — BRIEFING IA (PENDIENTE)
+## SPRINT 4 — BRIEFING IA (IMPLEMENTADO; OPERACIÓN EXTERNA PENDIENTE)
 
 ### Objetivo
 Cuando el chef abra ChefOS a las 08:00 AM, en menos de 30 segundos debe saber: qué producir, qué comprar, qué riesgos existen, qué problemas resolver hoy.
@@ -299,7 +321,7 @@ Cuando el chef abra ChefOS a las 08:00 AM, en menos de 30 segundos debe saber: q
 
 ---
 
-## SPRINT 5 — VENTAS E IMPORTACIÓN (PENDIENTE)
+## SPRINT 5 — VENTAS E IMPORTACIÓN (IMPLEMENTADO; VALIDACIÓN E2E PENDIENTE)
 
 ### Objetivo
 Importar reportes del POS (Fudo, Soft Restaurant), normalizar nombres de platos con IA, confirmar y descontar inventario automáticamente.
@@ -340,7 +362,7 @@ briefing recalculado
 
 ---
 
-## SPRINT 6 — COMPRAS INTELIGENTES (PENDIENTE)
+## SPRINT 6 — COMPRAS INTELIGENTES (MVP IMPLEMENTADO; AMPLIACIONES PENDIENTES)
 
 ### Objetivo
 Módulo completo de compras con historial de precios, tendencias y detección de variaciones anómalas.
@@ -365,7 +387,7 @@ Módulo completo de compras con historial de precios, tendencias y detección de
 
 ---
 
-## SPRINT 7 — MULTI-RESTAURANTE / EMPRESA (PENDIENTE)
+## SPRINT 7 — MULTI-RESTAURANTE / EMPRESA (MVP IMPLEMENTADO; GESTIÓN AVANZADA PENDIENTE)
 
 ### Objetivo
 Panel de grupo para dueños de múltiples locales.
@@ -390,8 +412,8 @@ Reemplazar con tipos generados reales:
 npx supabase gen types typescript --project-id TU_PROJECT_ID > src/types/database.types.ts
 ```
 
-**2. Módulo de compras sin frontend**  
-Los hooks `useCompras()` y `useProveedores()` existen pero las páginas de compras no están implementadas en Sprint 3. El inventario no se actualiza al recibir una compra hasta que se construya el módulo.
+**2. Módulo de compras MVP**  
+La pantalla, API de alta y recepción están implementadas; falta ampliar el formulario visual de alta y completar pruebas E2E de actualización de inventario.
 
 **3. Biblioteca sin validación runtime integral**  
 El listado y la creación están implementados y compilan, pero no hay evidencia E2E/runtime suficiente en esta auditoría.
@@ -399,8 +421,8 @@ El listado y la creación están implementados y compilan, pero no hay evidencia
 **4. `POST /api/biblioteca/recetas` sin transacción atómica explícita**  
 La creación de receta inserta en varias tablas de forma secuencial; existe riesgo de estado parcial ante fallas intermedias.
 
-**5. Verificación de RLS no determinable desde el repo actual**  
-No existe carpeta `supabase/migrations` en el árbol auditado; no se puede demostrar despliegue real de políticas.
+**5. RLS aplicado; falta prueba E2E multi-tenant**  
+Las políticas viven en `supabase/migrations` y fueron aplicadas al proyecto real; falta ejecutar una prueba con dos usuarios/restaurantes para dejar evidencia de aislamiento.
 
 **6. `src/components/ui/index.tsx` desalineado con contrato documental**  
 El archivo no funciona como barrel UI; contiene lógica de hooks de dominio.
@@ -411,11 +433,11 @@ Warnings por dependencias de `useMemo` y uso de `<img>` detectados en build.
 **8. Autorización por rol no explícita en creación de recetas**  
 Existe autenticación y validación de pertenencia de tenant, pero no guard de rol explícito en `POST /api/biblioteca/recetas`.
 
-**9. Supabase Cron Jobs no configurados**  
-Los briefings matutinos (06:00) y cierres nocturnos (23:00) no tienen cron configurado. Requiere plan Pro de Supabase o implementación manual con pg_cron.
+**9. Supabase Cron Jobs pendientes de activación externa**  
+La migración y la función `configurar_cron_chefos` están implementadas; falta ejecutarlas en el proyecto Supabase después de desplegar Edge Functions.  
 
-**10. Storage buckets no creados**  
-Crear en Supabase Dashboard:
+**10. Storage buckets creados y verificados**  
+En Supabase existen:
 - `recetas-imagenes` (público)
 - `recetas-videos` (público)
 - `facturas` (privado)
@@ -426,8 +448,8 @@ El Service Worker y el manifest.json están configurados pero las notificaciones
 
 ### Media prioridad
 
-**12. Onboarding no implementado**  
-El flujo de 5 pasos para nuevos restaurantes (importar recetas/inventario con IA) no está construido.
+**12. Onboarding MVP implementado**  
+El flujo permite configurar el restaurante e importar recetas o inventario CSV; la interpretación de formatos complejos con IA queda para una ampliación.
 
 **13. `useAuth.ts` y `sincronizador.ts` son dead code**  
 Archivos creados pero nunca importados. No rompen el build pero son confusos. Eliminar en Sprint 4.
@@ -440,11 +462,11 @@ El sistema de diseño tiene tokens preparados para dark mode únicamente. El cam
 
 ### Baja prioridad
 
-**16. `analisis_consumo` no tiene UI**  
-La función SQL `calcular_analisis_consumo()` existe y funciona pero no hay pantalla para visualizarlo. Solo se ven las alertas generadas.
+**16. Analítica de consumo MVP**  
+La pantalla `/analitica` permite snapshots y muestra desviaciones; falta automatizar el cálculo periódico y completar gráficos históricos.
 
-**17. `inventario_snapshots` no tiene UI**  
-La tabla existe para el cálculo de consumo real pero no hay flujo para que el chef registre conteos físicos.
+**17. Snapshots MVP**  
+La pantalla `/analitica` registra conteos físicos manuales; falta vista histórica comparativa.
 
 **18. Historial de versiones de receta sin UI**  
 `recetas_versiones` se popula correctamente por el trigger pero no hay componente para visualizar el historial completo.

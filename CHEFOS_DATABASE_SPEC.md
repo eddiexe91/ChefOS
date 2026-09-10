@@ -3,9 +3,24 @@
 **Motor:** PostgreSQL 15+ (Supabase)  
 **Estado:** Fuente de verdad permanente
 
+## Estado remoto verificado — 10-09-2026
+
+Las migraciones y los buckets de Storage del proyecto `nipovuqpxvsgeqdrszuq` están aplicados. Las Edge Functions `chat-ia`, `generar-briefing` y `cierre-diario` responden HTTP 200, y los cron jobs de briefing/cierre están activos. La validación E2E de login continúa pendiente porque el puente de cookies SSR falla en el backend Next.js; no hay evidencia de que sea un problema de esquema o RLS.
+
 ---
 
-## ESTADO DE EVIDENCIA (POST-AUDITORÍA)
+## ESTADO REAL DEL DESPLIEGUE — 09-09-2026
+
+- Proyecto: `nipovuqpxvsgeqdrszuq` — `https://nipovuqpxvsgeqdrszuq.supabase.co`.
+- Migraciones remotas aplicadas: `001`, `002`, `003`, `004` y `005_registro_inicial.sql`.
+- Verificación: tablas principales consultables y buckets `facturas`, `importaciones`, `recetas-imagenes` y `recetas-videos` creados.
+- Datos: cero usuarios registrados al momento de la verificación; todavía no existe un restaurante inicial.
+- Chef IA básico funciona sin secreto; `ANTHROPIC_API_KEY` solo es necesario para modo avanzado. Pendientes externos: despliegue de Edge Functions, activación de cron y prueba E2E con usuario real.
+- Las credenciales no forman parte de esta especificación ni deben subirse a GitHub.
+
+## ESTADO DE EVIDENCIA (POST-AUDITORÍA HISTÓRICA)
+
+La sección de despliegue real anterior es la fuente vigente para el proyecto conectado. Las advertencias “NO DETERMINABLE” que aparecen más abajo pertenecen a la auditoría histórica previa a la creación de `supabase/migrations` y no invalidan la verificación remota del 09-09-2026.
 
 Este documento describe el **contrato arquitectónico esperado** de base de datos.
 

@@ -2,6 +2,12 @@ INVENTARIO MAESTRO DE RECONSTRUCCIÓN — ChefOS Sprint 3
 
 ---
 
+## NOTA DE VIGENCIA — 08-09-2026
+
+Los estados históricos de esta reconstrucción se conservan como referencia, pero no son el estado actual completo. Hoy existen las rutas y servicios de IA, ventas, onboarding, analítica, multi-restaurante y Storage, además de las migraciones `001`–`005`. Fueron aplicadas al proyecto Supabase `nipovuqpxvsgeqdrszuq`; sus tablas principales y cuatro buckets fueron verificados. El proyecto aún no tiene usuarios ni datos de negocio. Para continuar desde GitHub, usar `GITHUB_HANDOFF.md`.
+
+---
+
 > **Sincronización post-auditoría (commit `9fd9b8544371c9a93322211dc53e686bc23a8f00`):**
 > - **A) Implementado y verificado estáticamente:** rutas `/biblioteca` y `/biblioteca/nueva`, `BibliotecaCliente`, `RecetaForm`, `useRecetas`, `fetchRecetas`, `useRegistrarReceta`, `POST /api/biblioteca/recetas`.
 > - **B) Implementado pero no verificado en runtime:** funcionamiento real contra Supabase, creación E2E de receta, comportamiento real de filtros/búsqueda en navegador.
