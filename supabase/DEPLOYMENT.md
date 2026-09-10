@@ -8,7 +8,7 @@ La migración `006_consistencia_operativa.sql` también fue aplicada desde el SQ
 
 Proyecto actualmente configurado: `nipovuqpxvsgeqdrszuq` — `https://nipovuqpxvsgeqdrszuq.supabase.co`.
 
-1. Completar `.env.local` desde `.env.example` sin subirlo a Git.
+1. Completar `.env.local` desde `.env.example` sin subirlo a Git. `SUPABASE_SERVICE_ROLE_KEY` debe ser la Secret key actual con formato `sb_secret_...` y solo debe existir en el backend/Vercel.
 2. Las migraciones `001` a `006` ya fueron aplicadas y verificadas. En una instalación nueva, ejecutarlas en orden desde el SQL Editor o con `supabase db push`.
 3. Opcional: crear el secreto de Anthropic para activar el modo avanzado de Chef IA:
 

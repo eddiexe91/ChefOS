@@ -47,7 +47,7 @@ select public.configurar_cron_chefos(
 
 ## Hosting permanente
 
-El workflow `.github/workflows/deploy.yml` reemplaza la plantilla anterior de GitHub Pages, porque ChefOS necesita runtime Next.js para sus API y middleware. Para activarlo en GitHub, configurar como secretos del repositorio `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` y `VERCEL_PROJECT_ID`. El workflow valida el proyecto y publica la rama `main` en Vercel sin escribir secretos en el repositorio.
+El workflow `.github/workflows/deploy.yml` reemplaza la plantilla anterior de GitHub Pages, porque ChefOS necesita runtime Next.js para sus API y middleware. Para activarlo en GitHub, configurar como secretos del repositorio `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (debe contener la Secret key actual `sb_secret_...` de Supabase), `ANTHROPIC_API_KEY`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` y `VERCEL_PROJECT_ID`. El workflow valida el proyecto y publica la rama `main` en Vercel sin escribir secretos en el repositorio.
 
 ## Android
 
