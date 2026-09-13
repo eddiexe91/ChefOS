@@ -3,19 +3,20 @@
 **Motor:** PostgreSQL 15+ (Supabase)  
 **Estado:** Fuente de verdad permanente
 
-## Estado remoto verificado — 10-09-2026
+## Estado remoto verificado — 13-09-2026
 
-Las migraciones 001–006 y los buckets de Storage del proyecto `nipovuqpxvsgeqdrszuq` están aplicados. Las Edge Functions `chat-ia`, `generar-briefing` y `cierre-diario` responden HTTP 200, y los cron jobs de briefing/cierre están activos. El puente de cookies SSR del backend Next.js fue corregido y validado localmente con un usuario temporal real; queda confirmar el flujo completo desde el teléfono físico.
+Las migraciones 001–006 y los buckets de Storage del proyecto `nipovuqpxvsgeqdrszuq` están aplicados. Las Edge Functions `chat-ia`, `generar-briefing` y `cierre-diario` responden HTTP 200, y los cron jobs de briefing/cierre están activos. El puente de cookies SSR del backend Next.js fue corregido y validado localmente con un usuario temporal real. Vercel responde `/api/health` con Supabase configurado y Storage accesible; queda confirmar el flujo completo desde el teléfono físico y la E2E de negocio.
 
 ---
 
-## ESTADO REAL DEL DESPLIEGUE — 09-09-2026
+## ESTADO REAL DEL DESPLIEGUE — 13-09-2026
 
 - Proyecto: `nipovuqpxvsgeqdrszuq` — `https://nipovuqpxvsgeqdrszuq.supabase.co`.
 - Migraciones remotas aplicadas: `001` a `006_consistencia_operativa.sql`.
 - Verificación: tablas principales consultables y buckets `facturas`, `importaciones`, `recetas-imagenes` y `recetas-videos` creados.
 - Datos: existe un usuario/restaurante de prueba creado durante la validación; el usuario temporal usado en la E2E fue eliminado.
 - Chef IA básico funciona sin secreto; `ANTHROPIC_API_KEY` solo es necesario para modo avanzado. Edge Functions y cron están desplegados; falta la E2E completa de negocio desde Android.
+- Backend Next.js publicado en Vercel: `https://chefos-pied.vercel.app`. La salud pública confirmó `ok:true`, Supabase configurado y Storage accesible con los cuatro buckets esperados.
 - Las credenciales no forman parte de esta especificación ni deben subirse a GitHub.
 
 ## ESTADO DE EVIDENCIA (POST-AUDITORÍA HISTÓRICA)

@@ -1,22 +1,22 @@
 # CHEFOS — ARQUITECTURA MAESTRA
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
-**Última actualización:** 10 de septiembre de 2026 (sincronización operativa, login y APK)
+**Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)
 
-## ACTUALIZACIÓN DE CONTROL — 10-09-2026
+## ACTUALIZACIÓN DE CONTROL — 13-09-2026
 
 - Supabase real: migraciones, Storage, Edge Functions y `pg_cron` activos.
 - `chat-ia`, `generar-briefing` y `cierre-diario` publicados y probados con HTTP 200.
 - `/api/auth/session` ya establece las cookies SSR fragmentadas sin una llamada de red adicional; la prueba local con un usuario temporal de Supabase devolvió HTTP 200.
-- La APK existente en `artifacts/ChefOS-debug-final.apk` es anterior a la última corrección del middleware y debe regenerarse con una URL HTTPS estable.
+- La APK `artifacts/ChefOS-debug-final.apk` fue regenerada con `https://chefos-pied.vercel.app`, `appId=com.chefos.app` y `cleartext=false`.
 - Compras dispone de alta, detalle y recepción; la recepción usa `recibir_compra_completa()` para actualizar inventario de forma atómica.
 - Mermas usan `registrar_merma_completa()`; la conversión de kg/unidades y la importación CSV conservan el modelo universal de gramos.
 - La migración remota `006_consistencia_operativa.sql` fue ejecutada y verificada mediante llamadas RPC negativas controladas.
-- El túnel HTTPS temporal está detenido; falta hosting HTTPS permanente o autorización explícita para reabrirlo.
+- Vercel está operativo en `https://chefos-pied.vercel.app`; `/api/health` confirmó Supabase configurado y los cuatro buckets de Storage accesibles.
 
-## ESTADO ACTUAL DEL REPOSITORIO — 09-09-2026
+## ESTADO ACTUAL DEL REPOSITORIO — 13-09-2026
 
-La auditoría histórica de Sprint 3 que aparece debajo de esta nota ya no describe completamente el árbol actual. Actualmente existen el detalle, edición y escalado de recetas, sus API, Chef IA básico sin coste, integración opcional con Claude, briefing manual, revisión avanzada de ventas, onboarding, snapshots, analítica, panel multi-restaurante, migraciones 001–006, Storage, Edge Functions y cron. La base de datos y los servicios remotos fueron desplegados y verificados contra el proyecto Supabase real de ChefOS; la prueba E2E de autenticación y dashboard ya pasa en servidor, pero falta hosting HTTPS permanente y confirmación desde Android.
+La auditoría histórica de Sprint 3 que aparece debajo de esta nota ya no describe completamente el árbol actual. Actualmente existen el detalle, edición y escalado de recetas, sus API, Chef IA básico sin coste, integración opcional con Claude, briefing manual, revisión avanzada de ventas, onboarding, snapshots, analítica, panel multi-restaurante, migraciones 001–006, Storage, Edge Functions, cron y backend Next.js en Vercel. La base de datos y los servicios remotos fueron desplegados y verificados contra el proyecto Supabase real de ChefOS; la prueba E2E de autenticación y dashboard ya pasa en servidor, y queda la confirmación desde Android y la E2E completa de negocio.
 
 ### Handoff operativo vigente
 
@@ -26,7 +26,7 @@ La auditoría histórica de Sprint 3 que aparece debajo de esta nota ya no descr
 - `005_registro_inicial.sql` crea restaurante, usuario propietario, relación y datos iniciales al registrarse un usuario nuevo.
 - Chef IA básico no requiere `ANTHROPIC_API_KEY`; la clave es opcional para modo avanzado.
 - Las tres Edge Functions están publicadas y los dos cron jobs están activos; la prueba E2E autenticada de servidor pasa, pero falta confirmar el flujo completo desde el teléfono físico.
-- La APK debug existente apunta al túnel HTTPS temporal detenido; para producción debe apuntar al backend HTTPS permanente. Ver `GITHUB_HANDOFF.md`.
+- La APK debug final apunta al backend HTTPS de producción `https://chefos-pied.vercel.app`. Ver `GITHUB_HANDOFF.md`.
 
 ---
 
@@ -38,7 +38,7 @@ Las categorías históricas de esta sección se conservan para trazabilidad. Par
 - **B) IMPLEMENTADO PERO NO VERIFICADO EN RUNTIME:** ejecución real contra Supabase, alta E2E de recetas, comportamiento real de filtros/búsqueda en navegador.
 - **C) Implementado y validado parcialmente:** `/biblioteca/[id]`, `/biblioteca/[id]/editar`, `RecetaDetalleCliente.tsx`, `EscaladoModal.tsx` y las APIs de costo/escalado/edición; la E2E completa de negocio sigue pendiente.
 - **D) Verificación externa pendiente:** las migraciones y políticas RLS están en `supabase/migrations` y se aplicaron al proyecto real; falta dejar una prueba E2E de aislamiento multi-tenant.
-- **E) PENDIENTE DE CIERRE:** hosting HTTPS permanente, regeneración de APK y validación runtime integral desde Android.
+- **E) PENDIENTE DE CIERRE:** validación runtime integral desde Android y E2E completa del negocio.
 
 ---
 

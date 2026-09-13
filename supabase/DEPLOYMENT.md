@@ -1,8 +1,8 @@
 # Despliegue real de ChefOS en Supabase
 
-## Corte de estado — 10-09-2026
+## Corte de estado — 13-09-2026
 
-Las tres Edge Functions y los dos cron jobs están publicados y respondieron correctamente. El puente de sesión SSR del backend Next.js fue corregido: la prueba local con tokens reales de un usuario temporal devolvió HTTP 200 y cookies de sesión. La confirmación restante es el flujo completo desde el teléfono físico.
+Las tres Edge Functions y los dos cron jobs están publicados y respondieron correctamente. El puente de sesión SSR del backend Next.js fue corregido: la prueba local con tokens reales de un usuario temporal devolvió HTTP 200 y cookies de sesión. El backend Next.js está publicado en Vercel en `https://chefos-pied.vercel.app` y `/api/health` confirma Supabase y Storage operativos. La confirmación restante es el flujo completo desde el teléfono físico.
 
 La migración `006_consistencia_operativa.sql` también fue aplicada desde el SQL Editor. Comprueba que `registrar_merma_completa` y `recibir_compra_completa` existan antes de desplegar una instalación nueva. El login SSR fue probado con un usuario temporal real y el endpoint `/dashboard` respondió HTTP 200.
 
@@ -40,4 +40,5 @@ No se deben guardar claves de servicio en el repositorio. Los objetos de Storage
 - Las tres Edge Functions (`chat-ia`, `generar-briefing`, `cierre-diario`) están publicadas y respondieron HTTP 200.
 - `configurar_cron_chefos` fue ejecutada en el proyecto real; los jobs `chefos-briefing-0600` y `chefos-cierre-2300` están activos.
 - `ANTHROPIC_API_KEY` es opcional; sin ella se conserva el modo básico por reglas.
-- Falta ejecutar la E2E completa de negocio desde Android y publicar el backend Next.js en hosting HTTPS permanente.
+- El backend Next.js está publicado en Vercel: `https://chefos-pied.vercel.app`.
+- Falta ejecutar la E2E completa de negocio desde Android.

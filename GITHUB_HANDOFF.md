@@ -1,12 +1,12 @@
 # ChefOS — guía de continuación en GitHub
 
-## Corte de estado — 10-09-2026
+## Corte de estado — 13-09-2026
 
-Edge Functions y cron ya están publicados y verificados en Supabase. `/api/auth/session` y el middleware API fueron corregidos; una prueba E2E con tokens reales confirmó cookie SSR, Storage accesible y `/dashboard` HTTP 200. La APK guardada todavía apunta a un túnel temporal detenido: el siguiente paso es fijar hosting HTTPS, regenerar la APK y repetir el login desde Android.
+Edge Functions y cron ya están publicados y verificados en Supabase. `/api/auth/session` y el middleware API fueron corregidos; una prueba E2E con tokens reales confirmó cookie SSR, Storage accesible y `/dashboard` HTTP 200. Vercel está publicado en `https://chefos-pied.vercel.app` y la APK final ya fue regenerada con ese backend. Solo falta la prueba física final y el flujo E2E completo de negocio.
 
 ## Estado conocido
 
-El proyecto Supabase real es `nipovuqpxvsgeqdrszuq`, con URL `https://nipovuqpxvsgeqdrszuq.supabase.co`. Las migraciones `001`–`006`, los buckets `facturas`, `importaciones`, `recetas-imagenes` y `recetas-videos`, las Edge Functions y los cron jobs fueron verificados. Ya existe un usuario/restaurante de prueba; los datos de negocio completos aún requieren una prueba E2E.
+El proyecto Supabase real es `nipovuqpxvsgeqdrszuq`, con URL `https://nipovuqpxvsgeqdrszuq.supabase.co`. Las migraciones `001`–`006`, los buckets `facturas`, `importaciones`, `recetas-imagenes` y `recetas-videos`, las Edge Functions y los cron jobs fueron verificados. Vercel responde salud con Supabase y Storage operativos; los datos de negocio completos aún requieren una prueba E2E.
 
 Chef IA funciona en modo básico sin Anthropic: entrega recomendaciones usando el contexto real del restaurante. `ANTHROPIC_API_KEY` es opcional y activa el modo avanzado en el chat, el briefing y el cierre.
 
@@ -51,18 +51,18 @@ El workflow `.github/workflows/deploy.yml` reemplaza la plantilla anterior de Gi
 
 ## Android
 
-La APK existente en `artifacts/ChefOS-debug.apk` apunta a un túnel HTTPS temporal de demostración que actualmente está detenido. Ese túnel requiere que el servidor local y Cloudflare permanezcan encendidos; no es un despliegue de producción.
+La APK final está en `artifacts/ChefOS-debug-final.apk` y apunta a `https://chefos-pied.vercel.app`. Es un APK debug para instalar directamente en Android; contiene `appId=com.chefos.app`, `cleartext=false` y fue compilado correctamente.
 
 Para un teléfono físico, compilar apuntando a HTTPS:
 
 ```powershell
-$env:CHEFOS_ANDROID_URL='https://<backend-publicado>'
-powershell -ExecutionPolicy Bypass -File .\scripts\build-android.ps1 -BackendUrl $env:CHEFOS_ANDROID_URL
+$env:CHEFOS_ANDROID_URL='https://chefos-pied.vercel.app'
+powershell -ExecutionPolicy Bypass -File .\scripts\build-android.ps1 -BackendUrl $env:CHEFOS_ANDROID_URL -SkipCapacitorSync
 ```
 
 Si Capacitor falla al leer el entorno Node de Windows, usar `-SkipCapacitorSync`; el script sincroniza los archivos web de forma equivalente y ejecuta Gradle con la configuración Android local.
 
-El APK se genera en `artifacts/ChefOS-debug.apk`; si el archivo anterior está abierto por el sistema, el script usa `artifacts/ChefOS-debug-latest.apk`. Es un APK debug y debe probarse en un dispositivo físico.
+El APK se genera en `artifacts/ChefOS-debug.apk`; si el archivo anterior está abierto por el sistema, el script usa `artifacts/ChefOS-debug-latest.apk`. La copia final entregada está en `artifacts/ChefOS-debug-final.apk` y debe probarse en un dispositivo físico.
 
 ## Orden recomendado de validación
 

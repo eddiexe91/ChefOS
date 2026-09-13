@@ -1,13 +1,13 @@
 # CHEFOS — ROADMAP MAESTRO
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
-**Última actualización:** 10 de septiembre de 2026 (sincronización operativa, login y APK)
+**Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)
 
-## Actualización de ejecución — 10-09-2026
+## Actualización de ejecución — 13-09-2026
 
-Completado en Supabase real: Edge Functions (`chat-ia`, `generar-briefing`, `cierre-diario`) publicadas, cron jobs activos y migración `006_consistencia_operativa.sql` aplicada. El puente de sesión SSR y el middleware API fueron corregidos; la E2E de sesión, Storage y `/dashboard` pasa en servidor. Pendiente para el cierre de producción: hosting HTTPS estable, regenerar la APK y confirmar en el teléfono físico. Chef IA básico sigue siendo el modo operativo actual; Anthropic continúa opcional.
+Completado en Supabase real: Edge Functions (`chat-ia`, `generar-briefing`, `cierre-diario`) publicadas, cron jobs activos y migración `006_consistencia_operativa.sql` aplicada. El puente de sesión SSR y el middleware API fueron corregidos; la E2E de sesión, Storage y `/dashboard` pasa en servidor. Vercel está operativo en `https://chefos-pied.vercel.app` y la APK final ya fue regenerada con ese backend. Pendiente para el cierre: confirmación en el teléfono físico y E2E completa de negocio. Chef IA básico sigue siendo el modo operativo actual; Anthropic continúa opcional.
 
-## ESTADO ACTUAL DE IMPLEMENTACIÓN (09-09-2026)
+## ESTADO ACTUAL DE IMPLEMENTACIÓN (13-09-2026)
 
 El repositorio contiene la implementación local de los módulos operativos, Chef IA básico sin coste, integración opcional con Claude, revisión de ventas, onboarding, snapshots/analítica, grupos de restaurantes, Storage y Edge Functions. `type-check`, `lint` y `build` pasan con las herramientas locales del proyecto. Las migraciones 001–006 están aplicadas en el proyecto Supabase real `nipovuqpxvsgeqdrszuq` y los cuatro buckets de Storage fueron verificados. Edge Functions y cron están activos; Chef IA básico funciona sin `ANTHROPIC_API_KEY`. Ver `GITHUB_HANDOFF.md` y `supabase/DEPLOYMENT.md`.
 
@@ -16,7 +16,7 @@ El repositorio contiene la implementación local de los módulos operativos, Che
 - Chef IA básico está activo por reglas y contexto real (stock, alertas, ventas y mermas); `ANTHROPIC_API_KEY` es opcional.
 - La importación de ventas calcula coincidencias normalizadas y marca para revisión todo resultado bajo 0,85.
 - El briefing Edge usa Claude cuando existe la clave y mantiene un fallback por reglas cuando no existe.
-- La APK debug instalable se genera en `artifacts/ChefOS-debug.apk`; para un teléfono físico necesita una URL HTTPS pública del backend Next.js.
+- La APK debug final está en `artifacts/ChefOS-debug-final.apk` y apunta a `https://chefos-pied.vercel.app`.
 - La clave de Anthropic nunca debe guardarse en GitHub ni enviarse por el chat.
 
 ### Estado de entrega y continuación en GitHub
@@ -24,7 +24,7 @@ El repositorio contiene la implementación local de los módulos operativos, Che
 - Código local implementado; comprobaciones estáticas y build pasadas.
 - Backend Supabase aplicado: esquema, RLS, funciones SQL, Storage y trigger de registro.
 - Existe un usuario/restaurante de prueba; la E2E completa de negocio aún no está cerrada.
-- Siguiente secuencia: hosting HTTPS permanente → regeneración de APK → prueba física → E2E de importación, ventas, briefing, compras, merma, Storage y cierre.
+- Siguiente secuencia: prueba física de la APK final → E2E de importación, ventas, briefing, compras, merma, Storage y cierre.
 
 ---
 
