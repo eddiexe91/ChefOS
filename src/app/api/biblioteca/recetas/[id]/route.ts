@@ -29,7 +29,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     actualizado_en: new Date().toISOString(),
   }
   if (!Number.isFinite(update.precio_venta ?? 0) || !Number.isFinite(update.tiempo_preparacion ?? 0)) return NextResponse.json({ error: 'Precio o tiempo inválido.' }, { status: 400 })
-  const { data, error } = await supabase.from('recetas').update(update).eq('id', params.id).eq('restaurante_id', perfil.restaurante_id).select('*').single()
+  const { data: existente, error: existenteError } = await supabase
+    .from('recetas')
+    .select('id, version_actual')
+    .eq('id', params.id)
+    .eq('restaurante_id', perfil.restaurante_id)
+    .single()
+  if (existenteError || !existente) return NextResponse.json({ error: 'Receta no encontrada.' }, { status: 404 })
+  const { data, error } = await supabase.from('recetas').update({
+    ...update,
+    version_actual: Number(existente.version_actual ?? 1) + 1,
+  }).eq('id', params.id).eq('restaurante_id', perfil.restaurante_id).select('*').single()
   if (error || !data) return NextResponse.json({ error: 'No se pudo actualizar la receta.' }, { status: 500 })
   return NextResponse.json({ data, error: null })
 }

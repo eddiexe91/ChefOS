@@ -136,13 +136,16 @@ export async function POST(request: NextRequest) {
   // ── 2. Perfil del usuario ──────────────────────────────────
   const { data: perfil, error: perfilError } = await supabase
     .from('usuarios')
-    .select('id, restaurante_id, activo')
+    .select('id, restaurante_id, activo, rol')
     .eq('id', user.id)
     .eq('activo', true)
     .single()
 
   if (perfilError || !perfil) {
     return errorJSON('Usuario no encontrado o inactivo.', 401)
+  }
+  if (!['dueño', 'chef_ejecutivo', 'chef_cocina'].includes(perfil.rol)) {
+    return errorJSON('No tienes permisos para crear recetas.', 403)
   }
 
   // ── 3. Parsear y validar body ──────────────────────────────
@@ -520,132 +523,26 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── 6. Insertar receta ───────────────────────────────────────
-  const { data: receta, error: recetaError } = await supabase
-    .from('recetas')
-    .insert({
-      restaurante_id:         perfil.restaurante_id,
-      nombre:                 datos.nombre,
-      descripcion:            datos.descripcion,
-      categoria_id:           datos.categoria_id,
-      rendimiento_porciones:  datos.rendimiento_porciones,
-      unidad_rendimiento:     datos.unidad_rendimiento,
-      precio_venta:           datos.precio_venta,
-      tiempo_preparacion:     datos.tiempo_preparacion,
-      dificultad:             datos.dificultad,
-      en_carta:               datos.en_carta,
-      es_produccion:          datos.es_produccion,
-      activa:                 true,
-      version_actual:         1,
-      creado_por:             perfil.id,
-    })
-    .select()
-    .single()
-
-  if (recetaError || !receta) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error al insertar receta:', recetaError?.message)
-    return errorJSON('Error al crear la receta. Intenta nuevamente.', 500)
-  }
-
-  // ── 7. Insertar ingredientes ─────────────────────────────────
-  const { error: ingredientesError } = await supabase
-    .from('recetas_ingredientes')
-    .insert(
-      ingredientesConGramos.map((ingrediente) => ({
-        receta_id:       receta.id,
-        producto_id:     ingrediente.producto_id,
-        cantidad:        ingrediente.cantidad,
-        unidad_medida:   ingrediente.unidad_medida,
-        cantidad_gramos: ingrediente.cantidad_gramos,
-        es_opcional:     ingrediente.es_opcional,
-        orden:           ingrediente.orden,
-        notas:           ingrediente.notas,
-      }))
-    )
-
-  if (ingredientesError) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error al insertar ingredientes:', ingredientesError.message)
-    return errorJSON('Error al crear los ingredientes de la receta. Intenta nuevamente.', 500)
-  }
-
-  // ── 8. Insertar pasos ─────────────────────────────────────────
-  const { error: pasosError } = await supabase
-    .from('recetas_pasos')
-    .insert(
-      pasos.map((paso) => ({
-        receta_id:      receta.id,
-        restaurante_id: perfil.restaurante_id,
-        numero:         paso.numero,
-        titulo:         paso.titulo,
-        descripcion:    paso.descripcion,
-        duracion_min:   paso.duracion_min,
-        temperatura_c:  paso.temperatura_c,
-        tecnica:        paso.tecnica,
-        punto_critico:  paso.punto_critico,
-        foto_url:       paso.foto_url,
-        activo:         true,
-      }))
-    )
-
-  if (pasosError) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error al insertar pasos:', pasosError.message)
-    return errorJSON('Error al crear los pasos de la receta. Intenta nuevamente.', 500)
-  }
-
-  // ── 9. Insertar mapa de productos afectados ──────────────────
-  //
-  // recetas_productos_afectados tiene clave compuesta (receta_id, producto_id):
-  // un mismo producto puede aparecer en varios ingredientes de la receta, por
-  // lo que se agrupa por producto_id sumando cantidad_gramos antes de insertar,
-  // para producir exactamente una fila por producto_id único.
-  const gramosPorProducto = new Map<string, number>()
-
-  for (const ingrediente of ingredientesConGramos) {
-    const acumulado = gramosPorProducto.get(ingrediente.producto_id) ?? 0
-    gramosPorProducto.set(ingrediente.producto_id, acumulado + ingrediente.cantidad_gramos)
-  }
-
-  const { error: afectadosError } = await supabase
-    .from('recetas_productos_afectados')
-    .insert(
-      Array.from(gramosPorProducto.entries()).map(([producto_id, cantidad_gramos]) => ({
-        receta_id:       receta.id,
-        producto_id:     producto_id,
-        restaurante_id:  perfil.restaurante_id,
-        cantidad_gramos: cantidad_gramos,
-      }))
-    )
-
-  if (afectadosError) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error al insertar productos afectados:', afectadosError.message)
-    return errorJSON('Error al registrar los productos afectados por la receta. Intenta nuevamente.', 500)
-  }
-
-  // ── 10. Recalcular costo ──────────────────────────────────────
-  const { error: costoError } = await supabase.rpc('recalcular_costo_receta', {
-    receta_id: receta.id,
+  // ── 6. Crear receta completa en una sola transacción de PostgreSQL ──
+  // La validación anterior mantiene mensajes claros para la interfaz; la RPC
+  // vuelve a validar tenant, rol, productos y conversiones dentro de la base.
+  const { data: receta, error: recetaError } = await supabase.rpc('crear_receta_completa', {
+    p_restaurante_id: perfil.restaurante_id,
+    p_creado_por: perfil.id,
+    p_datos: {
+      ...datos,
+      ingredientes: ingredientesConGramos.map(({ cantidad_gramos: _cantidadGramos, ...ingrediente }) => ingrediente),
+    },
   })
 
-  if (costoError) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error al recalcular costo:', costoError.message)
-    return errorJSON('Error al calcular el costo de la receta. Intenta nuevamente.', 500)
+  const recetaCreada = Array.isArray(receta) ? receta[0] : receta
+  if (recetaError || !recetaCreada) {
+    console.error('[ChefOS/api/biblioteca/recetas] Error en creación atómica:', recetaError?.message)
+    return errorJSON('No se pudo crear la receta completa. Verifica tus permisos y los ingredientes.', 500)
   }
 
-  // ── 11. Volver a consultar la receta con los costos actualizados ──
-  const { data: recetaActualizada, error: recetaActualizadaError } = await supabase
-    .from('recetas')
-    .select()
-    .eq('id', receta.id)
-    .single()
-
-  if (recetaActualizadaError || !recetaActualizada) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error al recuperar la receta actualizada:', recetaActualizadaError?.message)
-    return errorJSON('Error al recuperar la receta con los costos actualizados. Intenta nuevamente.', 500)
-  }
-
-  // ── 12. Respuesta exitosa ─────────────────────────────────────
   return NextResponse.json(
-    { data: recetaActualizada, error: null },
+    { data: recetaCreada, error: null },
     { status: 201 }
   )
 }
