@@ -1,5 +1,5 @@
-import RecetaForm from '@/components/biblioteca/RecetaForm'
+import BibliotecaCliente from '@/components/biblioteca/BibliotecaCliente'
 
-export default function PaginaNuevaReceta() {
-  return <RecetaForm />
+export default function PaginaRecetas() {
+  return <BibliotecaCliente />
 }

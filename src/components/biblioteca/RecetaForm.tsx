@@ -30,9 +30,11 @@
  */
 
 import { useState, type ChangeEvent }  from 'react'
+import { useQueryClient }             from '@tanstack/react-query'
 import { X }                            from 'lucide-react'
 import { useRegistrarReceta }           from '@/hooks/useRegistrarReceta'
 import { useProductos }                 from '@/hooks/useDominio'
+import { dashboardKeys }                from '@/lib/queries'
 import type {
   CuerpoNuevaReceta,
   IngredienteNuevaReceta,
@@ -131,6 +133,7 @@ function nuevaFilaPaso(): FilaPaso {
 // ─────────────────────────────────────────────────────────────
 
 export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'carta' }) {
+  const queryClient = useQueryClient()
   const [campos, setCampos]             = useState<CamposGenerales>(ESTADO_INICIAL)
   const [ingredientes, setIngredientes] = useState<FilaIngrediente[]>(() => [nuevaFilaIngrediente()])
   const [pasos, setPasos]               = useState<FilaPaso[]>(() => [nuevaFilaPaso()])
@@ -146,6 +149,12 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
       setCampos(ESTADO_INICIAL)
       setIngredientes([])
       setPasos([])
+      if (modo === 'carta') {
+        void (async () => {
+          await fetch('/api/ia/briefing', { method: 'POST' })
+          await queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
+        })()
+      }
     },
   })
 
@@ -782,7 +791,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
       {mutacion.isSuccess && (
         <div className="rounded-lg bg-exito-suave border border-exito-borde px-3 py-2.5">
           <p className="text-xs font-sans font-medium text-exito-texto">
-            Receta creada correctamente.
+            {modo === 'carta' ? 'Plato agregado a la carta correctamente.' : 'Receta creada correctamente.'}
           </p>
         </div>
       )}

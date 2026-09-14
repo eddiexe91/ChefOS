@@ -1,6 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 type Suggestion = { producto?: string; nombre?: string; cantidad?: number; unidad?: string; urgencia?: string; prioridad?: string; razon?: string }
+type CartaProducto = { id: string; nombre: string; cantidad_gramos: number | null; unidad_display: string | null; activo: boolean }
+type CartaIngrediente = { cantidad_gramos: number | null; producto: CartaProducto | CartaProducto[] | null }
+type CartaReceta = { id: string; nombre: string; rendimiento_porciones: number | null; ingredientes: CartaIngrediente[] | null }
+
+function productoDeIngrediente(ingrediente: CartaIngrediente): CartaProducto | null {
+  return Array.isArray(ingrediente.producto) ? ingrediente.producto[0] ?? null : ingrediente.producto
+}
 
 function jsonFromClaude(text: string): { produccion_sugerida: Suggestion[]; compras_sugeridas: Suggestion[]; riesgos: Suggestion[] } | null {
   try {
@@ -38,17 +45,36 @@ Deno.serve(async (request) => {
   const fecha = body.fecha ?? new Date().toISOString().slice(0, 10)
   const { data: restaurantes } = await supabase.from('restaurantes').select('id').eq('activo', true)
   for (const restaurante of restaurantes ?? []) {
-    const [{ data: stock }, { data: alertas }, { data: ventas }, { data: produccion }] = await Promise.all([
-      supabase.from('productos').select('nombre,cantidad_gramos,stock_minimo_gramos').eq('restaurante_id', restaurante.id).eq('activo', true).limit(100),
+    const [{ data: stock }, { data: alertas }, { data: ventas }, { data: produccion }, { data: carta }] = await Promise.all([
+      supabase.from('productos').select('id,nombre,cantidad_gramos,stock_minimo_gramos,unidad_display,activo').eq('restaurante_id', restaurante.id).eq('activo', true).limit(100),
       supabase.from('alertas_sistema').select('tipo,severidad,mensaje').eq('restaurante_id', restaurante.id).eq('leida', false).limit(20),
       supabase.from('ventas_items').select('nombre_original,cantidad_vendida,total').eq('restaurante_id', restaurante.id).gte('fecha_venta', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(500),
       supabase.from('produccion_registros').select('cantidad_producida,unidad,fecha_produccion').eq('restaurante_id', restaurante.id).gte('fecha_produccion', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)).limit(300),
+      supabase.from('recetas').select('id,nombre,rendimiento_porciones,ingredientes:recetas_ingredientes(cantidad_gramos,producto:productos(id,nombre,cantidad_gramos,unidad_display,activo))').eq('restaurante_id', restaurante.id).eq('activa', true).eq('en_carta', true).limit(100),
     ])
-    const compras = (stock ?? []).filter((item) => Number(item.cantidad_gramos) <= Number(item.stock_minimo_gramos)).map((item) => ({ producto: item.nombre, cantidad_sugerida: item.stock_minimo_gramos, unidad: 'g', urgencia: 'alta', razon: 'stock bajo' }))
+    const comprasPorProducto = new Map<string, Suggestion>()
+    for (const item of stock ?? []) {
+      if (Number(item.cantidad_gramos) <= Number(item.stock_minimo_gramos)) {
+        comprasPorProducto.set(item.id, { producto: item.nombre, cantidad_sugerida: item.stock_minimo_gramos, unidad: item.unidad_display ?? 'g', urgencia: 'alta', razon: 'stock bajo' })
+      }
+    }
+    const produccionCarta = ((carta ?? []) as CartaReceta[]).map((receta) => {
+      const ingredientes = (receta.ingredientes ?? []).filter((item) => productoDeIngrediente(item)?.activo !== false && productoDeIngrediente(item))
+      const faltantes = ingredientes.filter((item) => Number(productoDeIngrediente(item)?.cantidad_gramos ?? 0) < Number(item.cantidad_gramos ?? 0) / Math.max(Number(receta.rendimiento_porciones ?? 1), 1))
+      const faltantesTexto = faltantes.map((item) => productoDeIngrediente(item)?.nombre).filter(Boolean).join(', ')
+      const disponiblesTexto = ingredientes.filter((item) => !faltantes.includes(item)).map((item) => productoDeIngrediente(item)?.nombre).filter(Boolean).join(', ')
+      for (const item of faltantes) {
+        const producto = productoDeIngrediente(item)!
+        const requerido = Number(item.cantidad_gramos ?? 0) / Math.max(Number(receta.rendimiento_porciones ?? 1), 1)
+        comprasPorProducto.set(producto.id, { producto: producto.nombre, cantidad_sugerida: Math.max(Number(comprasPorProducto.get(producto.id)?.cantidad_sugerida ?? 0), Math.max(requerido - Number(producto.cantidad_gramos ?? 0), 0)), unidad: producto.unidad_display ?? 'g', urgencia: 'critica', razon: `Falta para preparar ${receta.nombre}` })
+      }
+      return { nombre: `Preparar ${receta.nombre}`, cantidad: 1, unidad: 'plato', prioridad: faltantes.length > 0 ? 'alta' : 'media', razon: faltantes.length > 0 ? `Revisar ${faltantesTexto}` : `Tienes ${disponiblesTexto || 'los ingredientes'} suficientes para este plato` }
+    })
+    const compras = Array.from(comprasPorProducto.values())
     const riesgos = (alertas ?? []).map((item) => ({ tipo: item.tipo, descripcion: item.mensaje, severidad: item.severidad, accion_sugerida: 'Revisar antes del servicio' }))
-    const contexto = { stock_bajo: compras, alertas: riesgos, ventas_28_dias: ventas ?? [], produccion_7_dias: produccion ?? [] }
+    const contexto = { stock_bajo: compras, platos_en_carta: (carta ?? []).length, analisis_carta: produccionCarta, alertas: riesgos, ventas_28_dias: ventas ?? [], produccion_7_dias: produccion ?? [] }
     const ia = await consultarClaude(contexto)
-    await supabase.from('briefings').upsert({ restaurante_id: restaurante.id, fecha, turno: 'mañana', confianza_estimacion: ia ? 'alta' : 'media', produccion_sugerida: ia?.produccion_sugerida ?? [], compras_sugeridas: ia?.compras_sugeridas ?? compras, riesgos: ia?.riesgos ?? riesgos, alertas: alertas ?? [], contexto_usado: { generado_por: ia ? 'claude' : 'reglas', ...contexto } }, { onConflict: 'restaurante_id,fecha,turno' })
+    await supabase.from('briefings').upsert({ restaurante_id: restaurante.id, fecha, turno: 'mañana', confianza_estimacion: ia ? 'alta' : 'media', produccion_sugerida: ia?.produccion_sugerida ?? produccionCarta, compras_sugeridas: ia?.compras_sugeridas ?? compras, riesgos: ia?.riesgos ?? riesgos, alertas: alertas ?? [], contexto_usado: { generado_por: ia ? 'claude' : 'reglas', ...contexto } }, { onConflict: 'restaurante_id,fecha,turno' })
   }
   return Response.json({ ok: true, fecha, restaurantes: restaurantes?.length ?? 0 })
 })

@@ -1,9 +1,5 @@
-import LoteDetalleCliente from '@/components/produccion/LoteDetalleCliente'
+import { redirect } from 'next/navigation'
 
-interface Props {
-  params: { loteId: string }
-}
-
-export default function PaginaLoteProduccion({ params }: Props) {
-  return <LoteDetalleCliente loteId={params.loteId} />
+export default function PaginaProduccion() {
+  redirect('/dashboard')
 }

@@ -169,7 +169,7 @@ export default function BibliotecaCliente() {
       <section>
         <div className="flex items-baseline justify-between gap-3">
           <h1 className="text-xl font-display font-bold text-texto-primario leading-tight">
-            Biblioteca
+            Recetas del restaurante
           </h1>
           {isSuccess && recetas.length > 0 && (
             <p className="text-xs font-sans text-texto-apagado flex-shrink-0">
@@ -181,7 +181,7 @@ export default function BibliotecaCliente() {
           )}
         </div>
         <p className="text-xs font-sans text-texto-apagado mt-0.5">
-          Recetas y fichas técnicas
+          Todas las recetas y fichas técnicas del restaurante
         </p>
         <Link
           href="/biblioteca/nueva"
@@ -190,7 +190,7 @@ export default function BibliotecaCliente() {
                      active:bg-acento-hover transition-colors"
         >
           <Plus size={13} />
-          Nueva receta
+          Añadir receta
         </Link>
       </section>
 
