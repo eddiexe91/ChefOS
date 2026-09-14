@@ -65,5 +65,6 @@ export async function POST(request: Request) {
     activo: true,
   }).select().single()
   if (error || !data) return errorJSON('No se pudo crear el producto. Intenta nuevamente.', 500)
+  await supabase.from('actividad_operativa').insert({ restaurante_id: perfil.restaurante_id, usuario_id: user.id, accion: 'crear_producto', entidad_id: data.id, descripcion: `${user.email ?? 'Usuario'} creó el producto ${nombre}`, datos: { nombre, unidad, stock, minimo, costo } })
   return NextResponse.json({ data, error: null }, { status: 201 })
 }

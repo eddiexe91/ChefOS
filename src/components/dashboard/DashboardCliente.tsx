@@ -1,4 +1,5 @@
 'use client'
+import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 
 /**
  * src/components/dashboard/DashboardCliente.tsx
@@ -73,7 +74,7 @@ export default function DashboardCliente() {
                 'Buenas noches'
 
   return (
-    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto"><TutorialPrimeraVez id="inicio" titulo="Aprende cómo usar Inicio" texto="Aquí encontrarás el briefing, ventas, producción, mermas y stock crítico." />
 
       {/* ── 1. Saludo ────────────────────────────────────── */}
       <section>

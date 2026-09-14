@@ -7,6 +7,7 @@ import { Plus, Search, X } from 'lucide-react'
 
 import { useRecetas } from '@/hooks/useDominio'
 import type { Receta } from '@/types/index'
+import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 
 type FiltroVista = 'todas' | 'en_carta'
 
@@ -163,7 +164,7 @@ export default function BibliotecaCliente() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto"><TutorialPrimeraVez id="recetas" titulo="Aprende cómo crear recetas" texto="Agrega ingredientes del inventario, completa los pasos y marca En carta para que el plato aparezca en la carta." />
 
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>

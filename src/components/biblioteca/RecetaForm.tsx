@@ -133,7 +133,7 @@ function nuevaFilaPaso(): FilaPaso {
 export default function RecetaForm() {
   const [campos, setCampos]             = useState<CamposGenerales>(ESTADO_INICIAL)
   const [ingredientes, setIngredientes] = useState<FilaIngrediente[]>([])
-  const [pasos, setPasos]               = useState<FilaPaso[]>([])
+  const [pasos, setPasos]               = useState<FilaPaso[]>([nuevaFilaPaso()])
 
   const {
     data:      productos,
@@ -145,7 +145,7 @@ export default function RecetaForm() {
     onSuccess: () => {
       setCampos(ESTADO_INICIAL)
       setIngredientes([])
-      setPasos([])
+      setPasos([nuevaFilaPaso()])
     },
   })
 

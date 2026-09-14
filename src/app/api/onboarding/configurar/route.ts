@@ -9,7 +9,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autenticado.' }, { status: 401 })
   const { data: perfil } = await supabase.from('usuarios').select('id, restaurante_id, rol, activo').eq('id', user.id).eq('activo', true).single()
-  if (!perfil || !['dueño', 'administrador'].includes(perfil.rol)) return NextResponse.json({ error: 'Sin permisos para configurar el restaurante.' }, { status: 403 })
+  if (!perfil) return NextResponse.json({ error: 'Usuario no encontrado o inactivo.' }, { status: 401 })
+  const { data: restaurante } = await supabase.from('restaurantes').select('onboarding_completado').eq('id', perfil.restaurante_id).single()
+  if (!['dueño', 'administrador'].includes(perfil.rol) && restaurante?.onboarding_completado !== false) return NextResponse.json({ error: 'Sin permisos para configurar el restaurante.' }, { status: 403 })
   const body = await request.json().catch(() => null) as { nombre?: unknown; rol?: unknown; zona_horaria?: unknown } | null
   const nombre = typeof body?.nombre === 'string' ? body.nombre.trim() : ''
   const rol = typeof body?.rol === 'string' && ROLES.includes(body.rol as (typeof ROLES)[number]) ? body.rol : perfil.rol

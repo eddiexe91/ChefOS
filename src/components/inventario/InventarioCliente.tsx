@@ -27,11 +27,13 @@
  */
 
 import { useState, useMemo }  from 'react'
-import { Search, Filter, X, Plus }  from 'lucide-react'
+import { Search, Filter, X, Plus, Pencil }  from 'lucide-react'
 import { useProductos }        from '@/hooks/useDominio'
 import type { Producto }       from '@/types/index'
 import { useState as useModalState } from 'react'
 import NuevoProductoCliente from '@/components/inventario/NuevoProductoCliente'
+import EditarProductoCliente from '@/components/inventario/EditarProductoCliente'
+import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 
 // ─────────────────────────────────────────────────────────────
 // Helper — criterio de stock crítico
@@ -56,7 +58,7 @@ interface TarjetaProductoProps {
   critico: boolean
 }
 
-function TarjetaProducto({ producto, critico }: TarjetaProductoProps) {
+function TarjetaProducto({ producto, critico, onEdit }: TarjetaProductoProps & { onEdit: () => void }) {
   const unidad = producto.unidad_display ?? producto.unidad_medida
 
   return (
@@ -90,6 +92,8 @@ function TarjetaProducto({ producto, critico }: TarjetaProductoProps) {
           </p>
         </div>
       </div>
+
+      <button type="button" onClick={onEdit} className="mt-3 inline-flex items-center gap-1.5 text-xs text-acento"><Pencil size={13}/> Editar o archivar</button>
 
       {/* Indicador de stock crítico */}
       {critico && (
@@ -139,6 +143,7 @@ function SkeletonProductos() {
 
 export default function InventarioCliente() {
   const [mostrarNuevo, setMostrarNuevo] = useModalState(false)
+  const [productoEditando, setProductoEditando] = useState<Producto | null>(null)
   const [busqueda,         setBusqueda]         = useState('')
   const [categoriaActiva,  setCategoriaActiva]  = useState<string>('todas')
   const [soloStockCritico, setSoloStockCritico] = useState(false)
@@ -205,7 +210,7 @@ export default function InventarioCliente() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto"><TutorialPrimeraVez id="inventario" titulo="Aprende cómo gestionar Inventario" texto="Crea, modifica y archiva productos. Usa el filtro Crítico para encontrar lo urgente." />
 
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>
@@ -373,12 +378,14 @@ export default function InventarioCliente() {
               key={producto.id}
               producto={producto}
               critico={esCritico(producto)}
+              onEdit={() => setProductoEditando(producto)}
             />
           ))}
         </section>
       )}
 
       {mostrarNuevo && <NuevoProductoCliente onClose={() => setMostrarNuevo(false)} />}
+      {productoEditando && <EditarProductoCliente producto={productoEditando} onClose={() => setProductoEditando(null)} />}
     </div>
   )
 }
