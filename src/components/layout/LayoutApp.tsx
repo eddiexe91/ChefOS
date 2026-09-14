@@ -8,6 +8,7 @@ import {
   FlameKindling,
   Boxes,
   Bell,
+  Utensils,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useApp } from '@/providers/AppProvider'
@@ -36,6 +37,14 @@ const NAV_ITEMS = [
     icono:         BookOpen,
     etiqueta:      'Recetas',
     activo:        (r: string) => r.startsWith('/biblioteca'),
+    esPrincipal:   false,
+    tieneContador: false,
+  },
+  {
+    href:          '/carta',
+    icono:         Utensils,
+    etiqueta:      'Carta',
+    activo:        (r: string) => r.startsWith('/carta'),
     esPrincipal:   false,
     tieneContador: false,
   },
@@ -72,9 +81,11 @@ export default function LayoutApp({ usuario, restaurante, children }: Props) {
     ? ['inicio', 'Aprende cómo usar Inicio', 'Aquí verás el briefing del día, ventas, producción, mermas, stock bajo y alertas.']
     : ruta.startsWith('/biblioteca')
       ? ['recetas', 'Aprende cómo crear recetas', 'Crea recetas usando productos del inventario y marca los platos que forman parte de la Carta.']
-      : ruta.startsWith('/produccion')
+          : ruta.startsWith('/produccion')
         ? ['produccion', 'Aprende cómo usar Producción', 'Registra lo que debes preparar y controla el turno desde un solo lugar.']
-        : ruta.startsWith('/inventario')
+        : ruta.startsWith('/carta')
+          ? ['carta', 'Aprende cómo usar Carta', 'Aquí verás los platos que ofrece tu restaurante y podrás agregar nuevos platos usando productos del inventario.']
+          : ruta.startsWith('/inventario')
           ? ['inventario', 'Aprende cómo usar Inventario', 'Crea, edita y archiva productos. Toca cualquier producto para modificarlo.']
           : ruta.startsWith('/alertas')
             ? ['alertas', 'Aprende cómo usar Alertas', 'Revisa avisos de stock crítico y otras situaciones que necesitan atención.']

@@ -22,13 +22,14 @@ function valores(body: Record<string, unknown>) {
   const stock = Number(body.stock ?? 0), minimo = Number(body.stock_minimo ?? 0), costo = Number(body.costo_unitario ?? 0)
   const densidad = body.densidad_g_por_ml == null ? undefined : Number(body.densidad_g_por_ml)
   const peso = body.peso_unitario_gramos == null ? undefined : Number(body.peso_unitario_gramos)
+  const categoriaId = typeof body.categoria_id === 'string' && body.categoria_id.trim() !== '' ? body.categoria_id.trim() : null
   if (!nombre || !UNIDADES.includes(unidad as UnidadEntrada)) throw new Error('Nombre y unidad válida son obligatorios.')
   if (![stock,minimo,costo].every(Number.isFinite) || stock < 0 || minimo < 0 || costo < 0) throw new Error('Stock, mínimo y costo deben ser números válidos.')
   if (densidad !== undefined && (!Number.isFinite(densidad) || densidad <= 0)) throw new Error('La densidad debe ser positiva.')
   if (peso !== undefined && (!Number.isFinite(peso) || peso <= 0)) throw new Error('El peso unitario debe ser positivo.')
   const sg = convertirAGramos(stock, unidad as UnidadEntrada, densidad, peso), mg = convertirAGramos(minimo, unidad as UnidadEntrada, densidad, peso)
   if (sg.gramos === null || mg.gramos === null) throw new Error('Para unidades, cajas o bandejas debes indicar el peso unitario en gramos.')
-  return { nombre, unidad, stock, minimo, costo, densidad, peso, stockGramos: sg.gramos, minimoGramos: mg.gramos }
+  return { nombre, unidad, stock, minimo, costo, densidad, peso, categoriaId, stockGramos: sg.gramos, minimoGramos: mg.gramos }
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -37,9 +38,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!body) return errorJSON('Body inválido.', 400)
   try {
     const v = valores(body)
-    const { data: anterior } = await ctx.supabase.from('productos').select('nombre, stock_actual, costo_unitario_actual').eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).single()
+    if (v.categoriaId) {
+      const { data: categoria } = await ctx.supabase.from('categorias_producto').select('id').eq('id', v.categoriaId).eq('restaurante_id', ctx.perfil.restaurante_id).eq('activa', true).maybeSingle()
+      if (!categoria) return errorJSON('La categoría seleccionada no es válida.', 400)
+    }
+    const { data: anterior } = await ctx.supabase.from('productos').select('nombre, stock_actual, costo_unitario_actual, categoria_id').eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).single()
     if (!anterior) return errorJSON('Producto no encontrado.', 404)
-    const { data, error } = await ctx.supabase.from('productos').update({ nombre:v.nombre, nombre_normalizado:v.nombre.toLowerCase(), unidad_medida:v.unidad, unidad_compra:v.unidad, unidad_display:v.unidad, costo_unitario_actual:v.costo, stock_actual:v.stock, stock_minimo:v.minimo, cantidad_gramos:v.stockGramos, stock_minimo_gramos:v.minimoGramos, densidad_g_por_ml:v.densidad ?? null, peso_unitario_gramos:v.peso ?? null }).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
+    const { data, error } = await ctx.supabase.from('productos').update({ nombre:v.nombre, nombre_normalizado:v.nombre.toLowerCase(), unidad_medida:v.unidad, unidad_compra:v.unidad, unidad_display:v.unidad, costo_unitario_actual:v.costo, stock_actual:v.stock, stock_minimo:v.minimo, cantidad_gramos:v.stockGramos, stock_minimo_gramos:v.minimoGramos, densidad_g_por_ml:v.densidad ?? null, peso_unitario_gramos:v.peso ?? null, categoria_id: v.categoriaId }).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
     if (error || !data) return errorJSON('No se pudo actualizar el producto.', 500)
     await ctx.supabase.from('actividad_operativa').insert({ restaurante_id:ctx.perfil.restaurante_id, usuario_id:ctx.user.id, accion:'editar_producto', entidad_id:id, descripcion:`${ctx.user.email ?? 'Usuario'} editó el producto ${v.nombre}`, datos:{ antes: anterior, despues: v } })
     return NextResponse.json({ data, error:null })

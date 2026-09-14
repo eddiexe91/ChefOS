@@ -229,8 +229,9 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
     tiempoPreparacionNumerico === null ||
     (Number.isFinite(tiempoPreparacionNumerico) && Number.isInteger(tiempoPreparacionNumerico))
 
-  const generalesValidos =
-    campos.nombre.trim() !== '' &&
+  const generalesValidos = modo === 'carta'
+    ? campos.nombre.trim() !== ''
+    : campos.nombre.trim() !== '' &&
     campos.rendimiento_porciones !== '' &&
     Number.isFinite(rendimientoNumerico) &&
     Number.isInteger(rendimientoNumerico) &&
@@ -305,15 +306,15 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
 
     const body: CuerpoNuevaReceta = {
       nombre:                 campos.nombre.trim(),
-      rendimiento_porciones:  rendimientoNumerico,
-      unidad_rendimiento:     campos.unidad_rendimiento.trim(),
+      rendimiento_porciones:  modo === 'carta' ? 1 : rendimientoNumerico,
+      unidad_rendimiento:     modo === 'carta' ? 'plato' : campos.unidad_rendimiento.trim(),
       en_carta:               campos.en_carta,
       es_produccion:          campos.es_produccion,
       ...(campos.descripcion.trim() !== '' ? { descripcion: campos.descripcion.trim() } : {}),
       ...(campos.categoria_id.trim() !== '' ? { categoria_id: campos.categoria_id.trim() } : {}),
-      ...(precioVentaNumerico !== null ? { precio_venta: precioVentaNumerico } : {}),
-      ...(tiempoPreparacionNumerico !== null ? { tiempo_preparacion: tiempoPreparacionNumerico } : {}),
-      ...(campos.dificultad !== '' ? { dificultad: campos.dificultad as DificultadReceta } : {}),
+      ...(modo !== 'carta' && precioVentaNumerico !== null ? { precio_venta: precioVentaNumerico } : {}),
+      ...(modo !== 'carta' && tiempoPreparacionNumerico !== null ? { tiempo_preparacion: tiempoPreparacionNumerico } : {}),
+      ...(modo !== 'carta' && campos.dificultad !== '' ? { dificultad: campos.dificultad as DificultadReceta } : {}),
       ingredientes: ingredientesBody,
       pasos:        pasosBody,
     }
@@ -323,7 +324,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
 
   return (
     <div className="px-4 pt-6 pb-36 max-w-lg mx-auto space-y-6">
-      <section><p className="text-xs uppercase tracking-wide text-acento">{modo === 'carta' ? 'Carta' : 'Recetas'}</p><h1 className="text-xl font-display font-bold text-texto-primario mt-1">{modo === 'carta' ? 'Agregar plato a la carta' : 'Crear receta'}</h1><p className="text-xs text-texto-apagado mt-1">{modo === 'carta' ? 'Agrega el plato, su rendimiento y sus ingredientes. Los pasos no son necesarios aquí.' : 'Crea una ficha técnica completa para producción.'}</p></section>
+      <section><p className="text-xs uppercase tracking-wide text-acento">{modo === 'carta' ? 'Carta' : 'Recetas'}</p><h1 className="text-xl font-display font-bold text-texto-primario mt-1">{modo === 'carta' ? 'Agregar plato a la carta' : 'Crear receta'}</h1><p className="text-xs text-texto-apagado mt-1">{modo === 'carta' ? 'Agrega el plato y sus ingredientes. Los datos técnicos se completan en Recetas.' : 'Crea una ficha técnica completa para producción.'}</p></section>
 
       {/* ── Datos generales ──────────────────────────────────── */}
       <div className="space-y-4">
@@ -367,6 +368,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
           />
         </div>
 
+        {modo !== 'carta' && <>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label htmlFor="rendimiento_porciones" className="text-xs font-sans font-medium text-texto-secundario">
@@ -482,7 +484,8 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
           </select>
         </div>
 
-        <div className="flex items-center gap-4">
+        </>}
+        {modo !== 'carta' && <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-xs font-sans text-texto-secundario">
             <input
               type="checkbox"
@@ -503,7 +506,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
             />
             Es producción
           </label>
-        </div>
+        </div>}
       </div>
 
       {/* ── Ingredientes ─────────────────────────────────────── */}

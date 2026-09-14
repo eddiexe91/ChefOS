@@ -38,6 +38,7 @@ import {
   fetchRecetas,
   fetchRecetaPorId,
   fetchProductos,
+  fetchCategoriasProducto,
   fetchProductoPorId,
   fetchMovimientos,
   fetchLotesProduccion,
@@ -108,6 +109,13 @@ export function useProductos(filtros?: FiltrosProducto) {
       ? inventarioKeys.productosFiltrados(filtros)
       : inventarioKeys.productos(),
     queryFn: () => fetchProductos(obtenerClienteNavegador(), filtros),
+  })
+}
+
+export function useCategoriasProducto() {
+  return useQuery({
+    queryKey: inventarioKeys.categorias(),
+    queryFn: () => fetchCategoriasProducto(obtenerClienteNavegador()),
   })
 }
 

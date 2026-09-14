@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (!email || !email.includes('@')) return NextResponse.json({ error: 'Escribe un correo válido.' }, { status: 400 })
   const admin = crearClienteAdmin()
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://chefos-pied.vercel.app').replace(/\/$/, '')
-  const { data: invitado, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/auth/callback?next=/dashboard`, data: { nombre, restaurante_id: perfil.restaurante_id, rol } })
+  const { data: invitado, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/auth/callback?next=/auth/invitacion`, data: { nombre, restaurante_id: perfil.restaurante_id, rol } })
   if (inviteError || !invitado.user) return NextResponse.json({ error: 'No se pudo enviar la invitación. Revisa la configuración de correo.' }, { status: 502 })
   const id = invitado.user.id
   // El trigger de registro puede ejecutarse inmediatamente después de la invitación.

@@ -168,12 +168,11 @@ export async function POST(request: NextRequest) {
   // Validar campos obligatorios de la receta
   if (
     !('nombre' in raw) ||
-    !('rendimiento_porciones' in raw) ||
-    !('unidad_rendimiento' in raw) ||
     !('en_carta' in raw) ||
     !('es_produccion' in raw) ||
     !('ingredientes' in raw) ||
-    !('pasos' in raw)
+    !('pasos' in raw) ||
+    (raw.en_carta !== true && (!('rendimiento_porciones' in raw) || !('unidad_rendimiento' in raw)))
   ) {
     return errorJSON(
       'Campos obligatorios faltantes: nombre, rendimiento_porciones, unidad_rendimiento, en_carta, es_produccion, ingredientes, pasos.',
@@ -185,16 +184,16 @@ export async function POST(request: NextRequest) {
     return errorJSON('nombre debe ser un string no vacío.', 400)
   }
 
-  if (
+  if (raw.en_carta !== true && (
     typeof raw.rendimiento_porciones !== 'number' ||
     !Number.isFinite(raw.rendimiento_porciones) ||
     !Number.isInteger(raw.rendimiento_porciones) ||
     raw.rendimiento_porciones <= 0
-  ) {
+  )) {
     return errorJSON('rendimiento_porciones debe ser un número entero mayor que 0.', 400)
   }
 
-  if (typeof raw.unidad_rendimiento !== 'string' || raw.unidad_rendimiento.trim() === '') {
+  if (raw.en_carta !== true && (typeof raw.unidad_rendimiento !== 'string' || raw.unidad_rendimiento.trim() === '')) {
     return errorJSON('unidad_rendimiento debe ser un string no vacío.', 400)
   }
 
@@ -452,8 +451,8 @@ export async function POST(request: NextRequest) {
       typeof raw.categoria_id === 'string' && raw.categoria_id.trim() !== ''
         ? raw.categoria_id.trim()
         : null,
-    rendimiento_porciones: raw.rendimiento_porciones,
-    unidad_rendimiento:    raw.unidad_rendimiento.trim(),
+    rendimiento_porciones: typeof raw.rendimiento_porciones === 'number' ? raw.rendimiento_porciones : 1,
+    unidad_rendimiento:    typeof raw.unidad_rendimiento === 'string' && raw.unidad_rendimiento.trim() !== '' ? raw.unidad_rendimiento.trim() : 'plato',
     precio_venta:          typeof raw.precio_venta === 'number' ? raw.precio_venta : null,
     tiempo_preparacion:    typeof raw.tiempo_preparacion === 'number' ? raw.tiempo_preparacion : null,
     dificultad:            typeof raw.dificultad === 'string' ? (raw.dificultad as DificultadReceta) : null,

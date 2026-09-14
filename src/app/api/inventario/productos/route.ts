@@ -36,11 +36,16 @@ export async function POST(request: Request) {
   const costo = Number(body.costo_unitario ?? 0)
   const densidad = body.densidad_g_por_ml == null ? undefined : Number(body.densidad_g_por_ml)
   const peso = body.peso_unitario_gramos == null ? undefined : Number(body.peso_unitario_gramos)
+  const categoriaId = typeof body.categoria_id === 'string' && body.categoria_id.trim() !== '' ? body.categoria_id.trim() : null
 
   if (!nombre || !UNIDADES.includes(unidad as UnidadEntrada)) return errorJSON('Nombre y unidad válida son obligatorios.', 400)
   if (![stock, minimo, costo].every(Number.isFinite) || stock < 0 || minimo < 0 || costo < 0) return errorJSON('Stock, mínimo y costo deben ser números válidos.', 400)
   if (densidad !== undefined && (!Number.isFinite(densidad) || densidad <= 0)) return errorJSON('La densidad debe ser positiva.', 400)
   if (peso !== undefined && (!Number.isFinite(peso) || peso <= 0)) return errorJSON('El peso unitario debe ser positivo.', 400)
+  if (categoriaId) {
+    const { data: categoria } = await supabase.from('categorias_producto').select('id').eq('id', categoriaId).eq('restaurante_id', perfil.restaurante_id).eq('activa', true).maybeSingle()
+    if (!categoria) return errorJSON('La categoría seleccionada no es válida.', 400)
+  }
 
   const stockGramos = convertirAGramos(stock, unidad as UnidadEntrada, densidad, peso)
   const minimoGramos = convertirAGramos(minimo, unidad as UnidadEntrada, densidad, peso)
@@ -62,6 +67,7 @@ export async function POST(request: Request) {
     stock_minimo_gramos: minimoGramos.gramos,
     densidad_g_por_ml: densidad ?? null,
     peso_unitario_gramos: peso ?? null,
+    categoria_id: categoriaId,
     activo: true,
   }).select().single()
   if (error || !data) return errorJSON('No se pudo crear el producto. Intenta nuevamente.', 500)

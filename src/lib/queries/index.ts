@@ -42,6 +42,7 @@ import type {
   Restaurante,
   Briefing,
   CierreDiario,
+  CategoriaProducto,
 } from '@/types/index'
 
 // ═══════════════════════════════════════════════════════════════
@@ -550,6 +551,16 @@ export async function fetchProductos(
   }
 
   return productos
+}
+
+export async function fetchCategoriasProducto(client: ClienteSupabase): Promise<CategoriaProducto[]> {
+  const { data, error } = await client
+    .from('categorias_producto')
+    .select('id, restaurante_id, nombre, tipo, activa')
+    .eq('activa', true)
+    .order('nombre', { ascending: true })
+  if (error) throw new Error(`[ChefOS/inventario] Error al cargar categorías: ${error.message}`)
+  return (data ?? []) as CategoriaProducto[]
 }
 
 /**
