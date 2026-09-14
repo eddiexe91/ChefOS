@@ -34,7 +34,7 @@ import { encolarAccion }               from '@/lib/offline/cola'
 
 export interface BodyProduccion {
   lote_id:            string
-  receta_id:          string | null
+  receta_id:          string
   cantidad_producida: number
   unidad:             string
   notas:              string | null

@@ -52,7 +52,6 @@ interface CamposGenerales {
   categoria_id:           string
   rendimiento_porciones:  string
   unidad_rendimiento:     string
-  precio_venta:           string
   tiempo_preparacion:     string
   dificultad:             string
   en_carta:               boolean
@@ -85,11 +84,10 @@ const ESTADO_INICIAL: CamposGenerales = {
   categoria_id:           '',
   rendimiento_porciones:  '',
   unidad_rendimiento:     'porción',
-  precio_venta:           '',
   tiempo_preparacion:     '',
   dificultad:             '',
-  en_carta:               true,
-  es_produccion:          false,
+  en_carta:               false,
+  es_produccion:          true,
 }
 
 const UNIDADES_INGREDIENTE: readonly UnidadEntrada[] = [
@@ -137,6 +135,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
   const [campos, setCampos]             = useState<CamposGenerales>(ESTADO_INICIAL)
   const [ingredientes, setIngredientes] = useState<FilaIngrediente[]>(() => [nuevaFilaIngrediente()])
   const [pasos, setPasos]               = useState<FilaPaso[]>(() => [nuevaFilaPaso()])
+  const [mensajeValidacion, setMensajeValidacion] = useState<string | null>(null)
 
   const {
     data:      productos,
@@ -149,6 +148,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
       setCampos(ESTADO_INICIAL)
       setIngredientes([])
       setPasos([])
+      setMensajeValidacion(null)
       if (modo === 'carta') {
         void (async () => {
           await fetch('/api/ia/briefing', { method: 'POST' })
@@ -161,6 +161,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
   const enviando = mutacion.isPending
 
   const limpiarEstadoMutacion = () => {
+    setMensajeValidacion(null)
     if (mutacion.isError || mutacion.isSuccess) {
       mutacion.reset()
     }
@@ -170,6 +171,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     limpiarEstadoMutacion()
+    setMensajeValidacion(null)
     const target = e.target
     if (target instanceof HTMLInputElement && target.type === 'checkbox') {
       setCampos((prev) => ({ ...prev, [target.name]: target.checked }))
@@ -228,10 +230,6 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
 
   const rendimientoNumerico = Number(campos.rendimiento_porciones)
 
-  const precioVentaNumerico = campos.precio_venta.trim() !== '' ? Number(campos.precio_venta) : null
-  const precioVentaValido =
-    precioVentaNumerico === null || Number.isFinite(precioVentaNumerico)
-
   const tiempoPreparacionNumerico =
     campos.tiempo_preparacion.trim() !== '' ? Number(campos.tiempo_preparacion) : null
   const tiempoPreparacionValido =
@@ -246,7 +244,6 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
     Number.isInteger(rendimientoNumerico) &&
     rendimientoNumerico > 0 &&
     campos.unidad_rendimiento.trim() !== '' &&
-    precioVentaValido &&
     tiempoPreparacionValido
 
   const ingredientesValidos =
@@ -290,8 +287,14 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
 
   const handleSubmit = () => {
     if (!esValido) {
+      setMensajeValidacion(
+        modo === 'carta'
+          ? 'Completa el nombre y agrega al menos un ingrediente válido.'
+          : 'Completa nombre, rendimiento, ingredientes y al menos un paso válido antes de crear la receta.'
+      )
       return
     }
+    setMensajeValidacion(null)
 
     const ingredientesBody: IngredienteNuevaReceta[] = ingredientes.map((fila, indice) => ({
       producto_id:    fila.producto_id,
@@ -321,7 +324,6 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
       es_produccion:          campos.es_produccion,
       ...(campos.descripcion.trim() !== '' ? { descripcion: campos.descripcion.trim() } : {}),
       ...(campos.categoria_id.trim() !== '' ? { categoria_id: campos.categoria_id.trim() } : {}),
-      ...(modo !== 'carta' && precioVentaNumerico !== null ? { precio_venta: precioVentaNumerico } : {}),
       ...(modo !== 'carta' && tiempoPreparacionNumerico !== null ? { tiempo_preparacion: tiempoPreparacionNumerico } : {}),
       ...(modo !== 'carta' && campos.dificultad !== '' ? { dificultad: campos.dificultad as DificultadReceta } : {}),
       ingredientes: ingredientesBody,
@@ -423,30 +425,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label htmlFor="precio_venta" className="text-xs font-sans font-medium text-texto-secundario">
-              Precio de venta
-            </label>
-            <input
-              id="precio_venta"
-              name="precio_venta"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              value={campos.precio_venta}
-              onChange={handleChangeGeneral}
-              disabled={enviando}
-              placeholder="0.00"
-              className="w-full rounded-lg bg-fondo-base border border-fondo-borde
-                         px-3 py-2.5 text-sm font-sans text-texto-primario
-                         placeholder:text-texto-apagado
-                         focus:outline-none focus:border-acento transition-colors
-                         disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
-
+        <div>
           <div className="space-y-1.5">
             <label htmlFor="tiempo_preparacion" className="text-xs font-sans font-medium text-texto-secundario">
               Tiempo (min)
@@ -494,8 +473,8 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
         </div>
 
         </>}
-        {modo !== 'carta' && <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-xs font-sans text-texto-secundario">
+        {modo !== 'carta' && <div className="space-y-3">
+          <label className="flex items-start gap-2 text-xs font-sans text-texto-secundario">
             <input
               type="checkbox"
               name="en_carta"
@@ -503,9 +482,9 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
               onChange={handleChangeGeneral}
               disabled={enviando}
             />
-            En carta
+            <span><span className="font-medium">En carta</span><span className="block text-2xs text-texto-apagado mt-0.5">Muestra este plato en la carta o menú del restaurante.</span></span>
           </label>
-          <label className="flex items-center gap-2 text-xs font-sans text-texto-secundario">
+          <label className="flex items-start gap-2 text-xs font-sans text-texto-secundario">
             <input
               type="checkbox"
               name="es_produccion"
@@ -513,7 +492,7 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
               onChange={handleChangeGeneral}
               disabled={enviando}
             />
-            Es producción
+            <span><span className="font-medium">Es producción</span><span className="block text-2xs text-texto-apagado mt-0.5">La habilita en Producción y permite descontar sus ingredientes del inventario.</span></span>
           </label>
         </div>}
       </div>
@@ -796,10 +775,16 @@ export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'car
         </div>
       )}
 
+      {mensajeValidacion && !mutacion.isSuccess && (
+        <div className="rounded-lg bg-advertencia-suave border border-advertencia-borde px-3 py-2.5">
+          <p className="text-xs font-sans text-advertencia-texto">{mensajeValidacion}</p>
+        </div>
+      )}
+
       {/* ── Envío ────────────────────────────────────────────── */}
       <button
         type="button"
-        disabled={!esValido || enviando}
+        disabled={enviando}
         onClick={handleSubmit}
         className="w-full rounded-xl bg-acento text-white
                    py-3 px-4 text-sm font-sans font-medium

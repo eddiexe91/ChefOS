@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   LayoutDashboard,
   BookOpen,
+  FlameKindling,
   Boxes,
   Bell,
   Utensils,
@@ -48,6 +49,14 @@ const NAV_ITEMS = [
     tieneContador: false,
   },
   {
+    href:          '/produccion',
+    icono:         FlameKindling,
+    etiqueta:      'Producción',
+    activo:        (r: string) => r.startsWith('/produccion'),
+    esPrincipal:   true,
+    tieneContador: false,
+  },
+  {
     href:          '/inventario',
     icono:         Boxes,
     etiqueta:      'Inventario',
@@ -74,6 +83,8 @@ export default function LayoutApp({ usuario, restaurante, children }: Props) {
       ? ['recetas', 'Aprende cómo crear recetas', 'Crea recetas usando productos del inventario y marca los platos que forman parte de la Carta.']
       : ruta.startsWith('/carta')
           ? ['carta', 'Aprende cómo usar Carta', 'Aquí verás los platos que ofrece tu restaurante y podrás agregar nuevos platos usando productos del inventario.']
+          : ruta.startsWith('/produccion')
+            ? ['produccion', 'Aprende cómo usar Producción', 'Registra las recetas de producción y descuenta automáticamente sus ingredientes del inventario.']
           : ruta.startsWith('/inventario')
           ? ['inventario', 'Aprende cómo usar Inventario', 'Crea, edita y archiva productos. Toca cualquier producto para modificarlo.']
           : ruta.startsWith('/alertas')

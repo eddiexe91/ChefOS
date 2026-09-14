@@ -33,7 +33,7 @@ interface BodyProduccion {
   lote_id:            string
   cantidad_producida: number
   unidad:             string
-  receta_id:          string | null
+  receta_id:          string
   notas:              string | null
 }
 
@@ -92,9 +92,9 @@ export async function POST(request: NextRequest) {
   const raw = body as Record<string, unknown>
 
   // Validar campos obligatorios
-  if (!('lote_id' in raw) || !('cantidad_producida' in raw) || !('unidad' in raw)) {
+  if (!('lote_id' in raw) || !('receta_id' in raw) || !('cantidad_producida' in raw) || !('unidad' in raw)) {
     return errorJSON(
-      'Campos obligatorios faltantes: lote_id, cantidad_producida, unidad.',
+      'Campos obligatorios faltantes: lote_id, receta_id, cantidad_producida, unidad.',
       400
     )
   }
@@ -111,14 +111,8 @@ export async function POST(request: NextRequest) {
     return errorJSON('unidad debe ser un string no vacío.', 400)
   }
 
-  // Validar campos opcionales si están presentes
-  if (
-    'receta_id' in raw &&
-    raw.receta_id !== null &&
-    raw.receta_id !== undefined &&
-    typeof raw.receta_id !== 'string'
-  ) {
-    return errorJSON('receta_id debe ser un string o null.', 400)
+  if (typeof raw.receta_id !== 'string' || raw.receta_id.trim() === '') {
+    return errorJSON('Selecciona una receta de producción.', 400)
   }
 
   if (
@@ -135,10 +129,7 @@ export async function POST(request: NextRequest) {
     lote_id:            raw.lote_id.trim(),
     cantidad_producida: raw.cantidad_producida,
     unidad:             raw.unidad.trim(),
-    receta_id:
-      typeof raw.receta_id === 'string' && raw.receta_id.trim() !== ''
-        ? raw.receta_id.trim()
-        : null,
+    receta_id: raw.receta_id.trim(),
     notas:
       typeof raw.notas === 'string' && raw.notas.trim() !== ''
         ? raw.notas.trim()
@@ -167,6 +158,21 @@ export async function POST(request: NextRequest) {
       `No se puede registrar producción en un lote con estado "${lote.estado}".`,
       409
     )
+  }
+
+  const { data: receta, error: recetaError } = await supabase
+    .from('recetas')
+    .select('id, nombre, es_produccion, activa')
+    .eq('id', datos.receta_id)
+    .eq('restaurante_id', perfil.restaurante_id)
+    .eq('activa', true)
+    .single()
+
+  if (recetaError || !receta) {
+    return errorJSON('La receta de producción no fue encontrada.', 404)
+  }
+  if (!receta.es_produccion) {
+    return errorJSON('Esta receta no está marcada como producción.', 400)
   }
 
   // ── 5. Registrar producción de forma atómica ────────────────

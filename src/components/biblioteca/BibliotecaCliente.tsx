@@ -119,7 +119,7 @@ function SkeletonRecetas() {
 // ─────────────────────────────────────────────────────────────
 
 export default function BibliotecaCliente() {
-  const { isPending, isError, isSuccess, data } = useRecetas()
+  const { isPending, isError, isSuccess, data } = useRecetas({ es_produccion: true, activa: true })
   const recetas = useMemo(() => data ?? [], [data])
 
   const [busqueda, setBusqueda] = useState('')
@@ -181,7 +181,7 @@ export default function BibliotecaCliente() {
           )}
         </div>
         <p className="text-xs font-sans text-texto-apagado mt-0.5">
-          Todas las recetas y fichas técnicas del restaurante
+          Fichas técnicas que pueden registrarse en Producción
         </p>
         <Link
           href="/biblioteca/nueva"

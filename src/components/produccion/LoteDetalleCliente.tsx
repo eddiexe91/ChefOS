@@ -26,13 +26,14 @@ import RegistrarProduccionForm                 from '@/components/produccion/Reg
 
 interface Props {
   loteId: string
+  recetaInicialId?: string
 }
 
 // ─────────────────────────────────────────────────────────────
 // Componente
 // ─────────────────────────────────────────────────────────────
 
-export default function LoteDetalleCliente({ loteId }: Props) {
+export default function LoteDetalleCliente({ loteId, recetaInicialId }: Props) {
   const { lote, registros } = useLoteDetalle(loteId)
 
   const registrosPreparados = useMemo(
@@ -170,7 +171,7 @@ export default function LoteDetalleCliente({ loteId }: Props) {
                 </p>
               </div>
               <div className="px-4 py-4">
-                <RegistrarProduccionForm loteId={loteId} />
+                <RegistrarProduccionForm loteId={loteId} recetaInicialId={recetaInicialId} />
               </div>
             </section>
           )}

@@ -11,8 +11,9 @@
 
 import { useState, useMemo }   from 'react'
 import Link                    from 'next/link'
-import { ChevronRight, X }     from 'lucide-react'
-import { useLotesProduccion }  from '@/hooks/useDominio'
+import { useRouter }           from 'next/navigation'
+import { ChevronRight, X, Plus, Play } from 'lucide-react'
+import { useLotesProduccion, useRecetas, useRegistrosProduccion } from '@/hooks/useDominio'
 import { useApp }              from '@/providers/AppProvider'
 import { parsearFechaLocal }   from '@/lib/produccion'
 import { ETIQUETAS_TURNO, ETIQUETAS_ESTADO, CLASES_ESTADO } from '@/lib/produccionUI'
@@ -111,11 +112,17 @@ function TarjetaLote({ lote }: { lote: ProduccionLote }) {
 
 export default function ProduccionCliente() {
   const { estaOnline, accionesPendientes } = useApp()
+  const router = useRouter()
 
   const [filtroTurno,  setFiltroTurno]  = useState<FiltroTurno>('todos')
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos')
 
   const { isPending, isError, isSuccess, data } = useLotesProduccion()
+  const recetasQuery = useRecetas({ es_produccion: true, activa: true })
+  const hoy = new Date().toISOString().slice(0, 10)
+  const registrosQuery = useRegistrosProduccion({ fecha_desde: hoy, fecha_hasta: hoy })
+  const [abriendoLote, setAbriendoLote] = useState(false)
+  const [errorAbrirLote, setErrorAbrirLote] = useState<string | null>(null)
 
   const lotes: ProduccionLote[] = useMemo(() => data ?? [], [data])
 
@@ -137,6 +144,37 @@ export default function ProduccionCliente() {
     setFiltroEstado('todos')
   }
 
+  const recetasPendientes = useMemo(() => {
+    const registradasHoy = new Set(
+      (registrosQuery.data ?? []).map((registro) => registro.receta_id).filter(Boolean)
+    )
+    return (recetasQuery.data ?? []).filter((receta) => !registradasHoy.has(receta.id))
+  }, [recetasQuery.data, registrosQuery.data])
+
+  const abrirProduccion = async (recetaId?: string) => {
+    if (abriendoLote) return
+    setAbriendoLote(true)
+    setErrorAbrirLote(null)
+    const hora = new Date().getHours()
+    const turno = hora < 14 ? 'mañana' : hora < 19 ? 'tarde' : 'noche'
+    try {
+      const response = await fetch('/api/produccion/lotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha: hoy, turno }),
+      })
+      const payload = await response.json() as { data?: { id?: string }; error?: string }
+      if (!response.ok || !payload.data?.id) {
+        throw new Error(payload.error ?? 'No se pudo abrir la producción.')
+      }
+      router.push(`/produccion/${payload.data.id}${recetaId ? `?receta=${encodeURIComponent(recetaId)}` : ''}`)
+    } catch (error) {
+      setErrorAbrirLote(error instanceof Error ? error.message : 'No se pudo abrir la producción.')
+    } finally {
+      setAbriendoLote(false)
+    }
+  }
+
   return (
     <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto">
 
@@ -156,8 +194,58 @@ export default function ProduccionCliente() {
           )}
         </div>
         <p className="text-xs font-sans text-texto-apagado mt-0.5">
-          Lotes y registros del turno
+          Registra producción y descuenta automáticamente sus ingredientes del inventario
         </p>
+        <button
+          type="button"
+          onClick={() => void abrirProduccion()}
+          disabled={abriendoLote}
+          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-acento px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        >
+          <Plus size={16} />
+          {abriendoLote ? 'Abriendo…' : 'Añadir producción'}
+        </button>
+      </section>
+
+      {errorAbrirLote && (
+        <section className="rounded-xl border border-peligro-borde bg-peligro-suave px-4 py-3">
+          <p className="text-xs text-peligro-texto">{errorAbrirLote}</p>
+        </section>
+      )}
+
+      <section className="rounded-xl bg-fondo-elevado border border-fondo-borde overflow-hidden">
+        <div className="px-4 py-3 border-b border-fondo-borde">
+          <p className="text-xs font-sans font-medium text-texto-secundario uppercase tracking-wide">
+            Producciones pendientes
+          </p>
+          <p className="text-2xs text-texto-apagado mt-1">
+            Recetas marcadas como “Es producción” que todavía no registras hoy.
+          </p>
+        </div>
+        <div className="px-4 py-3 space-y-2">
+          {recetasQuery.isPending || registrosQuery.isPending ? (
+            <p className="text-xs text-texto-apagado">Cargando producciones…</p>
+          ) : recetasPendientes.length === 0 ? (
+            <p className="text-xs text-texto-apagado">No hay producciones pendientes para hoy.</p>
+          ) : (
+            recetasPendientes.map((receta) => (
+              <div key={receta.id} className="flex items-center justify-between gap-3 rounded-lg border border-fondo-borde px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-texto-primario truncate">{receta.nombre}</p>
+                  <p className="text-2xs text-texto-apagado">Rinde {receta.rendimiento_porciones} {receta.unidad_rendimiento}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void abrirProduccion(receta.id)}
+                  disabled={abriendoLote}
+                  className="flex-shrink-0 inline-flex items-center gap-1 rounded-lg border border-acento px-2.5 py-1.5 text-2xs font-medium text-acento disabled:opacity-50"
+                >
+                  <Play size={12} /> Registrar
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </section>
 
       {/* ── Banner offline ───────────────────────────────── */}

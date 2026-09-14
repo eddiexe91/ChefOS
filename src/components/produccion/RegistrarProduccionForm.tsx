@@ -51,15 +51,19 @@ const UNIDADES_COMUNES = [
 
 interface Props {
   loteId: string
+  recetaInicialId?: string
 }
 
 // ─────────────────────────────────────────────────────────────
 // Componente
 // ─────────────────────────────────────────────────────────────
 
-export default function RegistrarProduccionForm({ loteId }: Props) {
-  const [campos, setCampos] = useState<CamposForm>(ESTADO_INICIAL)
-  const recetas = useRecetas()
+export default function RegistrarProduccionForm({ loteId, recetaInicialId }: Props) {
+  const [campos, setCampos] = useState<CamposForm>(() => ({
+    ...ESTADO_INICIAL,
+    receta_id: recetaInicialId ?? '',
+  }))
+  const recetas = useRecetas({ es_produccion: true, activa: true })
 
   const mutacion = useRegistrarProduccion({
     onSuccess: () => setCampos(ESTADO_INICIAL),
@@ -78,9 +82,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
   const handleSubmit = () => {
     const body: BodyProduccion = {
       lote_id:            loteId,
-      receta_id:          campos.receta_id.trim() !== ''
-                            ? campos.receta_id.trim()
-                            : null,
+      receta_id:          campos.receta_id.trim(),
       cantidad_producida: Number(campos.cantidad_producida),
       unidad:             campos.unidad,
       notas:              campos.notas.trim() !== ''
@@ -91,6 +93,7 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
   }
 
   const esValido =
+    campos.receta_id !== '' &&
     campos.cantidad_producida !== '' &&
     Number(campos.cantidad_producida) > 0 &&
     campos.unidad !== ''
@@ -119,11 +122,11 @@ export default function RegistrarProduccionForm({ loteId }: Props) {
                      focus:outline-none focus:border-acento transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <option value="">{recetas.isPending ? 'Cargando recetas…' : 'Seleccionar receta…'}</option>
+          <option value="">{recetas.isPending ? 'Cargando recetas…' : 'Seleccionar receta de producción…'}</option>
           {(recetas.data ?? []).map((receta) => <option key={receta.id} value={receta.id}>{receta.nombre}</option>)}
         </select>
         <p className="text-2xs font-sans text-texto-apagado">
-          Opcional — deja vacío para producción libre
+          Solo aparecen recetas marcadas como “Es producción”. Sus ingredientes se descontarán del inventario.
         </p>
       </div>
 
