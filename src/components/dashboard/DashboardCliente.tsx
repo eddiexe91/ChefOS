@@ -31,6 +31,7 @@ import { useMetricasDashboard } from '@/hooks/useDominio'
 import BriefingCard             from '@/components/dashboard/BriefingCard'
 import StockCriticoWidget       from '@/components/dashboard/StockCriticoWidget'
 import GenerarBriefingButton    from '@/components/dashboard/GenerarBriefingButton'
+import { useProductos }         from '@/hooks/useDominio'
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -63,6 +64,7 @@ export default function DashboardCliente() {
     isSuccess,
     data,
   } = useMetricasDashboard()
+  const productosQuery = useProductos()
 
   const hora   = new Date().getHours()
   const saludo =
@@ -88,6 +90,14 @@ export default function DashboardCliente() {
           </p>
         )}
       </section>
+
+      {productosQuery.isSuccess && productosQuery.data.length === 0 && (
+        <section className="rounded-xl border border-acento/30 bg-acento-suave px-4 py-4">
+          <p className="text-sm font-sans font-medium text-texto-primario">Completa tu configuración inicial</p>
+          <p className="text-xs text-texto-secundario mt-1 leading-relaxed">Aún no tienes productos. Créalos desde Inventario o descarga una plantilla para importarlos.</p>
+          <Link href="/configuracion/onboarding" className="inline-flex mt-3 rounded-xl bg-acento px-3 py-2 text-xs font-medium text-white">Comenzar configuración</Link>
+        </section>
+      )}
 
       {/* ── 2. Estado de conexión ────────────────────────── */}
       <section className="flex items-center gap-3">

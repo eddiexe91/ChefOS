@@ -2,7 +2,7 @@
 
 ## Corte de estado — 13-09-2026
 
-Edge Functions y cron ya están publicados y verificados en Supabase. `/api/auth/session` y el middleware API fueron corregidos; una prueba E2E con tokens reales confirmó cookie SSR, Storage accesible y `/dashboard` HTTP 200. Vercel está publicado en `https://chefos-pied.vercel.app` y la APK final ya fue regenerada con ese backend. Solo falta la prueba física final y el flujo E2E completo de negocio.
+Edge Functions y cron ya están publicados y verificados en Supabase. `/api/auth/session` y el middleware API fueron corregidos; una prueba E2E con tokens reales confirmó cookie SSR, Storage accesible y `/dashboard` HTTP 200. La corrección local agrega listado/alta manual de inventario, onboarding guiado, plantilla CSV, cargo/zona horaria e invitación de equipo. Antes de probarla en producción, publica este commit en GitHub para que Vercel lo despliegue y ejecuta `supabase/migrations/007_integridad_operativa.sql` en el SQL Editor.
 
 ## Estado conocido
 

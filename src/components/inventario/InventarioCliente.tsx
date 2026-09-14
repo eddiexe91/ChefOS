@@ -27,9 +27,11 @@
  */
 
 import { useState, useMemo }  from 'react'
-import { Search, Filter, X }  from 'lucide-react'
+import { Search, Filter, X, Plus }  from 'lucide-react'
 import { useProductos }        from '@/hooks/useDominio'
 import type { Producto }       from '@/types/index'
+import { useState as useModalState } from 'react'
+import NuevoProductoCliente from '@/components/inventario/NuevoProductoCliente'
 
 // ─────────────────────────────────────────────────────────────
 // Helper — criterio de stock crítico
@@ -136,6 +138,7 @@ function SkeletonProductos() {
 // ─────────────────────────────────────────────────────────────
 
 export default function InventarioCliente() {
+  const [mostrarNuevo, setMostrarNuevo] = useModalState(false)
   const [busqueda,         setBusqueda]         = useState('')
   const [categoriaActiva,  setCategoriaActiva]  = useState<string>('todas')
   const [soloStockCritico, setSoloStockCritico] = useState(false)
@@ -207,9 +210,7 @@ export default function InventarioCliente() {
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>
         <div className="flex items-baseline justify-between gap-3">
-          <h1 className="text-xl font-display font-bold text-texto-primario leading-tight">
-            Inventario
-          </h1>
+          <div className="flex items-center justify-between gap-3"><h1 className="text-xl font-display font-bold text-texto-primario leading-tight">Inventario</h1><button type="button" onClick={() => setMostrarNuevo(true)} className="flex items-center gap-1 rounded-xl bg-acento px-3 py-2 text-xs text-white"><Plus size={14} /> Nuevo</button></div>
           {isSuccess && (
             <p className="text-xs font-sans text-texto-apagado flex-shrink-0">
               {hayFiltros
@@ -358,8 +359,9 @@ export default function InventarioCliente() {
             No hay productos registrados
           </p>
           <p className="text-xs font-sans text-texto-apagado mt-1">
-            Los productos del inventario aparecerán aquí.
+            Puedes importarlos desde Configuración inicial o crearlos ahora con el botón Nuevo.
           </p>
+          <button type="button" onClick={() => setMostrarNuevo(true)} className="mt-4 rounded-xl bg-acento px-4 py-2.5 text-xs text-white">Crear primer producto</button>
         </section>
       )}
 
@@ -376,6 +378,7 @@ export default function InventarioCliente() {
         </section>
       )}
 
+      {mostrarNuevo && <NuevoProductoCliente onClose={() => setMostrarNuevo(false)} />}
     </div>
   )
-                      }
+}

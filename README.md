@@ -1,12 +1,12 @@
 # ChefOS
 
-> Estado de control 13-09-2026: Supabase, Storage, Edge Functions, cron y la migración operativa 006 están activos. Vercel está publicado en [https://chefos-pied.vercel.app](https://chefos-pied.vercel.app), `/api/health` confirma configuración y Storage accesible, y la APK final ya apunta a ese dominio. Pendientes: prueba física final y E2E completo de negocio.
+> Estado de control 13-09-2026: Supabase, Storage, Edge Functions, cron y la migración operativa 006 están activos. La corrección local incorpora listado/alta manual de inventario, onboarding guiado, plantilla CSV, cargo/zona horaria e invitación de equipo. Vercel está publicado en [https://chefos-pied.vercel.app](https://chefos-pied.vercel.app); falta publicar este commit en GitHub/Vercel y aplicar la migración 007 en Supabase.
 
 Sistema operativo gastronómico diseñado para restaurantes.
 
 ## Estado del proyecto
 
-Aplicación móvil operativa: inventario, recetas, producción, compras, ventas, Chef IA básico, onboarding, snapshots y panel multi-restaurante. El esquema Supabase, Storage, Edge Functions, cron y backend público ya están desplegados; queda completar la prueba E2E desde un teléfono físico.
+Aplicación móvil operativa: inventario, recetas, producción, compras, ventas, Chef IA básico, onboarding, snapshots y panel multi-restaurante. El listado de inventario permite crear productos sin CSV y el onboarding incluye una plantilla descargable. El esquema Supabase, Storage, Edge Functions, cron y backend público están desplegados; queda publicar la última versión y completar la prueba E2E desde un teléfono físico.
 
 ## Estado real de Supabase — 13-09-2026
 

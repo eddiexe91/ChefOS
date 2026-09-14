@@ -1,5 +1,5 @@
-import ProductoDetalleCliente from '@/components/inventario/ProductoDetalleCliente'
+import InventarioCliente from '@/components/inventario/InventarioCliente'
 
-export default function PaginaProductoDetalle({ params }: { params: { id: string } }) {
-  return <ProductoDetalleCliente productoId={params.id} />
+export default function PaginaInventario() {
+  return <InventarioCliente />
 }
