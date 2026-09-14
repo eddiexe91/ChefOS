@@ -12,6 +12,8 @@ import {
 import { clsx } from 'clsx'
 import { useApp } from '@/providers/AppProvider'
 import HeaderApp from '@/components/layout/HeaderApp'
+import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
+import BackButtonHandler from '@/components/layout/BackButtonHandler'
 import type { Restaurante, Usuario } from '@/types'
 
 interface Props {
@@ -66,6 +68,17 @@ const NAV_ITEMS = [
 export default function LayoutApp({ usuario, restaurante, children }: Props) {
   const ruta = usePathname()
   const { totalAlertas, estaOnline, accionesPendientes } = useApp()
+  const tutorial = ruta === '/dashboard'
+    ? ['inicio', 'Aprende cómo usar Inicio', 'Aquí verás el briefing del día, ventas, producción, mermas, stock bajo y alertas.']
+    : ruta.startsWith('/biblioteca')
+      ? ['recetas', 'Aprende cómo crear recetas', 'Crea recetas usando productos del inventario y marca los platos que forman parte de la Carta.']
+      : ruta.startsWith('/produccion')
+        ? ['produccion', 'Aprende cómo usar Producción', 'Registra lo que debes preparar y controla el turno desde un solo lugar.']
+        : ruta.startsWith('/inventario')
+          ? ['inventario', 'Aprende cómo usar Inventario', 'Crea, edita y archiva productos. Toca cualquier producto para modificarlo.']
+          : ruta.startsWith('/alertas')
+            ? ['alertas', 'Aprende cómo usar Alertas', 'Revisa avisos de stock crítico y otras situaciones que necesitan atención.']
+            : null
 
   return (
     <div className="app-layout">
@@ -100,6 +113,8 @@ export default function LayoutApp({ usuario, restaurante, children }: Props) {
       >
         {children}
       </main>
+      <BackButtonHandler />
+      {tutorial && <TutorialPrimeraVez id={tutorial[0]} titulo={tutorial[1]} texto={tutorial[2]} />}
 
       {/* Bottom Navigation */}
       <nav

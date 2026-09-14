@@ -20,7 +20,6 @@
  * marcarAlertaLeida(alertaId: string) => Promise<void>
  * confirmado en EstadoApp de AppProvider.
  */
-import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 
 import { useState }           from 'react'
 import { Bell, CheckCheck }   from 'lucide-react'
@@ -153,7 +152,7 @@ export default function AlertasCliente() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto"><TutorialPrimeraVez id="alertas" titulo="Aprende cómo usar Alertas" texto="Aquí aparecerán avisos importantes como stock crítico y tareas pendientes." />
+    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
 
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>

@@ -32,6 +32,7 @@ export default function NuevoProductoCliente({ onClose }: Props) {
     setGuardando(false)
     if (!response.ok) { setError(data.error ?? 'No se pudo crear el producto.'); return }
     await queryClient.invalidateQueries({ queryKey: inventarioKeys.productos() })
+    await queryClient.invalidateQueries({ queryKey: ['actividad-operativa'] })
     onClose()
   }
 

@@ -34,6 +34,7 @@ import {
   comprasKeys,
   configuracionKeys,
   fetchMetricasDashboard,
+  fetchActividadOperativa,
   fetchRecetas,
   fetchRecetaPorId,
   fetchProductos,
@@ -66,6 +67,13 @@ export function useMetricasDashboard() {
   return useQuery({
     queryKey: dashboardKeys.metricas(),
     queryFn: () => fetchMetricasDashboard(obtenerClienteNavegador()),
+  })
+}
+
+export function useActividadOperativa() {
+  return useQuery({
+    queryKey: ['actividad-operativa'],
+    queryFn: () => fetchActividadOperativa(obtenerClienteNavegador()),
   })
 }
 

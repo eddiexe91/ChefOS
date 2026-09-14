@@ -13,7 +13,6 @@ import { useState, useMemo }   from 'react'
 import Link                    from 'next/link'
 import { ChevronRight, X }     from 'lucide-react'
 import { useLotesProduccion }  from '@/hooks/useDominio'
-import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 import { useApp }              from '@/providers/AppProvider'
 import { parsearFechaLocal }   from '@/lib/produccion'
 import { ETIQUETAS_TURNO, ETIQUETAS_ESTADO, CLASES_ESTADO } from '@/lib/produccionUI'
@@ -139,7 +138,7 @@ export default function ProduccionCliente() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto"><TutorialPrimeraVez id="produccion" titulo="Aprende cómo usar Producción" texto="Revisa los lotes del turno y registra lo que se prepara para guiar al equipo." />
+    <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto">
 
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>

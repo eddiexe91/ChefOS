@@ -82,6 +82,23 @@ export interface MetricasDashboard {
   resumen: ResumenDashboard
 }
 
+export interface ActividadOperativa {
+  id: string
+  accion: string
+  descripcion: string
+  creado_en: string
+}
+
+export async function fetchActividadOperativa(client: ClienteSupabase): Promise<ActividadOperativa[]> {
+  const { data, error } = await client
+    .from('actividad_operativa')
+    .select('id, accion, descripcion, creado_en')
+    .order('creado_en', { ascending: false })
+    .limit(8)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ActividadOperativa[]
+}
+
 /**
  * Filtros comunes de paginación reutilizables entre dominios.
  */

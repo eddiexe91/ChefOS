@@ -1,5 +1,4 @@
 'use client'
-import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 
 /**
  * src/components/dashboard/DashboardCliente.tsx
@@ -28,7 +27,7 @@ import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 
 import Link                     from 'next/link'
 import { useApp }               from '@/providers/AppProvider'
-import { useMetricasDashboard } from '@/hooks/useDominio'
+import { useActividadOperativa, useMetricasDashboard } from '@/hooks/useDominio'
 import BriefingCard             from '@/components/dashboard/BriefingCard'
 import StockCriticoWidget       from '@/components/dashboard/StockCriticoWidget'
 import GenerarBriefingButton    from '@/components/dashboard/GenerarBriefingButton'
@@ -66,6 +65,7 @@ export default function DashboardCliente() {
     data,
   } = useMetricasDashboard()
   const productosQuery = useProductos()
+  const actividadQuery = useActividadOperativa()
 
   const hora   = new Date().getHours()
   const saludo =
@@ -74,7 +74,7 @@ export default function DashboardCliente() {
                 'Buenas noches'
 
   return (
-    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto"><TutorialPrimeraVez id="inicio" titulo="Aprende cómo usar Inicio" texto="Aquí encontrarás el briefing, ventas, producción, mermas y stock crítico." />
+    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
 
       {/* ── 1. Saludo ────────────────────────────────────── */}
       <section>
@@ -165,6 +165,20 @@ export default function DashboardCliente() {
 
       {/* ── 4. Stock crítico ─────────────────────────────── */}
       <StockCriticoWidget />
+
+      {actividadQuery.isSuccess && actividadQuery.data.length > 0 && (
+        <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wide text-texto-apagado">Actividad reciente</p>
+            <span className="text-2xs text-texto-apagado">Sesión del restaurante</span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {actividadQuery.data.slice(0, 4).map((actividad) => (
+              <p key={actividad.id} className="text-xs text-texto-secundario">{actividad.descripcion}</p>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── 5. Alertas ───────────────────────────────────── */}
       <section className="flex items-center justify-between

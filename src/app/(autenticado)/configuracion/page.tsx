@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BarChart3, Building2, ChevronRight, ClipboardCheck, ShieldCheck, ShoppingCart, UserRound, GraduationCap } from 'lucide-react'
+import { BarChart3, Building2, ChevronRight, ClipboardCheck, ShieldCheck, ShoppingCart, UserRound } from 'lucide-react'
 
 export default function PaginaConfiguracion() {
   return (
@@ -14,9 +14,6 @@ export default function PaginaConfiguracion() {
       </section>
 
       <nav className="rounded-xl bg-fondo-elevado border border-fondo-borde overflow-hidden">
-        <Link href="/configuracion/tutoriales" className="flex items-center justify-between px-4 py-4 active:bg-fondo-hover transition-colors">
-          <span className="flex items-center gap-3 text-sm text-texto-primario"><GraduationCap size={18} className="text-acento" /> Tutoriales</span><ChevronRight size={17} className="text-texto-apagado" />
-        </Link>
         <Link
           href="/configuracion/perfil"
           className="flex items-center justify-between px-4 py-4 active:bg-fondo-hover transition-colors"
@@ -45,6 +42,10 @@ export default function PaginaConfiguracion() {
         </Link>
         <Link href="/configuracion/estado" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
           <span className="flex items-center gap-3 text-sm text-texto-primario"><ShieldCheck size={18} className="text-acento" /> Estado del sistema</span>
+          <ChevronRight size={17} className="text-texto-apagado" />
+        </Link>
+        <Link href="/configuracion/tutoriales" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
+          <span className="flex items-center gap-3 text-sm text-texto-primario"><ClipboardCheck size={18} className="text-acento" /> Tutoriales</span>
           <ChevronRight size={17} className="text-texto-apagado" />
         </Link>
       </nav>

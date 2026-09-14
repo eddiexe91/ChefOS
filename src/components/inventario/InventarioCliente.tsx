@@ -27,13 +27,12 @@
  */
 
 import { useState, useMemo }  from 'react'
-import { Search, Filter, X, Plus, Pencil }  from 'lucide-react'
+import { Search, Filter, X, Plus }  from 'lucide-react'
 import { useProductos }        from '@/hooks/useDominio'
 import type { Producto }       from '@/types/index'
 import { useState as useModalState } from 'react'
 import NuevoProductoCliente from '@/components/inventario/NuevoProductoCliente'
 import EditarProductoCliente from '@/components/inventario/EditarProductoCliente'
-import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 
 // ─────────────────────────────────────────────────────────────
 // Helper — criterio de stock crítico
@@ -58,11 +57,11 @@ interface TarjetaProductoProps {
   critico: boolean
 }
 
-function TarjetaProducto({ producto, critico, onEdit }: TarjetaProductoProps & { onEdit: () => void }) {
+function TarjetaProducto({ producto, critico, onEditar }: TarjetaProductoProps & { onEditar: () => void }) {
   const unidad = producto.unidad_display ?? producto.unidad_medida
 
   return (
-    <div className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-3">
+    <button type="button" onClick={onEditar} className="w-full text-left rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-3 active:bg-fondo-hover">
 
       {/* Fila principal */}
       <div className="flex items-start justify-between gap-3">
@@ -93,8 +92,6 @@ function TarjetaProducto({ producto, critico, onEdit }: TarjetaProductoProps & {
         </div>
       </div>
 
-      <button type="button" onClick={onEdit} className="mt-3 inline-flex items-center gap-1.5 text-xs text-acento"><Pencil size={13}/> Editar o archivar</button>
-
       {/* Indicador de stock crítico */}
       {critico && (
         <div className="mt-2 flex items-center gap-1.5">
@@ -105,7 +102,8 @@ function TarjetaProducto({ producto, critico, onEdit }: TarjetaProductoProps & {
         </div>
       )}
 
-    </div>
+      <p className="mt-2 text-2xs text-acento">Toca para editar o archivar</p>
+    </button>
   )
 }
 
@@ -143,7 +141,7 @@ function SkeletonProductos() {
 
 export default function InventarioCliente() {
   const [mostrarNuevo, setMostrarNuevo] = useModalState(false)
-  const [productoEditando, setProductoEditando] = useState<Producto | null>(null)
+  const [productoEditar, setProductoEditar] = useState<Producto | null>(null)
   const [busqueda,         setBusqueda]         = useState('')
   const [categoriaActiva,  setCategoriaActiva]  = useState<string>('todas')
   const [soloStockCritico, setSoloStockCritico] = useState(false)
@@ -210,12 +208,12 @@ export default function InventarioCliente() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto"><TutorialPrimeraVez id="inventario" titulo="Aprende cómo gestionar Inventario" texto="Crea, modifica y archiva productos. Usa el filtro Crítico para encontrar lo urgente." />
+    <div className="px-4 pt-6 pb-36 space-y-5 max-w-lg mx-auto">
 
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>
         <div className="flex items-baseline justify-between gap-3">
-          <div className="flex items-center justify-between gap-3"><h1 className="text-xl font-display font-bold text-texto-primario leading-tight">Inventario</h1><button type="button" onClick={() => setMostrarNuevo(true)} className="flex items-center gap-1 rounded-xl bg-acento px-3 py-2 text-xs text-white"><Plus size={14} /> Nuevo</button></div>
+          <div className="flex items-center justify-between gap-3"><h1 className="text-xl font-display font-bold text-texto-primario leading-tight">Inventario</h1><button type="button" onClick={() => setMostrarNuevo(true)} className="flex items-center gap-1 rounded-xl bg-acento px-3 py-2.5 text-xs text-white shadow-sm"><Plus size={14} /> Nuevo producto</button></div>
           {isSuccess && (
             <p className="text-xs font-sans text-texto-apagado flex-shrink-0">
               {hayFiltros
@@ -378,14 +376,14 @@ export default function InventarioCliente() {
               key={producto.id}
               producto={producto}
               critico={esCritico(producto)}
-              onEdit={() => setProductoEditando(producto)}
+              onEditar={() => setProductoEditar(producto)}
             />
           ))}
         </section>
       )}
 
       {mostrarNuevo && <NuevoProductoCliente onClose={() => setMostrarNuevo(false)} />}
-      {productoEditando && <EditarProductoCliente producto={productoEditando} onClose={() => setProductoEditando(null)} />}
+      {productoEditar && <EditarProductoCliente producto={productoEditar} onClose={() => setProductoEditar(null)} />}
     </div>
   )
 }
