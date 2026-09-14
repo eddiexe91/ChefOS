@@ -26,8 +26,11 @@
  */
 
 import Link                     from 'next/link'
+import { useEffect }            from 'react'
+import { useQueryClient }       from '@tanstack/react-query'
 import { useApp }               from '@/providers/AppProvider'
 import { useActividadOperativa, useMetricasDashboard } from '@/hooks/useDominio'
+import { dashboardKeys }        from '@/lib/queries'
 import BriefingCard             from '@/components/dashboard/BriefingCard'
 import StockCriticoWidget       from '@/components/dashboard/StockCriticoWidget'
 import GenerarBriefingButton    from '@/components/dashboard/GenerarBriefingButton'
@@ -50,6 +53,7 @@ const ETIQUETAS_ROL: Record<string, string> = {
 // ─────────────────────────────────────────────────────────────
 
 export default function DashboardCliente() {
+  const queryClient = useQueryClient()
   const {
     usuario,
     restaurante,
@@ -66,6 +70,21 @@ export default function DashboardCliente() {
   } = useMetricasDashboard()
   const productosQuery = useProductos()
   const actividadQuery = useActividadOperativa()
+
+  useEffect(() => {
+    let activo = true
+    void (async () => {
+      try {
+        const respuesta = await fetch('/api/ia/briefing', { method: 'POST' })
+        if (activo && respuesta.ok) {
+          await queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
+        }
+      } catch {
+        // El dashboard conserva el último briefing disponible si no hay conexión.
+      }
+    })()
+    return () => { activo = false }
+  }, [queryClient])
 
   const hora   = new Date().getHours()
   const saludo =
