@@ -2,7 +2,7 @@
 
 ## Corte de estado — 13-09-2026
 
-Edge Functions y cron ya están publicados y verificados en Supabase. `/api/auth/session` y el middleware API fueron corregidos; una prueba E2E con tokens reales confirmó cookie SSR, Storage accesible y `/dashboard` HTTP 200. La corrección local agrega listado/alta manual de inventario, onboarding guiado, plantilla CSV, cargo/zona horaria e invitación de equipo. Antes de probarla en producción, publica este commit en GitHub para que Vercel lo despliegue y ejecuta `supabase/migrations/007_integridad_operativa.sql` en el SQL Editor.
+Edge Functions, cron y `supabase/migrations/007_integridad_operativa.sql` están publicados y verificados en Supabase. `/api/auth/session` y el middleware API fueron corregidos; una prueba E2E con tokens reales confirmó cookie SSR, Storage accesible y `/dashboard` HTTP 200. La versión actual agrega listado/alta manual de inventario, onboarding guiado, plantilla CSV, cargo/zona horaria, invitación de equipo, operaciones atómicas y políticas RLS por rol.
 
 ## Estado conocido
 

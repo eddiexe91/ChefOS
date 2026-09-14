@@ -4,12 +4,12 @@
 
 Las tres Edge Functions y los dos cron jobs están publicados y respondieron correctamente. El puente de sesión SSR del backend Next.js fue corregido: la prueba local con tokens reales de un usuario temporal devolvió HTTP 200 y cookies de sesión. El backend Next.js está publicado en Vercel en `https://chefos-pied.vercel.app` y `/api/health` confirma Supabase y Storage operativos. La confirmación restante es el flujo completo desde el teléfono físico.
 
-La migración `006_consistencia_operativa.sql` también fue aplicada desde el SQL Editor. Comprueba que `registrar_merma_completa` y `recibir_compra_completa` existan antes de desplegar una instalación nueva. El login SSR fue probado con un usuario temporal real y el endpoint `/dashboard` respondió HTTP 200.
+Las migraciones `006_consistencia_operativa.sql` y `007_integridad_operativa.sql` fueron aplicadas desde el SQL Editor. La última dejó verificadas las operaciones atómicas, la auditoría de precios, el historial de recetas y 44 políticas RLS. El login SSR fue probado con un usuario temporal real y el endpoint `/dashboard` respondió HTTP 200.
 
 Proyecto actualmente configurado: `nipovuqpxvsgeqdrszuq` — `https://nipovuqpxvsgeqdrszuq.supabase.co`.
 
 1. Completar `.env.local` desde `.env.example` sin subirlo a Git. `SUPABASE_SERVICE_ROLE_KEY` debe ser la Secret key actual con formato `sb_secret_...` y solo debe existir en el backend/Vercel.
-2. Las migraciones `001` a `006` ya fueron aplicadas y verificadas. En una instalación nueva, ejecutarlas en orden desde el SQL Editor o con `supabase db push`.
+2. Las migraciones `001` a `007` ya fueron aplicadas y verificadas. En una instalación nueva, ejecutarlas en orden desde el SQL Editor o con `supabase db push`.
 3. Opcional: crear el secreto de Anthropic para activar el modo avanzado de Chef IA:
 
 ```bash
