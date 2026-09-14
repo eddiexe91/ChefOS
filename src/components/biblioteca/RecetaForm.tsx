@@ -130,7 +130,7 @@ function nuevaFilaPaso(): FilaPaso {
 // Componente
 // ─────────────────────────────────────────────────────────────
 
-export default function RecetaForm() {
+export default function RecetaForm({ modo = 'receta' }: { modo?: 'receta' | 'carta' }) {
   const [campos, setCampos]             = useState<CamposGenerales>(ESTADO_INICIAL)
   const [ingredientes, setIngredientes] = useState<FilaIngrediente[]>(() => [nuevaFilaIngrediente()])
   const [pasos, setPasos]               = useState<FilaPaso[]>(() => [nuevaFilaPaso()])
@@ -253,7 +253,7 @@ export default function RecetaForm() {
     })
 
   const pasosValidos =
-    pasos.length > 0 &&
+    modo === 'carta' || (pasos.length > 0 &&
     pasos.every((fila) => {
       const duracionValida =
         fila.duracion_min.trim() === '' ||
@@ -267,7 +267,7 @@ export default function RecetaForm() {
         duracionValida &&
         temperaturaValida
       )
-    })
+    }))
 
   const esValido =
     generalesValidos &&
@@ -292,7 +292,7 @@ export default function RecetaForm() {
       ...(fila.notas.trim() !== '' ? { notas: fila.notas.trim() } : {}),
     }))
 
-    const pasosBody: PasoNuevaReceta[] = pasos.map((fila, indice) => ({
+    const pasosBody: PasoNuevaReceta[] = modo === 'carta' ? [] : pasos.map((fila, indice) => ({
       numero:         indice + 1,
       titulo:         fila.titulo.trim(),
       descripcion:    fila.descripcion.trim(),
@@ -322,7 +322,8 @@ export default function RecetaForm() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 pt-6 pb-36 max-w-lg mx-auto space-y-6">
+      <section><p className="text-xs uppercase tracking-wide text-acento">{modo === 'carta' ? 'Carta' : 'Recetas'}</p><h1 className="text-xl font-display font-bold text-texto-primario mt-1">{modo === 'carta' ? 'Agregar plato a la carta' : 'Crear receta'}</h1><p className="text-xs text-texto-apagado mt-1">{modo === 'carta' ? 'Agrega el plato, su rendimiento y sus ingredientes. Los pasos no son necesarios aquí.' : 'Crea una ficha técnica completa para producción.'}</p></section>
 
       {/* ── Datos generales ──────────────────────────────────── */}
       <div className="space-y-4">
@@ -632,6 +633,7 @@ export default function RecetaForm() {
         ))}
       </div>
 
+      {modo !== 'carta' && <>
       {/* ── Pasos ────────────────────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -759,6 +761,7 @@ export default function RecetaForm() {
           </div>
         ))}
       </div>
+      </>}
 
       {/* Mensaje de error */}
       {mutacion.isError && (
@@ -791,7 +794,7 @@ export default function RecetaForm() {
                    active:bg-acento/90 transition-colors
                    disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {enviando ? 'Creando receta...' : 'Crear receta'}
+        {enviando ? (modo === 'carta' ? 'Agregando plato...' : 'Creando receta...') : (modo === 'carta' ? 'Agregar plato a la carta' : 'Crear receta')}
       </button>
 
     </div>

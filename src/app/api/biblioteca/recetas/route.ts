@@ -324,7 +324,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validar pasos
-  if (!Array.isArray(raw.pasos) || raw.pasos.length === 0) {
+  if (!Array.isArray(raw.pasos) || (raw.pasos.length === 0 && raw.en_carta !== true)) {
     return errorJSON('pasos debe ser un array con al menos un elemento.', 400)
   }
 
@@ -418,6 +418,19 @@ export async function POST(request: NextRequest) {
         typeof paso.foto_url === 'string' && paso.foto_url.trim() !== ''
           ? paso.foto_url.trim()
           : null,
+    })
+  }
+
+  if (pasos.length === 0 && raw.en_carta === true) {
+    pasos.push({
+      numero: 1,
+      titulo: 'Plato de carta',
+      descripcion: 'Ficha de preparación pendiente.',
+      duracion_min: null,
+      temperatura_c: null,
+      tecnica: null,
+      punto_critico: false,
+      foto_url: null,
     })
   }
 

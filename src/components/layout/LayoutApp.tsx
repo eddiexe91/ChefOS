@@ -118,7 +118,7 @@ export default function LayoutApp({ usuario, restaurante, children }: Props) {
 
       {/* Bottom Navigation */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-[var(--z-nav)]
+        className="fixed bottom-0 left-0 right-0 z-40
                    bg-fondo-card/95 backdrop-blur-md
                    border-t border-fondo-borde"
         style={{
