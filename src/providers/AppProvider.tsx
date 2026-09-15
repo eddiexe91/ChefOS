@@ -38,7 +38,7 @@ function crearQueryClient() {
 
 interface EstadoApp {
   usuario:            Pick<Usuario, 'id' | 'nombre' | 'email' | 'rol' | 'restaurante_id' | 'avatar_url'> | null
-  restaurante:        Pick<Restaurante, 'id' | 'nombre' | 'plan'> | null
+  restaurante:        Pick<Restaurante, 'id' | 'nombre' | 'plan' | 'config' | 'onboarding_completado' | 'zona_horaria'> | null
   alertasNoLeidas:    AlertaSistema[]
   totalAlertas:       number
   estaOnline:         boolean
@@ -58,7 +58,7 @@ export function useApp(): EstadoApp {
 
 interface Props {
   usuario:     Pick<Usuario, 'id' | 'nombre' | 'email' | 'rol' | 'restaurante_id' | 'avatar_url'>
-  restaurante: Pick<Restaurante, 'id' | 'nombre' | 'plan'>
+  restaurante: Pick<Restaurante, 'id' | 'nombre' | 'plan' | 'config' | 'onboarding_completado' | 'zona_horaria'>
   children:    React.ReactNode
 }
 

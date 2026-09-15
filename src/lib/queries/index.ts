@@ -43,6 +43,7 @@ import type {
   Briefing,
   CierreDiario,
   CategoriaProducto,
+  TipoOperativoProducto,
 } from '@/types/index'
 
 // ═══════════════════════════════════════════════════════════════
@@ -127,6 +128,7 @@ export interface FiltrosProducto extends FiltrosPaginacion {
   categoria_id?: string
   activo?: boolean
   stock_bajo?: boolean
+  tipos_operativos?: TipoOperativoProducto[]
 }
 
 export interface FiltrosMerma extends FiltrosPaginacion {
@@ -389,7 +391,8 @@ export async function fetchRecetas(
     .from('recetas')
     .select(`
       *,
-      categoria:categorias_receta(id, restaurante_id, nombre, orden, activa)
+      categoria:categorias_receta(id, restaurante_id, nombre, orden, activa),
+      producto_salida:productos(id, nombre, tipo_operativo, unidad_medida, unidad_display, stock_actual, stock_minimo, activo)
     `)
     .eq('activa', true)
     .order('nombre', { ascending: true })
@@ -465,6 +468,30 @@ export async function fetchRecetaPorId(
           stock_minimo,
           activo
         )
+      ),
+      pasos:recetas_pasos(
+        id,
+        receta_id,
+        restaurante_id,
+        numero,
+        titulo,
+        descripcion,
+        duracion_min,
+        temperatura_c,
+        tecnica,
+        punto_critico,
+        foto_url,
+        activo
+      ),
+      producto_salida:productos(
+        id,
+        nombre,
+        tipo_operativo,
+        unidad_medida,
+        unidad_display,
+        stock_actual,
+        stock_minimo,
+        activo
       )
     `)
     .eq('id', id)
@@ -489,6 +516,9 @@ export async function fetchRecetaPorId(
     receta.ingredientes = [...receta.ingredientes].sort(
       (a, b) => a.orden - b.orden
     )
+  }
+  if (receta.pasos) {
+    receta.pasos = [...receta.pasos].sort((a, b) => a.numero - b.numero)
   }
 
   return receta
@@ -525,11 +555,15 @@ export async function fetchProductos(
       *,
       categoria:categorias_producto(id, nombre, tipo, activa, restaurante_id)
     `)
-    .eq('activo', true)
     .order('nombre', { ascending: true })
+
+  query = query.eq('activo', filtros?.activo ?? true)
 
   if (filtros?.categoria_id) {
     query = query.eq('categoria_id', filtros.categoria_id)
+  }
+  if (filtros?.tipos_operativos && filtros.tipos_operativos.length > 0) {
+    query = query.in('tipo_operativo', filtros.tipos_operativos)
   }
 
   const { data, error } = await query
@@ -617,7 +651,7 @@ export async function fetchMovimientos(
     .from('inventario_movimientos')
     .select(`
       *,
-      producto:productos(id, nombre, unidad_medida, costo_unitario_actual, activo),
+      producto:productos(id, nombre, tipo_operativo, unidad_medida, unidad_display, costo_unitario_actual, activo),
       registrado_por_usuario:usuarios(id, nombre)
     `)
     .eq('producto_id', producto_id)
@@ -727,7 +761,7 @@ export async function fetchRegistrosProduccion(
     .select(`
       *,
       receta:recetas(id, nombre),
-      producto:productos(id, nombre, unidad_medida),
+      producto:productos(id, nombre, tipo_operativo, unidad_medida, unidad_display),
       responsable:usuarios(id, nombre)
     `)
     .order('fecha_produccion', { ascending: false })

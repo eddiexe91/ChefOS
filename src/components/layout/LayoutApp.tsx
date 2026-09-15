@@ -19,7 +19,7 @@ import type { Restaurante, Usuario } from '@/types'
 
 interface Props {
   usuario:     Pick<Usuario,     'id' | 'nombre' | 'email' | 'rol' | 'avatar_url' | 'restaurante_id'>
-  restaurante: Pick<Restaurante, 'id' | 'nombre' | 'plan'>
+  restaurante: Pick<Restaurante, 'id' | 'nombre' | 'plan' | 'config' | 'onboarding_completado' | 'zona_horaria'>
   children:    React.ReactNode
 }
 
@@ -60,7 +60,7 @@ const NAV_ITEMS = [
     href:          '/inventario',
     icono:         Boxes,
     etiqueta:      'Inventario',
-    activo:        (r: string) => r.startsWith('/inventario') || r.startsWith('/mermas'),
+    activo:        (r: string) => r.startsWith('/inventario') || r.startsWith('/stock') || r.startsWith('/mermas'),
     esPrincipal:   false,
     tieneContador: false,
   },
@@ -85,8 +85,10 @@ export default function LayoutApp({ usuario, restaurante, children }: Props) {
           ? ['carta', 'Aprende cómo usar Carta', 'Aquí verás los platos que ofrece tu restaurante y podrás agregar nuevos platos usando productos del inventario.']
           : ruta.startsWith('/produccion')
             ? ['produccion', 'Aprende cómo usar Producción', 'Registra las recetas de producción y descuenta automáticamente sus ingredientes del inventario.']
+          : ruta.startsWith('/stock')
+            ? ['stock', 'Aprende cómo usar Stock disponible', 'Aquí verás productos elaborados y porcionados listos para vender o usar como ingredientes.']
           : ruta.startsWith('/inventario')
-          ? ['inventario', 'Aprende cómo usar Inventario', 'Crea, edita y archiva productos. Toca cualquier producto para modificarlo.']
+          ? ['inventario', 'Aprende cómo usar Inventario', 'Aquí gestionas materias primas e insumos. Usa Stock disponible para productos elaborados.']
           : ruta.startsWith('/alertas')
             ? ['alertas', 'Aprende cómo usar Alertas', 'Revisa avisos de stock crítico y otras situaciones que necesitan atención.']
             : null

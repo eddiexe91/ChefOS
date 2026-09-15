@@ -54,6 +54,7 @@ export async function POST(request: Request) {
   const minimoIndex = headers.findIndex((header) => ['stock_minimo', 'mínimo', 'minimo'].includes(header))
   const densidadIndex = headers.findIndex((header) => ['densidad', 'densidad_g_por_ml'].includes(header))
   const pesoIndex = headers.findIndex((header) => ['peso_unitario', 'peso_unitario_gramos'].includes(header))
+  const tipoIndex = headers.findIndex((header) => ['tipo_operativo', 'tipo', 'clasificacion'].includes(header))
   const registros: Array<Record<string, unknown>> = []
   for (const fila of filas.slice(1).filter((fila) => fila[nombreIndex])) {
     const unidad = (unidadIndex >= 0 ? fila[unidadIndex] || 'g' : 'g').toLowerCase() as UnidadEntrada
@@ -64,7 +65,10 @@ export async function POST(request: Request) {
     const stockEnGramos = convertirAGramos(Number.isFinite(stock) ? stock : 0, unidad, Number.isFinite(densidad) ? densidad : undefined, Number.isFinite(peso) ? peso : undefined)
     const minimoEnGramos = convertirAGramos(Number.isFinite(minimo) ? minimo : 0, unidad, Number.isFinite(densidad) ? densidad : undefined, Number.isFinite(peso) ? peso : undefined)
     if (stockEnGramos.gramos === null || minimoEnGramos.gramos === null) return NextResponse.json({ error: `El producto "${fila[nombreIndex]}" necesita peso unitario para convertirse a gramos.` }, { status: 400 })
-    registros.push({ restaurante_id: perfil.restaurante_id, nombre: fila[nombreIndex], nombre_normalizado: fila[nombreIndex].toLowerCase(), unidad_medida: unidad, unidad_compra: unidad, unidad_display: unidad, densidad_g_por_ml: Number.isFinite(densidad) ? densidad : null, peso_unitario_gramos: Number.isFinite(peso) ? peso : null, costo_unitario_actual: costoIndex >= 0 ? Number(String(fila[costoIndex] ?? 0).replace(',', '.')) || 0 : 0, stock_actual: Number.isFinite(stock) ? stock : 0, stock_minimo: Number.isFinite(minimo) ? minimo : 0, cantidad_gramos: stockEnGramos.gramos, stock_minimo_gramos: minimoEnGramos.gramos, activo: true })
+    const tipoOperativo = tipoIndex >= 0 && ['materia_prima', 'insumo', 'elaborado'].includes((fila[tipoIndex] ?? '').toLowerCase())
+      ? (fila[tipoIndex] ?? '').toLowerCase()
+      : 'materia_prima'
+    registros.push({ restaurante_id: perfil.restaurante_id, nombre: fila[nombreIndex], nombre_normalizado: fila[nombreIndex].toLowerCase(), tipo_operativo: tipoOperativo, unidad_medida: unidad, unidad_compra: unidad, unidad_display: unidad, densidad_g_por_ml: Number.isFinite(densidad) ? densidad : null, peso_unitario_gramos: Number.isFinite(peso) ? peso : null, costo_unitario_actual: costoIndex >= 0 ? Number(String(fila[costoIndex] ?? 0).replace(',', '.')) || 0 : 0, stock_actual: Number.isFinite(stock) ? stock : 0, stock_minimo: Number.isFinite(minimo) ? minimo : 0, cantidad_gramos: stockEnGramos.gramos, stock_minimo_gramos: minimoEnGramos.gramos, activo: true })
   }
   const { error } = await supabase.from('productos').insert(registros)
   if (error) return NextResponse.json({ error: 'No se pudo importar el inventario.' }, { status: 500 })

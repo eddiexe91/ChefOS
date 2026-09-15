@@ -1,12 +1,12 @@
 # ChefOS
 
-> Estado de control 15-09-2026: `main` contiene la versión validada de ChefOS. Recetas, Producción, Carta, Inventario, briefing y actividad reciente están operativos. La migración 009 agrega la categoría Postres en Supabase. Vercel está publicado en [https://chefos-pied.vercel.app](https://chefos-pied.vercel.app).
+> Estado de control 15-09-2026: `main` contiene la versión validada de ChefOS. Inventario distingue materias primas/insumos de `Stock disponible` para elaborados; Carta y Recetas se gestionan por separado; Producción usa solo fichas `es_produccion` y puede aumentar el stock de salida configurado. Vercel está publicado en [https://chefos-pied.vercel.app](https://chefos-pied.vercel.app).
 
 Sistema operativo gastronómico diseñado para restaurantes.
 
 ## Estado del proyecto
 
-Aplicación móvil operativa: inventario, recetas, producción, compras, ventas, Chef IA básico, onboarding, snapshots y panel multi-restaurante. El listado de inventario permite crear productos sin CSV y el onboarding incluye una plantilla descargable. El esquema Supabase, Storage, Edge Functions, cron, RLS y backend público están desplegados; queda completar la prueba E2E desde un teléfono físico.
+Aplicación móvil operativa: inventario, stock disponible, recetas, carta, producción, compras, ventas, Chef IA básico, onboarding, snapshots y panel multi-restaurante. El inventario administra materias primas e insumos; el stock disponible administra elaborados y porcionados. El esquema Supabase, Storage, Edge Functions, cron, RLS y backend público están desplegados; queda completar la prueba E2E desde un teléfono físico.
 
 ## Estado real de Supabase — 13-09-2026
 
@@ -45,7 +45,7 @@ ChefOS se entrega como PWA instalable, optimizada para teléfono Android.
 3. Usa `⋮ → Instalar aplicación` o `Añadir a pantalla de inicio`.
 4. Abre ChefOS desde el icono instalado: se ejecutará en modo independiente y vertical.
 
-El service worker se genera automáticamente durante `npm run build` cuando la dependencia PWA está instalada. El soporte offline de la interfaz utiliza IndexedDB; las operaciones que requieran Supabase necesitan que exista una sesión válida y sincronización disponible.
+El service worker se genera automáticamente durante `npm run build` cuando la dependencia PWA está instalada. El soporte offline actual es básico: hay cola local de algunas mutaciones, pero **no** existe todavía un modo offline-first completo. Trabajo futuro: almacenamiento offline, sincronización segura, resolución de conflictos y recuperación consistente de sesiones.
 
 ### APK instalable
 
@@ -71,4 +71,4 @@ La APK no puede contener por sí sola las rutas API de Next.js: necesita ese bac
 
 ## Estado actual
 
-El código, la comprobación de tipos, lint y build Next.js pasan localmente. Supabase, Storage, Edge Functions, cron, Vercel y el login SSR fueron validados. La separación completa entre Inventario y Stock disponible, junto con la elaboración avanzada de Carta, está especificada para la siguiente iteración; el modo sin conexión completo queda fuera de alcance por ahora.
+El código busca mantener type-check, lint y build Next.js operativos tras la separación entre Inventario y Stock disponible. Supabase, Storage, Edge Functions, cron, Vercel y el login SSR fueron validados. El modo sin conexión completo sigue fuera de alcance por ahora y permanece como trabajo futuro.

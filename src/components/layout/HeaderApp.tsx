@@ -20,7 +20,7 @@ import type { Restaurante, Usuario } from '@/types'
 
 interface Props {
   usuario:     Pick<Usuario,     'id' | 'nombre' | 'email' | 'rol' | 'avatar_url' | 'restaurante_id'>
-  restaurante: Pick<Restaurante, 'id' | 'nombre' | 'plan'>
+  restaurante: Pick<Restaurante, 'id' | 'nombre' | 'plan' | 'config' | 'onboarding_completado' | 'zona_horaria'>
 }
 
 const ETIQUETAS_ROL: Record<string, string> = {
