@@ -1,6 +1,6 @@
 # ChefOS
 
-> Estado de control 13-09-2026: Supabase, Storage, Edge Functions, cron y las migraciones operativas 006–007 están activos. La corrección incorpora listado/alta manual de inventario, onboarding guiado, plantilla CSV, cargo/zona horaria, invitación de equipo, operaciones atómicas y 44 políticas RLS. Vercel está publicado en [https://chefos-pied.vercel.app](https://chefos-pied.vercel.app) y `main` contiene la implementación.
+> Estado de control 15-09-2026: `main` contiene la versión validada de ChefOS. Recetas, Producción, Carta, Inventario, briefing y actividad reciente están operativos. La migración 009 agrega la categoría Postres en Supabase. Vercel está publicado en [https://chefos-pied.vercel.app](https://chefos-pied.vercel.app).
 
 Sistema operativo gastronómico diseñado para restaurantes.
 
@@ -14,7 +14,7 @@ Proyecto configurado: `nipovuqpxvsgeqdrszuq` — [abrir Supabase](https://supaba
 
 ## Continuar desde GitHub
 
-La guía completa está en [GITHUB_HANDOFF.md](GITHUB_HANDOFF.md): instalar dependencias, ejecutar `type-check`, `lint` y `build`, y reinstalar [artifacts/ChefOS-debug-final.apk](artifacts/ChefOS-debug-final.apk) para la prueba física. Anthropic es opcional: Chef IA básico funciona sin esa clave.
+La guía de continuidad está en [GITHUB_HANDOFF.md](GITHUB_HANDOFF.md). La especificación detallada para Copilot está en [COPILOT_NEXT_ITERATION.md](COPILOT_NEXT_ITERATION.md). Anthropic es opcional: Chef IA básico funciona sin esa clave.
 
 ## Documentos maestros
 
@@ -71,4 +71,4 @@ La APK no puede contener por sí sola las rutas API de Next.js: necesita ese bac
 
 ## Estado actual
 
-El código, la comprobación de tipos, lint y build Next.js pasan localmente. Supabase, sus tablas principales, Storage, Edge Functions, cron, Vercel y el login SSR fueron validados. La APK final está generada y apunta a producción; falta confirmar el flujo completo desde Android y ejecutar la E2E completa de negocio.
+El código, la comprobación de tipos, lint y build Next.js pasan localmente. Supabase, Storage, Edge Functions, cron, Vercel y el login SSR fueron validados. La separación completa entre Inventario y Stock disponible, junto con la elaboración avanzada de Carta, está especificada para la siguiente iteración; el modo sin conexión completo queda fuera de alcance por ahora.
