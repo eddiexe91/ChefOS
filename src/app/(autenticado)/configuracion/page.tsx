@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BarChart3, Building2, ChevronRight, ClipboardCheck, ShieldCheck, ShoppingCart, UserRound } from 'lucide-react'
+import { BarChart3, Building2, ChevronRight, ClipboardCheck, ShieldCheck, ShoppingCart, Soup, UserRound } from 'lucide-react'
 
 export default function PaginaConfiguracion() {
   return (
@@ -26,6 +26,10 @@ export default function PaginaConfiguracion() {
         </Link>
         <Link href="/compras" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
           <span className="flex items-center gap-3 text-sm text-texto-primario"><ShoppingCart size={18} className="text-acento" /> Compras</span>
+          <ChevronRight size={17} className="text-texto-apagado" />
+        </Link>
+        <Link href="/stock" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
+          <span className="flex items-center gap-3 text-sm text-texto-primario"><Soup size={18} className="text-acento" /> Stock disponible</span>
           <ChevronRight size={17} className="text-texto-apagado" />
         </Link>
         <Link href="/configuracion/onboarding" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">

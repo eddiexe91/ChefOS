@@ -29,6 +29,7 @@ export default function RecetaDetalleCliente({ recetaId }: { recetaId: string })
         <div className="tarjeta p-3"><p className="text-2xs text-texto-apagado">Rendimiento</p><p className="text-sm text-texto-primario mt-1">{receta.rendimiento_porciones} {receta.unidad_rendimiento}</p></div>
         <div className="tarjeta p-3"><p className="text-2xs text-texto-apagado">Costo por porción</p><p className="text-sm text-texto-primario mt-1">{dinero(receta.costo_porcion)}</p></div>
       </section>
+      {receta.producto_salida?.nombre && <section className="tarjeta p-3"><p className="text-2xs text-texto-apagado">Salida a stock</p><p className="text-sm text-texto-primario mt-1">{receta.producto_salida.nombre} · {receta.cantidad_salida} {receta.unidad_salida}</p></section>}
       {receta.descripcion && <p className="text-sm leading-relaxed text-texto-secundario">{receta.descripcion}</p>}
       <EscaladoModal recetaId={receta.id} />
       <section className="space-y-3">
@@ -39,6 +40,15 @@ export default function RecetaDetalleCliente({ recetaId }: { recetaId: string })
             <span className="text-texto-primario">{ingrediente.cantidad} {ingrediente.unidad_medida}</span>
           </div>
         )) : <p className="text-sm text-texto-apagado">No hay ingredientes registrados.</p>}
+      </section>
+      <section className="space-y-3">
+        <h2 className="seccion-titulo">Pasos</h2>
+        {receta.pasos?.length ? receta.pasos.map((paso) => (
+          <div key={paso.id} className="tarjeta p-3">
+            <p className="text-xs font-medium text-texto-primario">Paso {paso.numero}: {paso.titulo}</p>
+            <p className="text-xs text-texto-secundario mt-1">{paso.descripcion}</p>
+          </div>
+        )) : <p className="text-sm text-texto-apagado">No hay pasos registrados.</p>}
       </section>
     </div>
   )

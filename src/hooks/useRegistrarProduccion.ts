@@ -25,7 +25,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { produccionKeys }              from '@/lib/queries'
+import { dashboardKeys, inventarioKeys, produccionKeys } from '@/lib/queries'
 import { encolarAccion }               from '@/lib/offline/cola'
 
 // ─────────────────────────────────────────────────────────────
@@ -122,6 +122,9 @@ export function useRegistrarProduccion(opciones?: OpcionesHook) {
       // React Query v5 invalida por prefijo: cubre produccionKeys.registros(...)
       // y produccionKeys.registro(id) sin necesidad de modificar produccionKeys.
       void queryClient.invalidateQueries({ queryKey: ['produccion', 'registros'] })
+      void queryClient.invalidateQueries({ queryKey: inventarioKeys.all })
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['actividad-operativa'] })
     },
   })
 

@@ -32,7 +32,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { inventarioKeys }              from '@/lib/queries'
+import { dashboardKeys, inventarioKeys } from '@/lib/queries'
 import type { FormAjusteInventario }   from '@/types/index'
 import { encolarAccion }               from '@/lib/offline/cola'
 
@@ -115,6 +115,8 @@ export function useAjustarInventario(opciones?: OpcionesHook) {
       // Prefijos/llaves oficiales de src/lib/queries/index.ts.
       void queryClient.invalidateQueries({ queryKey: inventarioKeys.productos() })
       void queryClient.invalidateQueries({ queryKey: inventarioKeys.movimientos(variables.producto_id) })
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['actividad-operativa'] })
     },
   })
 

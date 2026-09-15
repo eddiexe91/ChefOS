@@ -26,7 +26,7 @@
  */
 
 import Link                     from 'next/link'
-import { useEffect }            from 'react'
+import { useEffect, useMemo }   from 'react'
 import { useQueryClient }       from '@tanstack/react-query'
 import { useApp }               from '@/providers/AppProvider'
 import { useActividadOperativa, useMetricasDashboard } from '@/hooks/useDominio'
@@ -35,6 +35,7 @@ import BriefingCard             from '@/components/dashboard/BriefingCard'
 import StockCriticoWidget       from '@/components/dashboard/StockCriticoWidget'
 import GenerarBriefingButton    from '@/components/dashboard/GenerarBriefingButton'
 import { useProductos }         from '@/hooks/useDominio'
+import { esProductoInventario } from '@/lib/productos'
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -70,6 +71,13 @@ export default function DashboardCliente() {
   } = useMetricasDashboard()
   const productosQuery = useProductos()
   const actividadQuery = useActividadOperativa()
+  const conteoBase = useMemo(() => {
+    const productos = productosQuery.data ?? []
+    return {
+      inventario: productos.filter(esProductoInventario).length,
+      stock: productos.filter((producto) => producto.tipo_operativo === 'elaborado').length,
+    }
+  }, [productosQuery.data])
 
   useEffect(() => {
     let activo = true
@@ -111,11 +119,17 @@ export default function DashboardCliente() {
         )}
       </section>
 
-      {productosQuery.isSuccess && productosQuery.data.length === 0 && (
+      {productosQuery.isSuccess && (productosQuery.data.length === 0 || !restaurante?.onboarding_completado || conteoBase.inventario === 0 || conteoBase.stock === 0) && (
         <section className="rounded-xl border border-acento/30 bg-acento-suave px-4 py-4">
-          <p className="text-sm font-sans font-medium text-texto-primario">Completa tu configuración inicial</p>
-          <p className="text-xs text-texto-secundario mt-1 leading-relaxed">Aún no tienes productos. Créalos desde Inventario o descarga una plantilla para importarlos.</p>
-          <Link href="/configuracion/onboarding" className="inline-flex mt-3 rounded-xl bg-acento px-3 py-2 text-xs font-medium text-white">Comenzar configuración</Link>
+          <p className="text-sm font-sans font-medium text-texto-primario">Completa Inventario y Stock disponible</p>
+          <p className="text-xs text-texto-secundario mt-1 leading-relaxed">
+            Inventario: {conteoBase.inventario} · Stock disponible: {conteoBase.stock}. El onboarding seguirá pendiente hasta completar ambos módulos o confirmarlo explícitamente.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/configuracion/onboarding" className="rounded-xl bg-acento px-3 py-2 text-xs font-medium text-white">Abrir onboarding</Link>
+            <Link href="/inventario" className="rounded-xl border border-acento px-3 py-2 text-xs font-medium text-acento">Inventario</Link>
+            <Link href="/stock" className="rounded-xl border border-acento px-3 py-2 text-xs font-medium text-acento">Stock disponible</Link>
+          </div>
         </section>
       )}
 

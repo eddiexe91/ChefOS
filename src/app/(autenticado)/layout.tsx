@@ -24,7 +24,7 @@ export default async function LayoutAutenticado({
 
   const { data: restaurante } = await supabase
     .from('restaurantes')
-    .select('id, nombre, plan, config')
+    .select('id, nombre, plan, config, zona_horaria, onboarding_completado')
     .eq('id', perfil.restaurante_id)
     .single()
 

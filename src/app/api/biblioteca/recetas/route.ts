@@ -1,61 +1,7 @@
-/**
- * src/app/api/biblioteca/recetas/route.ts
- *
- * API Route — Crear una receta completa (receta + ingredientes + pasos).
- *
- * POST /api/biblioteca/recetas
- *
- * Flujo:
- * 1. Autenticar usuario via sesión Supabase.
- * 2. Obtener perfil del usuario (id, restaurante_id, activo).
- * 3. Validar el body de la request (incluye rechazo de numero de paso
- *    duplicado, ya que recetas_pasos tiene UNIQUE (receta_id, numero)).
- * 4. Verificar que todos los productos de los ingredientes existan y
- *    pertenezcan al restaurante.
- * 5. Convertir la cantidad de cada ingrediente a gramos vía convertirAGramos().
- * 5b. Verificar que categoria_id, si viene informada, pertenezca al
- *     restaurante — consulta restringida por restaurante_id desde el
- *     origen (categorias_receta tiene restaurante_id propio).
- * 6. Insertar en recetas.
- * 7. Insertar en recetas_ingredientes (una fila por ingrediente).
- * 8. Insertar en recetas_pasos.
- * 9. Insertar en recetas_productos_afectados (agrupado por producto_id,
- *    sumando cantidad_gramos, ya que la tabla tiene clave compuesta
- *    receta_id + producto_id y un mismo producto puede repetirse entre
- *    ingredientes).
- * 10. Invocar supabase.rpc('recalcular_costo_receta', { receta_id }).
- * 11. Volver a consultar la receta por su id para obtener los costos
- *     actualizados por el RPC (costo_total, costo_porcion, margen_porcentaje).
- * 12. Retornar la receta actualizada con status 201.
- *
- * Decisión de arquitectura (interacción previa a esta implementación):
- * el recálculo de costo se invoca directamente vía RPC
- * ('recalcular_costo_receta'), no mediante fetch() HTTP hacia
- * /api/biblioteca/recetas/[id]/costo — esa ruta queda para una iteración
- * posterior, exclusiva para recálculo manual de una receta existente.
- *
- * No existe RPC atómica de creación (a diferencia de producción). Los pasos
- * 6-10 son inserciones/llamadas secuenciales, no una transacción. Si un paso
- * posterior a la creación de la receta falla, se registra el error y se
- * retorna 500 — sin compensación automática, mismo criterio ya aplicado en
- * mermas/route.ts y api/inventario/movimientos/route.ts.
- *
- * Convención de respuesta:
- * { data: T | null, error: string | null }
- */
-
 import { NextResponse, type NextRequest } from 'next/server'
-import { crearClienteServidor }           from '@/lib/supabase/servidor'
 
-import {
-  convertirAGramos,
-  type UnidadEntrada,
-  type DificultadReceta,
-} from '@/types/index'
-
-// ─────────────────────────────────────────────────────────────
-// Constantes de validación
-// ─────────────────────────────────────────────────────────────
+import { crearClienteServidor } from '@/lib/supabase/servidor'
+import { convertirAGramos, type DificultadReceta, type UnidadEntrada } from '@/types'
 
 const UNIDADES_VALIDAS: readonly UnidadEntrada[] = [
   'g', 'kg', 'mg', 'oz', 'lb',
@@ -63,498 +9,274 @@ const UNIDADES_VALIDAS: readonly UnidadEntrada[] = [
   'unidad', 'docena', 'caja', 'bandeja', 'porcion',
 ]
 
-const DIFICULTADES_VALIDAS: readonly DificultadReceta[] = [
-  'basica',
-  'intermedia',
-  'avanzada',
-]
-
-// ─────────────────────────────────────────────────────────────
-// Tipos internos
-// ─────────────────────────────────────────────────────────────
+const DIFICULTADES_VALIDAS: readonly DificultadReceta[] = ['basica', 'intermedia', 'avanzada']
 
 interface BodyIngrediente {
-  producto_id:    string
-  cantidad:       number
-  unidad_medida:  UnidadEntrada
-  es_opcional:    boolean
-  orden:          number
-  notas:          string | null
+  producto_id: string
+  cantidad: number
+  unidad_medida: UnidadEntrada
+  es_opcional: boolean
+  orden: number
+  notas: string | null
 }
 
 interface BodyPaso {
-  numero:         number
-  titulo:         string
-  descripcion:    string
-  duracion_min:   number | null
-  temperatura_c:  number | null
-  tecnica:        string | null
-  punto_critico:  boolean
-  foto_url:       string | null
+  numero: number
+  titulo: string
+  descripcion: string
+  duracion_min: number | null
+  temperatura_c: number | null
+  tecnica: string | null
+  punto_critico: boolean
+  foto_url: string | null
 }
 
 interface BodyReceta {
-  nombre:                 string
-  descripcion:            string | null
-  categoria_id:           string | null
-  rendimiento_porciones:  number
-  unidad_rendimiento:     string
-  precio_venta:           number | null
-  tiempo_preparacion:     number | null
-  dificultad:             DificultadReceta | null
-  en_carta:               boolean
-  es_produccion:          boolean
-  ingredientes:           BodyIngrediente[]
-  pasos:                  BodyPaso[]
+  nombre: string
+  descripcion: string | null
+  categoria_id: string | null
+  rendimiento_porciones: number
+  unidad_rendimiento: string
+  precio_venta: number | null
+  tiempo_preparacion: number | null
+  dificultad: DificultadReceta | null
+  en_carta: boolean
+  es_produccion: boolean
+  producto_salida_id: string | null
+  cantidad_salida: number | null
+  unidad_salida: string | null
+  origen_editor: 'carta' | 'receta'
+  ingredientes: BodyIngrediente[]
+  pasos: BodyPaso[]
 }
 
-// ─────────────────────────────────────────────────────────────
-// Helper — respuesta de error
-// ─────────────────────────────────────────────────────────────
-
-function errorJSON(mensaje: string, status: number) {
-  return NextResponse.json(
-    { data: null, error: mensaje },
-    { status }
-  )
+function errorJSON(error: string, status: number) {
+  return NextResponse.json({ data: null, error }, { status })
 }
 
-// ─────────────────────────────────────────────────────────────
-// POST /api/biblioteca/recetas
-// ─────────────────────────────────────────────────────────────
+function leerNumero(valor: unknown) {
+  return typeof valor === 'number' && Number.isFinite(valor) ? valor : null
+}
+
+function leerEnteroPositivo(valor: unknown) {
+  return typeof valor === 'number' && Number.isFinite(valor) && Number.isInteger(valor) && valor > 0 ? valor : null
+}
+
+function parsearBody(raw: Record<string, unknown>): BodyReceta {
+  const nombre = typeof raw.nombre === 'string' ? raw.nombre.trim() : ''
+  const unidadRendimiento = typeof raw.unidad_rendimiento === 'string' ? raw.unidad_rendimiento.trim() : ''
+  const rendimiento = leerEnteroPositivo(raw.rendimiento_porciones)
+  const enCarta = raw.en_carta
+  const esProduccion = raw.es_produccion
+
+  if (!nombre) throw new Error('nombre debe ser un string no vacío.')
+  if (rendimiento === null) throw new Error('rendimiento_porciones debe ser un número entero mayor que 0.')
+  if (!unidadRendimiento) throw new Error('unidad_rendimiento debe ser un string no vacío.')
+  if (typeof enCarta !== 'boolean') throw new Error('en_carta debe ser un booleano.')
+  if (typeof esProduccion !== 'boolean') throw new Error('es_produccion debe ser un booleano.')
+
+  if (raw.precio_venta !== undefined && raw.precio_venta !== null && leerNumero(raw.precio_venta) === null) {
+    throw new Error('precio_venta debe ser un número finito o null.')
+  }
+  if (raw.tiempo_preparacion !== undefined && raw.tiempo_preparacion !== null && (typeof raw.tiempo_preparacion !== 'number' || !Number.isInteger(raw.tiempo_preparacion))) {
+    throw new Error('tiempo_preparacion debe ser un número entero o null.')
+  }
+  if (raw.dificultad !== undefined && raw.dificultad !== null && (typeof raw.dificultad !== 'string' || !DIFICULTADES_VALIDAS.includes(raw.dificultad as DificultadReceta))) {
+    throw new Error(`dificultad debe ser una de: ${DIFICULTADES_VALIDAS.join(', ')}.`)
+  }
+
+  if (!Array.isArray(raw.ingredientes) || raw.ingredientes.length === 0) {
+    throw new Error('ingredientes debe ser un array con al menos un elemento.')
+  }
+  const ingredientes: BodyIngrediente[] = raw.ingredientes.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) throw new Error('Cada ingrediente debe ser un objeto.')
+    const ing = item as Record<string, unknown>
+    const productoId = typeof ing.producto_id === 'string' ? ing.producto_id.trim() : ''
+    const cantidad = leerNumero(ing.cantidad)
+    const unidad = typeof ing.unidad_medida === 'string' ? ing.unidad_medida : ''
+    if (!productoId) throw new Error('Cada ingrediente requiere producto_id.')
+    if (cantidad === null || cantidad <= 0) throw new Error('Cada ingrediente requiere cantidad válida.')
+    if (!UNIDADES_VALIDAS.includes(unidad as UnidadEntrada)) throw new Error('Cada ingrediente requiere unidad_medida válida.')
+    return {
+      producto_id: productoId,
+      cantidad,
+      unidad_medida: unidad as UnidadEntrada,
+      es_opcional: ing.es_opcional === true,
+      orden: typeof ing.orden === 'number' && Number.isInteger(ing.orden) ? ing.orden : index,
+      notas: typeof ing.notas === 'string' && ing.notas.trim() !== '' ? ing.notas.trim() : null,
+    }
+  })
+
+  const pasosRaw = Array.isArray(raw.pasos) ? raw.pasos : []
+  const pasos: BodyPaso[] = pasosRaw.length > 0
+    ? pasosRaw.map((item, index) => {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) throw new Error('Cada paso debe ser un objeto.')
+        const paso = item as Record<string, unknown>
+        const numero = typeof paso.numero === 'number' && Number.isInteger(paso.numero) && paso.numero > 0 ? paso.numero : index + 1
+        const titulo = typeof paso.titulo === 'string' ? paso.titulo.trim() : ''
+        const descripcion = typeof paso.descripcion === 'string' ? paso.descripcion.trim() : ''
+        if (!titulo) throw new Error('Cada paso requiere titulo.')
+        if (!descripcion) throw new Error('Cada paso requiere descripcion.')
+        return {
+          numero,
+          titulo,
+          descripcion,
+          duracion_min: typeof paso.duracion_min === 'number' && Number.isInteger(paso.duracion_min) ? paso.duracion_min : null,
+          temperatura_c: typeof paso.temperatura_c === 'number' && Number.isFinite(paso.temperatura_c) ? paso.temperatura_c : null,
+          tecnica: typeof paso.tecnica === 'string' && paso.tecnica.trim() !== '' ? paso.tecnica.trim() : null,
+          punto_critico: paso.punto_critico === true,
+          foto_url: typeof paso.foto_url === 'string' && paso.foto_url.trim() !== '' ? paso.foto_url.trim() : null,
+        }
+      })
+    : [{
+        numero: 1,
+        titulo: enCarta ? 'Elaboración del plato' : 'Preparación base',
+        descripcion: enCarta ? 'Completa los pasos de elaboración del plato.' : 'Completa los pasos de preparación de la receta.',
+        duracion_min: null,
+        temperatura_c: null,
+        tecnica: null,
+        punto_critico: false,
+        foto_url: null,
+      }]
+
+  if (new Set(pasos.map((paso) => paso.numero)).size !== pasos.length) {
+    throw new Error('Los números de los pasos no pueden repetirse.')
+  }
+
+  if (new Set(pasos.map((paso) => paso.numero)).size !== pasos.length) {
+    throw new Error('Los números de los pasos no pueden repetirse.')
+  }
+
+  const productoSalidaId = typeof raw.producto_salida_id === 'string' && raw.producto_salida_id.trim() !== '' ? raw.producto_salida_id.trim() : null
+  const cantidadSalida = raw.cantidad_salida == null || raw.cantidad_salida === '' ? null : leerNumero(raw.cantidad_salida)
+  const unidadSalida = typeof raw.unidad_salida === 'string' && raw.unidad_salida.trim() !== '' ? raw.unidad_salida.trim() : null
+  if ((productoSalidaId || cantidadSalida !== null || unidadSalida) && (!productoSalidaId || cantidadSalida === null || !unidadSalida)) {
+    throw new Error('La salida de producción requiere producto, cantidad y unidad.')
+  }
+  if (unidadSalida && !UNIDADES_VALIDAS.includes(unidadSalida as UnidadEntrada)) {
+    throw new Error('La unidad de salida no es válida.')
+  }
+
+  return {
+    nombre,
+    descripcion: typeof raw.descripcion === 'string' && raw.descripcion.trim() !== '' ? raw.descripcion.trim() : null,
+    categoria_id: typeof raw.categoria_id === 'string' && raw.categoria_id.trim() !== '' ? raw.categoria_id.trim() : null,
+    rendimiento_porciones: rendimiento,
+    unidad_rendimiento: unidadRendimiento,
+    precio_venta: leerNumero(raw.precio_venta),
+    tiempo_preparacion: typeof raw.tiempo_preparacion === 'number' && Number.isInteger(raw.tiempo_preparacion) ? raw.tiempo_preparacion : null,
+    dificultad: typeof raw.dificultad === 'string' ? raw.dificultad as DificultadReceta : null,
+    en_carta: enCarta,
+    es_produccion: esProduccion,
+    producto_salida_id: productoSalidaId,
+    cantidad_salida: cantidadSalida,
+    unidad_salida: unidadSalida,
+    origen_editor: raw.origen_editor === 'carta' ? 'carta' : 'receta',
+    ingredientes,
+    pasos,
+  }
+}
 
 export async function POST(request: NextRequest) {
   const supabase = crearClienteServidor()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return errorJSON('No autenticado.', 401)
 
-  // ── 1. Autenticación ───────────────────────────────────────
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return errorJSON('No autenticado.', 401)
-  }
-
-  // ── 2. Perfil del usuario ──────────────────────────────────
-  const { data: perfil, error: perfilError } = await supabase
+  const { data: perfil } = await supabase
     .from('usuarios')
     .select('id, restaurante_id, activo, rol')
     .eq('id', user.id)
     .eq('activo', true)
     .single()
-
-  if (perfilError || !perfil) {
-    return errorJSON('Usuario no encontrado o inactivo.', 401)
-  }
+  if (!perfil) return errorJSON('Usuario no encontrado o inactivo.', 401)
   if (!['dueño', 'chef_ejecutivo', 'chef_cocina'].includes(perfil.rol)) {
     return errorJSON('No tienes permisos para crear recetas.', 403)
   }
 
-  // ── 3. Parsear y validar body ──────────────────────────────
-  let body: unknown
+  const body = await request.json().catch(() => null)
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return errorJSON('El body debe ser un objeto JSON.', 400)
 
+  let datos: BodyReceta
   try {
-    body = await request.json()
-  } catch {
-    return errorJSON('Body inválido — se esperaba JSON.', 400)
+    datos = parsearBody(body as Record<string, unknown>)
+  } catch (error) {
+    return errorJSON(error instanceof Error ? error.message : 'Body inválido.', 400)
   }
 
-  // Verificar que body sea un objeto no nulo antes de cualquier cast
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return errorJSON('El body debe ser un objeto JSON.', 400)
-  }
-
-  // Cast seguro: body ya fue verificado como objeto no nulo y no array
-  const raw = body as Record<string, unknown>
-
-  // Validar campos obligatorios de la receta
-  if (
-    !('nombre' in raw) ||
-    !('en_carta' in raw) ||
-    !('es_produccion' in raw) ||
-    !('ingredientes' in raw) ||
-    !('pasos' in raw) ||
-    (raw.en_carta !== true && (!('rendimiento_porciones' in raw) || !('unidad_rendimiento' in raw)))
-  ) {
-    return errorJSON(
-      'Campos obligatorios faltantes: nombre, rendimiento_porciones, unidad_rendimiento, en_carta, es_produccion, ingredientes, pasos.',
-      400
-    )
-  }
-
-  if (typeof raw.nombre !== 'string' || raw.nombre.trim() === '') {
-    return errorJSON('nombre debe ser un string no vacío.', 400)
-  }
-
-  if (raw.en_carta !== true && (
-    typeof raw.rendimiento_porciones !== 'number' ||
-    !Number.isFinite(raw.rendimiento_porciones) ||
-    !Number.isInteger(raw.rendimiento_porciones) ||
-    raw.rendimiento_porciones <= 0
-  )) {
-    return errorJSON('rendimiento_porciones debe ser un número entero mayor que 0.', 400)
-  }
-
-  if (raw.en_carta !== true && (typeof raw.unidad_rendimiento !== 'string' || raw.unidad_rendimiento.trim() === '')) {
-    return errorJSON('unidad_rendimiento debe ser un string no vacío.', 400)
-  }
-
-  if (typeof raw.en_carta !== 'boolean') {
-    return errorJSON('en_carta debe ser un booleano.', 400)
-  }
-
-  if (typeof raw.es_produccion !== 'boolean') {
-    return errorJSON('es_produccion debe ser un booleano.', 400)
-  }
-
-  // Validar campos opcionales de la receta
-  if (
-    'descripcion' in raw &&
-    raw.descripcion !== null &&
-    raw.descripcion !== undefined &&
-    typeof raw.descripcion !== 'string'
-  ) {
-    return errorJSON('descripcion debe ser un string o null.', 400)
-  }
-
-  if (
-    'categoria_id' in raw &&
-    raw.categoria_id !== null &&
-    raw.categoria_id !== undefined &&
-    typeof raw.categoria_id !== 'string'
-  ) {
-    return errorJSON('categoria_id debe ser un string o null.', 400)
-  }
-
-  if (
-    'precio_venta' in raw &&
-    raw.precio_venta !== null &&
-    raw.precio_venta !== undefined &&
-    (typeof raw.precio_venta !== 'number' || !Number.isFinite(raw.precio_venta))
-  ) {
-    return errorJSON('precio_venta debe ser un número finito o null.', 400)
-  }
-
-  if (
-    'tiempo_preparacion' in raw &&
-    raw.tiempo_preparacion !== null &&
-    raw.tiempo_preparacion !== undefined &&
-    (typeof raw.tiempo_preparacion !== 'number' ||
-      !Number.isFinite(raw.tiempo_preparacion) ||
-      !Number.isInteger(raw.tiempo_preparacion))
-  ) {
-    return errorJSON('tiempo_preparacion debe ser un número entero o null.', 400)
-  }
-
-  if (
-    'dificultad' in raw &&
-    raw.dificultad !== null &&
-    raw.dificultad !== undefined &&
-    (typeof raw.dificultad !== 'string' || !DIFICULTADES_VALIDAS.includes(raw.dificultad as DificultadReceta))
-  ) {
-    return errorJSON(
-      `dificultad debe ser una de: ${DIFICULTADES_VALIDAS.join(', ')}, o null.`,
-      400
-    )
-  }
-
-  // Validar ingredientes
-  if (!Array.isArray(raw.ingredientes) || raw.ingredientes.length === 0) {
-    return errorJSON('ingredientes debe ser un array con al menos un elemento.', 400)
-  }
-
-  const ingredientes: BodyIngrediente[] = []
-
-  for (const item of raw.ingredientes) {
-    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-      return errorJSON('Cada ingrediente debe ser un objeto.', 400)
-    }
-
-    const ing = item as Record<string, unknown>
-
-    if (typeof ing.producto_id !== 'string' || ing.producto_id.trim() === '') {
-      return errorJSON('Cada ingrediente requiere producto_id (string no vacío).', 400)
-    }
-
-    if (typeof ing.cantidad !== 'number' || !Number.isFinite(ing.cantidad) || ing.cantidad <= 0) {
-      return errorJSON('Cada ingrediente requiere cantidad (número finito mayor que 0).', 400)
-    }
-
-    if (
-      typeof ing.unidad_medida !== 'string' ||
-      !UNIDADES_VALIDAS.includes(ing.unidad_medida as UnidadEntrada)
-    ) {
-      return errorJSON(
-        `Cada ingrediente requiere unidad_medida válida: ${UNIDADES_VALIDAS.join(', ')}.`,
-        400
-      )
-    }
-
-    if (typeof ing.es_opcional !== 'boolean') {
-      return errorJSON('Cada ingrediente requiere es_opcional (booleano).', 400)
-    }
-
-    if (
-      typeof ing.orden !== 'number' ||
-      !Number.isFinite(ing.orden) ||
-      !Number.isInteger(ing.orden)
-    ) {
-      return errorJSON('Cada ingrediente requiere orden (número entero).', 400)
-    }
-
-    if (
-      'notas' in ing &&
-      ing.notas !== null &&
-      ing.notas !== undefined &&
-      typeof ing.notas !== 'string'
-    ) {
-      return errorJSON('notas del ingrediente debe ser un string o null.', 400)
-    }
-
-    ingredientes.push({
-      producto_id:    ing.producto_id.trim(),
-      cantidad:       ing.cantidad,
-      unidad_medida:  ing.unidad_medida as UnidadEntrada,
-      es_opcional:    ing.es_opcional,
-      orden:          ing.orden,
-      notas:
-        typeof ing.notas === 'string' && ing.notas.trim() !== ''
-          ? ing.notas.trim()
-          : null,
-    })
-  }
-
-  // Validar pasos
-  if (!Array.isArray(raw.pasos) || (raw.pasos.length === 0 && raw.en_carta !== true)) {
-    return errorJSON('pasos debe ser un array con al menos un elemento.', 400)
-  }
-
-  const pasos: BodyPaso[] = []
-
-  for (const item of raw.pasos) {
-    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-      return errorJSON('Cada paso debe ser un objeto.', 400)
-    }
-
-    const paso = item as Record<string, unknown>
-
-    if (
-      typeof paso.numero !== 'number' ||
-      !Number.isFinite(paso.numero) ||
-      !Number.isInteger(paso.numero) ||
-      paso.numero <= 0
-    ) {
-      return errorJSON('Cada paso requiere numero (número entero mayor que 0).', 400)
-    }
-
-    if (typeof paso.titulo !== 'string' || paso.titulo.trim() === '') {
-      return errorJSON('Cada paso requiere titulo (string no vacío).', 400)
-    }
-
-    if (typeof paso.descripcion !== 'string' || paso.descripcion.trim() === '') {
-      return errorJSON('Cada paso requiere descripcion (string no vacío).', 400)
-    }
-
-    if (
-      'punto_critico' in paso &&
-      paso.punto_critico !== null &&
-      paso.punto_critico !== undefined &&
-      typeof paso.punto_critico !== 'boolean'
-    ) {
-      return errorJSON('punto_critico del paso debe ser un booleano.', 400)
-    }
-
-    if (
-      'duracion_min' in paso &&
-      paso.duracion_min !== null &&
-      paso.duracion_min !== undefined &&
-      (typeof paso.duracion_min !== 'number' ||
-        !Number.isFinite(paso.duracion_min) ||
-        !Number.isInteger(paso.duracion_min))
-    ) {
-      return errorJSON('duracion_min del paso debe ser un número entero o null.', 400)
-    }
-
-    if (
-      'temperatura_c' in paso &&
-      paso.temperatura_c !== null &&
-      paso.temperatura_c !== undefined &&
-      (typeof paso.temperatura_c !== 'number' ||
-        !Number.isFinite(paso.temperatura_c) ||
-        !Number.isInteger(paso.temperatura_c))
-    ) {
-      return errorJSON('temperatura_c del paso debe ser un número entero o null.', 400)
-    }
-
-    if (
-      'tecnica' in paso &&
-      paso.tecnica !== null &&
-      paso.tecnica !== undefined &&
-      typeof paso.tecnica !== 'string'
-    ) {
-      return errorJSON('tecnica del paso debe ser un string o null.', 400)
-    }
-
-    if (
-      'foto_url' in paso &&
-      paso.foto_url !== null &&
-      paso.foto_url !== undefined &&
-      typeof paso.foto_url !== 'string'
-    ) {
-      return errorJSON('foto_url del paso debe ser un string o null.', 400)
-    }
-
-    pasos.push({
-      numero:         paso.numero,
-      titulo:         paso.titulo.trim(),
-      descripcion:    paso.descripcion.trim(),
-      duracion_min:   typeof paso.duracion_min === 'number' ? paso.duracion_min : null,
-      temperatura_c:  typeof paso.temperatura_c === 'number' ? paso.temperatura_c : null,
-      tecnica:
-        typeof paso.tecnica === 'string' && paso.tecnica.trim() !== ''
-          ? paso.tecnica.trim()
-          : null,
-      punto_critico:  typeof paso.punto_critico === 'boolean' ? paso.punto_critico : false,
-      foto_url:
-        typeof paso.foto_url === 'string' && paso.foto_url.trim() !== ''
-          ? paso.foto_url.trim()
-          : null,
-    })
-  }
-
-  if (pasos.length === 0 && raw.en_carta === true) {
-    pasos.push({
-      numero: 1,
-      titulo: 'Plato de carta',
-      descripcion: 'Ficha de preparación pendiente.',
-      duracion_min: null,
-      temperatura_c: null,
-      tecnica: null,
-      punto_critico: false,
-      foto_url: null,
-    })
-  }
-
-  // Validar que no haya numero duplicado entre los pasos —
-  // recetas_pasos tiene UNIQUE (receta_id, numero)
-  const numerosDePaso = pasos.map((p) => p.numero)
-  if (new Set(numerosDePaso).size !== numerosDePaso.length) {
-    return errorJSON('Los números de los pasos no pueden repetirse.', 400)
-  }
-
-  // Construcción del body completamente validado
-  const datos: BodyReceta = {
-    nombre:                raw.nombre.trim(),
-    descripcion:
-      typeof raw.descripcion === 'string' && raw.descripcion.trim() !== ''
-        ? raw.descripcion.trim()
-        : null,
-    categoria_id:
-      typeof raw.categoria_id === 'string' && raw.categoria_id.trim() !== ''
-        ? raw.categoria_id.trim()
-        : null,
-    rendimiento_porciones: typeof raw.rendimiento_porciones === 'number' ? raw.rendimiento_porciones : 1,
-    unidad_rendimiento:    typeof raw.unidad_rendimiento === 'string' && raw.unidad_rendimiento.trim() !== '' ? raw.unidad_rendimiento.trim() : 'plato',
-    precio_venta:          typeof raw.precio_venta === 'number' ? raw.precio_venta : null,
-    tiempo_preparacion:    typeof raw.tiempo_preparacion === 'number' ? raw.tiempo_preparacion : null,
-    dificultad:            typeof raw.dificultad === 'string' ? (raw.dificultad as DificultadReceta) : null,
-    en_carta:              raw.en_carta,
-    es_produccion:         raw.es_produccion,
-    ingredientes,
-    pasos,
-  }
-
-  // ── 4. Verificar productos de los ingredientes ──────────────
-  const productoIds = [...new Set(datos.ingredientes.map((i) => i.producto_id))]
+  const productoIds = [...new Set([
+    ...datos.ingredientes.map((ingrediente) => ingrediente.producto_id),
+    ...(datos.producto_salida_id ? [datos.producto_salida_id] : []),
+  ])]
 
   const { data: productos, error: productosError } = await supabase
     .from('productos')
-    .select('id, restaurante_id, densidad_g_por_ml, peso_unitario_gramos')
+    .select('id, restaurante_id, nombre, activo, tipo_operativo, densidad_g_por_ml, peso_unitario_gramos')
     .in('id', productoIds)
 
-  if (productosError) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error al verificar productos:', productosError.message)
-    return errorJSON('Error al verificar los productos de la receta. Intenta nuevamente.', 500)
-  }
+  if (productosError) return errorJSON('Error al verificar los productos de la receta.', 500)
+  if (!productos || productos.length !== productoIds.length) return errorJSON('Uno o más productos de la receta no fueron encontrados.', 404)
 
-  if (!productos || productos.length !== productoIds.length) {
-    return errorJSON('Uno o más productos de los ingredientes no fueron encontrados.', 404)
-  }
-
+  const productosPorId = new Map(productos.map((producto) => [producto.id, producto]))
   for (const producto of productos) {
-    if (producto.restaurante_id !== perfil.restaurante_id) {
-      return errorJSON('Sin autorización sobre uno o más productos de los ingredientes.', 403)
+    if (producto.restaurante_id !== perfil.restaurante_id || producto.activo === false) {
+      return errorJSON('Sin autorización sobre uno o más productos de la receta.', 403)
     }
   }
 
-  const productosPorId = new Map(productos.map((p) => [p.id, p]))
-
-  // ── 5. Convertir cantidad de cada ingrediente a gramos ──────
-  const ingredientesConGramos: Array<BodyIngrediente & { cantidad_gramos: number }> = []
+  if (datos.producto_salida_id) {
+    const salida = productosPorId.get(datos.producto_salida_id)
+    if (!salida || salida.tipo_operativo !== 'elaborado') {
+      return errorJSON('El producto de salida debe existir y pertenecer a Stock disponible.', 400)
+    }
+  }
 
   for (const ingrediente of datos.ingredientes) {
     const producto = productosPorId.get(ingrediente.producto_id)
-
-    if (!producto) {
-      return errorJSON('Uno o más productos de los ingredientes no fueron encontrados.', 404)
-    }
-
     const conversion = convertirAGramos(
       ingrediente.cantidad,
       ingrediente.unidad_medida,
-      producto.densidad_g_por_ml ?? undefined,
-      producto.peso_unitario_gramos ?? undefined
+      producto?.densidad_g_por_ml ?? undefined,
+      producto?.peso_unitario_gramos ?? undefined
     )
-
     if (conversion.gramos === null) {
-      return errorJSON(
-        `No fue posible convertir la cantidad del ingrediente "${ingrediente.producto_id}" a gramos. Verifica la unidad_medida o la configuración de densidad/peso unitario del producto.`,
-        400
-      )
+      return errorJSON(`No fue posible convertir la cantidad del ingrediente "${producto?.nombre ?? ingrediente.producto_id}" a gramos.`, 400)
     }
-
-    ingredientesConGramos.push({
-      ...ingrediente,
-      cantidad_gramos: conversion.gramos,
-    })
   }
 
-  // Verificar tenancy de categoria_id, si viene informada.
-  // La consulta se restringe desde el origen por restaurante_id — nunca se
-  // lee una categoría de otro restaurante para luego rechazarla. Categoría
-  // inexistente y categoría de otro restaurante se tratan igual (404), para
-  // no facilitar enumeración de recursos entre tenants.
-  if (datos.categoria_id !== null) {
-    const { data: categoria, error: categoriaError } = await supabase
+  if (datos.categoria_id) {
+    const { data: categoria } = await supabase
       .from('categorias_receta')
       .select('id')
       .eq('id', datos.categoria_id)
       .eq('restaurante_id', perfil.restaurante_id)
       .single()
-
-    if (categoriaError || !categoria) {
-      return errorJSON('La categoría indicada no fue encontrada.', 404)
-    }
+    if (!categoria) return errorJSON('La categoría indicada no fue encontrada.', 404)
   }
 
-  // ── 6. Crear receta completa en una sola transacción de PostgreSQL ──
-  // La validación anterior mantiene mensajes claros para la interfaz; la RPC
-  // vuelve a validar tenant, rol, productos y conversiones dentro de la base.
-  const { data: receta, error: recetaError } = await supabase.rpc('crear_receta_completa', {
+  const { data: recetaCreadaRPC, error: recetaError } = await supabase.rpc('crear_receta_completa', {
     p_restaurante_id: perfil.restaurante_id,
     p_creado_por: perfil.id,
-    p_datos: {
-      ...datos,
-      ingredientes: ingredientesConGramos.map(({ cantidad_gramos: _cantidadGramos, ...ingrediente }) => ingrediente),
+    p_datos: datos,
+  })
+  const recetaCreada = Array.isArray(recetaCreadaRPC) ? recetaCreadaRPC[0] : recetaCreadaRPC
+  if (recetaError || !recetaCreada) return errorJSON('No se pudo crear la receta completa.', 500)
+
+  await supabase.from('actividad_operativa').insert({
+    restaurante_id: perfil.restaurante_id,
+    usuario_id: user.id,
+    accion: datos.origen_editor === 'carta' ? 'crear_carta' : 'crear_receta',
+    entidad_tipo: datos.origen_editor === 'carta' ? 'carta' : 'receta',
+    entidad_id: recetaCreada.id,
+    descripcion: `${user.email ?? 'Usuario'} creó ${datos.origen_editor === 'carta' ? 'el plato' : 'la receta'} ${datos.nombre}`,
+    datos: {
+      receta_id: recetaCreada.id,
+      en_carta: datos.en_carta,
+      es_produccion: datos.es_produccion,
+      producto_salida_id: datos.producto_salida_id,
+      cantidad_salida: datos.cantidad_salida,
+      unidad_salida: datos.unidad_salida,
     },
   })
 
-  const recetaCreada = Array.isArray(receta) ? receta[0] : receta
-  if (recetaError || !recetaCreada) {
-    console.error('[ChefOS/api/biblioteca/recetas] Error en creación atómica:', recetaError?.message)
-    return errorJSON('No se pudo crear la receta completa. Verifica tus permisos y los ingredientes.', 500)
-  }
-
-  return NextResponse.json(
-    { data: recetaCreada, error: null },
-    { status: 201 }
-  )
+  return NextResponse.json({ data: recetaCreada, error: null }, { status: 201 })
 }

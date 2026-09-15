@@ -14,7 +14,7 @@
  * - llamar al hook
  */
 
-import { useState, type ChangeEvent }                    from 'react'
+import { useMemo, useState, type ChangeEvent }           from 'react'
 import { useRegistrarProduccion, type BodyProduccion }   from '@/hooks/useRegistrarProduccion'
 import { useRecetas }                                    from '@/hooks/useDominio'
 
@@ -36,15 +36,6 @@ const ESTADO_INICIAL: CamposForm = {
   notas:              '',
 }
 
-const UNIDADES_COMUNES = [
-  'porciones',
-  'kg',
-  'g',
-  'lt',
-  'ml',
-  'unidades',
-] as const
-
 // ─────────────────────────────────────────────────────────────
 // Props
 // ─────────────────────────────────────────────────────────────
@@ -64,6 +55,10 @@ export default function RegistrarProduccionForm({ loteId, recetaInicialId }: Pro
     receta_id: recetaInicialId ?? '',
   }))
   const recetas = useRecetas({ es_produccion: true, activa: true })
+  const recetaSeleccionada = useMemo(
+    () => (recetas.data ?? []).find((receta) => receta.id === campos.receta_id),
+    [campos.receta_id, recetas.data]
+  )
 
   const mutacion = useRegistrarProduccion({
     onSuccess: () => setCampos(ESTADO_INICIAL),
@@ -84,7 +79,7 @@ export default function RegistrarProduccionForm({ loteId, recetaInicialId }: Pro
       lote_id:            loteId,
       receta_id:          campos.receta_id.trim(),
       cantidad_producida: Number(campos.cantidad_producida),
-      unidad:             campos.unidad,
+      unidad:             recetaSeleccionada?.unidad_salida ?? recetaSeleccionada?.unidad_rendimiento ?? campos.unidad,
       notas:              campos.notas.trim() !== ''
                             ? campos.notas.trim()
                             : null,
@@ -126,7 +121,7 @@ export default function RegistrarProduccionForm({ loteId, recetaInicialId }: Pro
           {(recetas.data ?? []).map((receta) => <option key={receta.id} value={receta.id}>{receta.nombre}</option>)}
         </select>
         <p className="text-2xs font-sans text-texto-apagado">
-          Solo aparecen recetas marcadas como “Es producción”. Sus ingredientes se descontarán del inventario.
+          Solo aparecen recetas marcadas como “Es producción”. Sus ingredientes se descontarán y la salida configurada aumentará el Stock disponible.
         </p>
       </div>
 
@@ -157,31 +152,9 @@ export default function RegistrarProduccionForm({ loteId, recetaInicialId }: Pro
         />
       </div>
 
-      {/* Unidad */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor="unidad"
-          className="text-xs font-sans font-medium text-texto-secundario"
-        >
-          Unidad <span className="text-peligro">*</span>
-        </label>
-        <select
-          id="unidad"
-          name="unidad"
-          value={campos.unidad}
-          onChange={handleChange}
-          disabled={enviando}
-          className="w-full rounded-lg bg-fondo-base border border-fondo-borde
-                     px-3 py-2.5 text-sm font-sans text-texto-primario
-                     focus:outline-none focus:border-acento transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {UNIDADES_COMUNES.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
+      <div className="rounded-xl border border-fondo-borde bg-fondo-card px-4 py-3 text-xs text-texto-secundario">
+        <p><span className="font-medium text-texto-primario">Unidad registrada:</span> {recetaSeleccionada?.unidad_salida ?? recetaSeleccionada?.unidad_rendimiento ?? 'porciones'}</p>
+        <p className="mt-1"><span className="font-medium text-texto-primario">Salida configurada:</span> {recetaSeleccionada?.producto_salida?.nombre ?? 'Sin producto de salida'}</p>
       </div>
 
       {/* Notas */}

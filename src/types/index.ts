@@ -39,7 +39,13 @@ export type TipoMovimientoInventario =
   | 'ajuste'
   | 'merma'
   | 'produccion'
+  | 'produccion_salida'
   | 'transferencia'
+
+export type TipoOperativoProducto =
+  | 'materia_prima'
+  | 'insumo'
+  | 'elaborado'
 
 // ─────────────────────────────────────────────────────────────
 // SISTEMA UNIVERSAL DE GRAMOS
@@ -166,6 +172,14 @@ export interface ConfigRestaurante {
   color_marca?: string
   limite_usuarios?: number
   limite_ia_diario?: number
+  onboarding?: {
+    paso_actual?: number
+    inventario_confirmado?: boolean
+    stock_confirmado?: boolean
+    completo?: boolean
+    confirmacion_incompleta?: boolean
+    actualizado_en?: string
+  }
 }
 
 export interface Restaurante {
@@ -175,6 +189,8 @@ export interface Restaurante {
   plan: PlanRestaurante
   config: ConfigRestaurante
   activo: boolean
+  zona_horaria?: string
+  onboarding_completado?: boolean
   creado_en: string
 }
 
@@ -231,6 +247,7 @@ export interface Producto {
   nombre_normalizado?: string
   codigo_interno?: string
   categoria_id?: string
+  tipo_operativo: TipoOperativoProducto
   unidad_medida: string
   unidad_compra?: string
   unidad_display?: string
@@ -297,11 +314,17 @@ export interface Receta {
   activa: boolean
   en_carta: boolean
   es_produccion: boolean
+  producto_salida_id?: string | null
+  cantidad_salida?: number | null
+  unidad_salida?: string | null
+  cantidad_salida_gramos?: number | null
   creado_por?: string
   creado_en: string
   actualizado_en: string
   categoria?: CategoriaReceta
   ingredientes?: RecetaIngrediente[]
+  pasos?: RecetaPaso[]
+  producto_salida?: Producto | null
 }
 
 export interface RecetaIngrediente {
@@ -604,6 +627,9 @@ export interface FormNuevaReceta {
   dificultad?: DificultadReceta
   en_carta: boolean
   es_produccion: boolean
+  producto_salida_id?: string
+  cantidad_salida?: number
+  unidad_salida?: string
 }
 
 export interface FormNuevaMerma {

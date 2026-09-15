@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
   // ── 4. Verificar producto ───────────────────────────────────
   const { data: producto, error: productoError } = await supabase
     .from('productos')
-    .select('id, restaurante_id, costo_unitario_actual, costo_por_gramo, densidad_g_por_ml, peso_unitario_gramos')
+    .select('id, restaurante_id, nombre, tipo_operativo, costo_unitario_actual, costo_por_gramo, densidad_g_por_ml, peso_unitario_gramos')
     .eq('id', datos.producto_id)
     .single()
 
@@ -219,6 +219,25 @@ export async function POST(request: NextRequest) {
     console.error('[ChefOS/api/inventario/movimientos] Error al insertar ajuste:', movimientoError?.message)
     return errorJSON('Error al registrar el ajuste de inventario. Intenta nuevamente.', 500)
   }
+
+  await supabase.from('actividad_operativa').insert({
+    restaurante_id: perfil.restaurante_id,
+    usuario_id: user.id,
+    accion: 'ajustar_stock',
+    entidad_tipo: producto.tipo_operativo === 'elaborado' ? 'stock_disponible' : 'inventario',
+    entidad_id: datos.producto_id,
+    descripcion: `${user.email ?? 'Usuario'} ajustó ${producto.nombre} a ${datos.cantidad_fisica} ${datos.unidad_medida}`,
+    datos: {
+      producto_id: datos.producto_id,
+      producto_nombre: producto.nombre,
+      tipo_operativo: producto.tipo_operativo,
+      cantidad_fisica: datos.cantidad_fisica,
+      unidad_medida: datos.unidad_medida,
+      gramos: gramos,
+      motivo: datos.motivo,
+      movimiento_id: movimiento.id,
+    },
+  })
 
   // ── 7. Respuesta exitosa ────────────────────────────────────
   return NextResponse.json(

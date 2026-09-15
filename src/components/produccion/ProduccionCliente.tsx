@@ -232,7 +232,7 @@ export default function ProduccionCliente() {
               <div key={receta.id} className="flex items-center justify-between gap-3 rounded-lg border border-fondo-borde px-3 py-2.5">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-texto-primario truncate">{receta.nombre}</p>
-                  <p className="text-2xs text-texto-apagado">Rinde {receta.rendimiento_porciones} {receta.unidad_rendimiento}</p>
+                  <p className="text-2xs text-texto-apagado">Rinde {receta.rendimiento_porciones} {receta.unidad_rendimiento}{receta.producto_salida?.nombre ? ` · salida ${receta.producto_salida.nombre}` : ''}</p>
                 </div>
                 <button
                   type="button"
