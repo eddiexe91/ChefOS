@@ -570,25 +570,26 @@ export async function fetchProductos(
     )
   }
 
-  const productos = ((data ?? []) as Producto[]).map((producto) => ({
-    ...producto,
-    tipo_operativo: obtenerTipoOperativoProducto(producto) ?? 'materia_prima',
-  }))
+  const productos = (data ?? []) as Producto[]
   const productosFiltrados = filtrarProductosPorTipoOperativo(
     productos,
     filtros?.tipos_operativos,
     Boolean(filtros?.tipos_operativos?.every((tipo) => tipo !== 'elaborado'))
   )
+  const productosNormalizados = productosFiltrados.map((producto) => ({
+    ...producto,
+    tipo_operativo: obtenerTipoOperativoProducto(producto) ?? 'materia_prima',
+  }))
 
   if (filtros?.stock_bajo) {
-    return productosFiltrados.filter((p) =>
+    return productosNormalizados.filter((p) =>
       p.cantidad_gramos !== undefined && p.stock_minimo_gramos !== undefined
         ? p.cantidad_gramos <= p.stock_minimo_gramos
         : p.stock_actual <= p.stock_minimo
     )
   }
 
-  return productosFiltrados
+  return productosNormalizados
 }
 
 export async function fetchCategoriasProducto(client: ClienteSupabase): Promise<CategoriaProducto[]> {
