@@ -14,6 +14,10 @@ function errorJSON(error: string, status: number) {
   return NextResponse.json({ data: null, error }, { status })
 }
 
+async function cargarProductoCreado(supabase: ReturnType<typeof crearClienteServidor>, id: string) {
+  return supabase.from('productos').select('*').eq('id', id).single()
+}
+
 export async function POST(request: Request) {
   const supabase = crearClienteServidor()
   const { data: { user } } = await supabase.auth.getUser()
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
     metadata: { tipo_operativo: tipoOperativo },
   }
 
-  let { data, error } = await supabase.from('productos').insert(payload).select().single()
+  let { data, error } = await supabase.from('productos').insert(payload).select('id').single()
 
   if (error && esErrorColumnaTipoOperativo(error)) {
     const fallbackPayload = { ...payload }
@@ -86,19 +90,21 @@ export async function POST(request: Request) {
     const fallback = await supabase.from('productos').insert({
       ...fallbackPayload,
       metadata: { ...(fallbackPayload.metadata ?? {}), tipo_operativo: tipoOperativo },
-    }).select().single()
+    }).select('id').single()
     data = fallback.data
     error = fallback.error
   }
 
   if (error || !data) return errorJSON('No se pudo crear el producto. Intenta nuevamente.', 500)
+  const productoCreado = await cargarProductoCreado(supabase, data.id)
+  if (productoCreado.error || !productoCreado.data) return errorJSON('El producto fue creado pero no se pudo recuperar.', 500)
   await supabase.from('actividad_operativa').insert({
     restaurante_id: perfil.restaurante_id,
     usuario_id: user.id,
     accion: 'crear_producto',
-    entidad_id: data.id,
+    entidad_id: productoCreado.data.id,
     descripcion: `${user.email ?? 'Usuario'} creó ${tipoOperativo === 'elaborado' ? 'el stock' : 'el producto'} ${nombre}`,
     datos: { nombre, unidad, stock, minimo, costo, tipo_operativo: tipoOperativo },
   })
-  return NextResponse.json({ data, error: null }, { status: 201 })
+  return NextResponse.json({ data: productoCreado.data, error: null }, { status: 201 })
 }

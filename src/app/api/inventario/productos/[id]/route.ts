@@ -9,6 +9,10 @@ const TIPOS_OPERATIVOS: readonly TipoOperativoProducto[] = ['materia_prima', 'in
 const ROLES = ['dueño','administrador','chef_ejecutivo','chef_cocina']
 const errorJSON = (error: string, status: number) => NextResponse.json({ data: null, error }, { status })
 
+async function cargarProductoActualizado(supabase: ReturnType<typeof crearClienteServidor>, restauranteId: string, id: string) {
+  return supabase.from('productos').select('*').eq('id', id).eq('restaurante_id', restauranteId).single()
+}
+
 async function contexto() {
   const supabase = crearClienteServidor()
   const { data: { user } } = await supabase.auth.getUser()
@@ -51,17 +55,19 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!anterior) return errorJSON('Producto no encontrado.', 404)
     const metadataAnterior = typeof anterior.metadata === 'object' && anterior.metadata !== null ? anterior.metadata as Record<string, unknown> : {}
     const payload = { nombre:v.nombre, nombre_normalizado:v.nombre.toLowerCase(), tipo_operativo: v.tipoOperativo, unidad_medida:v.unidad, unidad_compra:v.unidad, unidad_display:v.unidad, costo_unitario_actual:v.costo, stock_actual:v.stock, stock_minimo:v.minimo, cantidad_gramos:v.stockGramos, stock_minimo_gramos:v.minimoGramos, densidad_g_por_ml:v.densidad ?? null, peso_unitario_gramos:v.peso ?? null, categoria_id: v.categoriaId, metadata: { ...metadataAnterior, tipo_operativo: v.tipoOperativo } }
-    let { data, error } = await ctx.supabase.from('productos').update(payload).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
+    let { data, error } = await ctx.supabase.from('productos').update(payload).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select('id').single()
     if (error && esErrorColumnaTipoOperativo(error)) {
       const fallbackPayload = { ...payload }
       delete (fallbackPayload as Record<string, unknown>).tipo_operativo
-      const fallback = await ctx.supabase.from('productos').update(fallbackPayload).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
+      const fallback = await ctx.supabase.from('productos').update(fallbackPayload).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select('id').single()
       data = fallback.data
       error = fallback.error
     }
     if (error || !data) return errorJSON('No se pudo actualizar el producto.', 500)
+    const productoActualizado = await cargarProductoActualizado(ctx.supabase, ctx.perfil.restaurante_id, id)
+    if (productoActualizado.error || !productoActualizado.data) return errorJSON('El producto fue actualizado pero no se pudo recuperar.', 500)
     await ctx.supabase.from('actividad_operativa').insert({ restaurante_id:ctx.perfil.restaurante_id, usuario_id:ctx.user.id, accion:'editar_producto', entidad_id:id, descripcion:`${ctx.user.email ?? 'Usuario'} editó ${v.tipoOperativo === 'elaborado' ? 'el stock' : 'el producto'} ${v.nombre}`, datos:{ antes: anterior, despues: v } })
-    return NextResponse.json({ data, error:null })
+    return NextResponse.json({ data: productoActualizado.data, error:null })
   } catch (e) { return errorJSON(e instanceof Error ? e.message : 'Datos inválidos.', 400) }
 }
 
