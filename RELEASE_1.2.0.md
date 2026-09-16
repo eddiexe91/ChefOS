@@ -16,7 +16,7 @@
 
 - Migración 012 aplicada y confirmada en SQL Editor: categorías, claves/roles de equipo, políticas de escritura de briefings y RPC para crear claves sin depender de service_role en el servidor web.
 - Prueba SQL con BEGIN/ROLLBACK: alta de restaurante, categorías, usuario de equipo, clave consumida, creación de receta/carta, descuento por producción y merma. Resultado PASS; no persisten datos de prueba. Archivo `scripts/test-operacion.sql`.
-- IMPORTANTE: se detectó que 010 solo tenía aplicada su estructura. Las funciones de crear receta/registrar producción seguían en su versión anterior y NO guardaban/acreditaban producto de salida. Queda pendiente completar las funciones de `010_stock_operativo_carta.sql` y verificar una producción que incremente Stock disponible. La sesión del panel Supabase expiró durante esta comprobación; no dar este punto por resuelto sin ejecutar y verificar.
+- RESUELTO el 16-09-2026: se recuperó la sesión de Supabase mediante la cuenta vinculada. Se completaron las funciones, el trigger de validación de salida y la restricción de actividad de `010_stock_operativo_carta.sql` que faltaban (la estructura ya existía). SQL Editor confirmó éxito. Prueba BEGIN/ROLLBACK: receta guarda salida de 1000 g, producción consume 1000 g de materia prima y acredita 1000 g de elaborado, registra actividad y una merma de 250 g deja 750 g. Resultado PASS, sin datos QA persistidos. No cambiaron permisos ni existencias reales.
 - La clave administrativa local respondió `Unregistered API key`. No se copia a GitHub. `scripts/test-operacion.cjs` necesita una clave administrativa válida y un backend de prueba para sus pruebas API; no se ejecutó satisfactoriamente. La prueba SQL transaccional sí pasó, pero no sustituye pruebas RLS con un usuario real.
 - Compilación web y Android correctas. Avisos existentes: dependencia useEffect de onboarding, compatibilidad Edge de Supabase y advertencias Gradle/flatDir. No son pruebas de funcionamiento en un teléfono.
 - `node scripts/test-captura.cjs`: 11 pruebas de interpretación de voz y CSV, sin dependencias nuevas de test.
@@ -33,7 +33,7 @@
 
 1. Abrir Recetas y Carta: deben mostrar las fichas existentes; crear una ficha de prueba con ingredientes en g/kg y comprobar el guardado.
 2. Inicio: con stock crítico deben aparecer compras sugeridas, no “Sin briefing para hoy”. Modificar existencias y volver a Inicio.
-3. Producción: verificar descuento; después de completar 010, comprobar también el aumento del producto elaborado configurado.
+3. Producción: verificar descuento y aumento del producto elaborado configurado; las funciones 010 ya están aplicadas y probadas en base de datos.
 4. Crear clave en Configuración > Equipo; otra persona registra su propia cuenta con ella. Verificar mismo restaurante/rol, rechazo de reutilización y datos visibles únicamente a miembros.
 5. Captura rápida: dictar, revisar y cancelar primero; luego confirmar una merma controlada y verificar un único descuento.
 6. Foto de comanda: comprobar OCR, corregir borrador y precios, importar una sola vez, revisar platos y confirmar consumo. No importar comandas reales dos veces.
