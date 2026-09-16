@@ -20,9 +20,8 @@ interface Props {
   tipoDefault?: TipoOperativoProducto
 }
 
-function requierePeso(unidad: string) {
-  return ['unidad', 'docena', 'caja', 'bandeja', 'porcion'].includes(unidad)
-}
+function requierePeso(unidad: string) { return unidad === 'porcion' }
+function requiereUnidadesPorEmpaque(unidad: string) { return unidad === 'caja' || unidad === 'bandeja' }
 
 export default function ProductoEditorSheet({
   modo,
@@ -40,6 +39,8 @@ export default function ProductoEditorSheet({
   const [minimo, setMinimo] = useState(producto ? String(producto.stock_minimo) : '')
   const [costo, setCosto] = useState(producto ? String(producto.costo_unitario_actual) : '')
   const [peso, setPeso] = useState(producto?.peso_unitario_gramos ? String(producto.peso_unitario_gramos) : '')
+  const metadataProducto = producto?.metadata as Record<string, unknown> | undefined
+  const [unidadesPorEmpaque, setUnidadesPorEmpaque] = useState(metadataProducto?.unidades_por_empaque ? String(metadataProducto.unidades_por_empaque) : '')
   const [categoriaId, setCategoriaId] = useState(producto?.categoria_id ?? '')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -58,6 +59,7 @@ export default function ProductoEditorSheet({
     stock_minimo: minimo,
     costo_unitario: costo,
     peso_unitario_gramos: peso || undefined,
+    unidades_por_empaque: unidadesPorEmpaque || undefined,
     categoria_id: categoriaId || undefined,
   }
 
@@ -170,8 +172,15 @@ export default function ProductoEditorSheet({
 
         {requierePeso(unidad) && (
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-texto-secundario">Peso por unidad (gramos)</span>
-            <input value={peso} onChange={(e) => setPeso(e.target.value)} required type="number" min="0.001" step="0.001" className="campo-input" placeholder="Ejemplo: 180" />
+            <span className="text-xs font-medium text-texto-secundario">Peso por porción (gramos, opcional)</span>
+            <input value={peso} onChange={(e) => setPeso(e.target.value)} type="number" min="0.001" step="0.001" className="campo-input" placeholder="Ejemplo: 180" />
+          </label>
+        )}
+
+        {requiereUnidadesPorEmpaque(unidad) && (
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-texto-secundario">Unidades por {unidad} (opcional)</span>
+            <input value={unidadesPorEmpaque} onChange={(e) => setUnidadesPorEmpaque(e.target.value)} type="number" min="1" step="1" className="campo-input" placeholder="Ejemplo: 30" />
           </label>
         )}
 

@@ -127,16 +127,16 @@ export function convertirAGramos(
   }
 
   if (u === 'unidad' || u === 'und' || u === 'u') {
-    if (!pesoUnitarioGramos) return { ...base, gramos: null, advertencia: 'Se requiere el peso unitario en gramos' }
+    if (!pesoUnitarioGramos) return { ...base, gramos: cantidad, advertencia: 'Cantidad controlada por unidad, sin equivalencia de peso' }
     return { ...base, gramos: Math.round(cantidad * pesoUnitarioGramos * 1000) / 1000, peso_unitario_usado: pesoUnitarioGramos }
   }
   if (u === 'docena') {
-    if (!pesoUnitarioGramos) return { ...base, gramos: null, advertencia: 'Se requiere el peso unitario en gramos' }
+    if (!pesoUnitarioGramos) return { ...base, gramos: cantidad * 12, advertencia: 'Cantidad controlada por unidades, sin equivalencia de peso' }
     return { ...base, gramos: Math.round(cantidad * 12 * pesoUnitarioGramos * 1000) / 1000, peso_unitario_usado: pesoUnitarioGramos }
   }
 
   if (u === 'caja' || u === 'bandeja' || u === 'porcion') {
-    if (!pesoUnitarioGramos) return { ...base, gramos: null, advertencia: `Se requiere el peso de una ${u} en gramos` }
+    if (!pesoUnitarioGramos) return { ...base, gramos: cantidad, advertencia: `Cantidad controlada por ${u}, sin equivalencia de peso` }
     return { ...base, gramos: Math.round(cantidad * pesoUnitarioGramos * 1000) / 1000, peso_unitario_usado: pesoUnitarioGramos }
   }
 

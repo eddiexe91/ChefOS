@@ -25,6 +25,7 @@ function valores(body: Record<string, unknown>) {
   const peso = body.peso_unitario_gramos == null ? undefined : Number(body.peso_unitario_gramos)
   const categoriaId = typeof body.categoria_id === 'string' && body.categoria_id.trim() !== '' ? body.categoria_id.trim() : null
   const tipoOperativo = typeof body.tipo_operativo === 'string' ? body.tipo_operativo.trim() : 'materia_prima'
+  const unidadesPorEmpaque = body.unidades_por_empaque == null ? null : Number(body.unidades_por_empaque)
   if (!nombre || !UNIDADES.includes(unidad as UnidadEntrada)) throw new Error('Nombre y unidad válida son obligatorios.')
   if (!TIPOS_OPERATIVOS.includes(tipoOperativo as TipoOperativoProducto)) throw new Error('El tipo operativo no es válido.')
   if (![stock,minimo,costo].every(Number.isFinite) || stock < 0 || minimo < 0 || costo < 0) throw new Error('Stock, mínimo y costo deben ser números válidos.')
@@ -32,7 +33,7 @@ function valores(body: Record<string, unknown>) {
   if (peso !== undefined && (!Number.isFinite(peso) || peso <= 0)) throw new Error('El peso unitario debe ser positivo.')
   const sg = convertirAGramos(stock, unidad as UnidadEntrada, densidad, peso), mg = convertirAGramos(minimo, unidad as UnidadEntrada, densidad, peso)
   if (sg.gramos === null || mg.gramos === null) throw new Error('Para unidades, cajas o bandejas debes indicar el peso unitario en gramos.')
-  return { nombre, unidad, stock, minimo, costo, densidad, peso, categoriaId, tipoOperativo, stockGramos: sg.gramos, minimoGramos: mg.gramos }
+  return { nombre, unidad, stock, minimo, costo, densidad, peso, categoriaId, tipoOperativo, unidadesPorEmpaque, stockGramos: sg.gramos, minimoGramos: mg.gramos }
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -48,7 +49,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: anterior } = await ctx.supabase.from('productos').select('nombre, stock_actual, costo_unitario_actual, categoria_id, tipo_operativo, metadata').eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).single()
     if (!anterior) return errorJSON('Producto no encontrado.', 404)
     const metadataAnterior = typeof anterior.metadata === 'object' && anterior.metadata !== null ? anterior.metadata as Record<string, unknown> : {}
-    const { data, error } = await ctx.supabase.from('productos').update({ nombre:v.nombre, nombre_normalizado:v.nombre.toLowerCase(), tipo_operativo: v.tipoOperativo, unidad_medida:v.unidad, unidad_compra:v.unidad, unidad_display:v.unidad, costo_unitario_actual:v.costo, stock_actual:v.stock, stock_minimo:v.minimo, cantidad_gramos:v.stockGramos, stock_minimo_gramos:v.minimoGramos, densidad_g_por_ml:v.densidad ?? null, peso_unitario_gramos:v.peso ?? null, categoria_id: v.categoriaId, metadata: { ...metadataAnterior, tipo_operativo: v.tipoOperativo } }).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
+    const { data, error } = await ctx.supabase.from('productos').update({ nombre:v.nombre, nombre_normalizado:v.nombre.toLowerCase(), tipo_operativo: v.tipoOperativo, unidad_medida:v.unidad, unidad_compra:v.unidad, unidad_display:v.unidad, costo_unitario_actual:v.costo, stock_actual:v.stock, stock_minimo:v.minimo, cantidad_gramos:v.stockGramos, stock_minimo_gramos:v.minimoGramos, densidad_g_por_ml:v.densidad ?? null, peso_unitario_gramos:v.peso ?? null, categoria_id: v.categoriaId, metadata: { ...metadataAnterior, tipo_operativo: v.tipoOperativo, ...(Number.isFinite(v.unidadesPorEmpaque) && Number(v.unidadesPorEmpaque) > 0 ? { unidades_por_empaque: v.unidadesPorEmpaque } : {}) } }).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
     if (error || !data) return errorJSON('No se pudo actualizar el producto.', 500)
     await ctx.supabase.from('actividad_operativa').insert({ restaurante_id:ctx.perfil.restaurante_id, usuario_id:ctx.user.id, accion:'editar_producto', entidad_id:id, descripcion:`${ctx.user.email ?? 'Usuario'} editó ${v.tipoOperativo === 'elaborado' ? 'el stock' : 'el producto'} ${v.nombre}`, datos:{ antes: anterior, despues: v } })
     return NextResponse.json({ data, error:null })

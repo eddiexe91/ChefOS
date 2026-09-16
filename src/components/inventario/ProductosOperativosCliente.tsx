@@ -22,16 +22,21 @@ function ProductoCard({
   producto,
   onEditar,
   onAjustar,
+  seleccionado,
+  onSeleccionar,
 }: {
   producto: Producto
   onEditar: () => void
   onAjustar: () => void
+  seleccionado: boolean
+  onSeleccionar: () => void
 }) {
   const critico = esCritico(producto)
 
   return (
     <article className="rounded-xl border border-fondo-borde bg-fondo-elevado p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
+        <input type="checkbox" checked={seleccionado} onChange={onSeleccionar} aria-label={`Seleccionar ${producto.nombre}`} className="mt-1" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-medium text-texto-primario truncate">{producto.nombre}</h3>
@@ -110,6 +115,8 @@ export default function ProductosOperativosCliente({
   const [busqueda, setBusqueda] = useState('')
   const [categoriaActiva, setCategoriaActiva] = useState('todas')
   const [soloCritico, setSoloCritico] = useState(false)
+  const [seleccionados, setSeleccionados] = useState<string[]>([])
+  const [moviendo, setMoviendo] = useState(false)
 
   const productosQuery = useProductos({ tipos_operativos: tiposOperativos, activo: true })
   const productos = useMemo(() => productosQuery.data ?? [], [productosQuery.data])
@@ -135,11 +142,52 @@ export default function ProductosOperativosCliente({
   }, [busqueda, categoriaActiva, productos, soloCritico])
 
   const totalCriticos = useMemo(() => productos.filter(esCritico).length, [productos])
+  const gruposDuplicados = useMemo(() => {
+    const grupos = new Map<string, Producto[]>()
+    for (const producto of productos) {
+      const clave = producto.nombre.trim().toLocaleLowerCase('es')
+      grupos.set(clave, [...(grupos.get(clave) ?? []), producto])
+    }
+    return [...grupos.values()].filter((grupo) => grupo.length > 1)
+  }, [productos])
   const hayFiltros = busqueda.trim() !== '' || categoriaActiva !== 'todas' || soloCritico
+
+  async function moverSeleccionados() {
+    if (!seleccionados.length) return
+    setMoviendo(true)
+    const destino = tipoDefault === 'elaborado' ? 'materia_prima' : 'elaborado'
+    const response = await fetch('/api/inventario/productos/mover', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: seleccionados, tipo_operativo: destino }) })
+    setMoviendo(false)
+    if (!response.ok) return
+    setSeleccionados([])
+    await productosQuery.refetch()
+  }
+
+  async function resolverDuplicados(grupo: Producto[], accion: 'sumar' | 'omitir') {
+    const response = await fetch('/api/inventario/duplicados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: grupo.map((item) => item.id), accion }) })
+    if (response.ok) await productosQuery.refetch()
+  }
 
   return (
     <div className="px-4 pt-6 pb-36 max-w-lg mx-auto space-y-5">
       <section className="space-y-3">
+        {gruposDuplicados.length > 0 ? (
+          <div className="rounded-xl border border-advertencia-borde bg-advertencia-suave p-4 space-y-3">
+            <p className="text-sm font-medium text-advertencia-texto">ChefOS detectó {gruposDuplicados.length} grupo{gruposDuplicados.length !== 1 ? 's' : ''} duplicado{gruposDuplicados.length !== 1 ? 's' : ''}</p>
+            {gruposDuplicados.map((grupo) => (
+              <div key={grupo[0].nombre.toLowerCase()} className="rounded-lg border border-advertencia-borde px-3 py-2">
+                <p className="text-xs text-texto-primario">{grupo[0].nombre} · {grupo.length} registros</p>
+                <div className="mt-2 flex gap-2"><button type="button" onClick={() => void resolverDuplicados(grupo, 'sumar')} className="text-xs text-acento">Sumar y unificar</button><button type="button" onClick={() => void resolverDuplicados(grupo, 'omitir')} className="text-xs text-texto-secundario">Eliminar copias</button></div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {seleccionados.length > 0 ? (
+          <div className="rounded-xl border border-acento bg-acento-suave px-3 py-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-texto-primario">{seleccionados.length} seleccionado{seleccionados.length !== 1 ? 's' : ''}</p>
+            <button type="button" onClick={() => void moverSeleccionados()} disabled={moviendo} className="rounded-lg bg-acento px-3 py-2 text-xs font-medium text-white disabled:opacity-50">{moviendo ? 'Moviendo…' : tipoDefault === 'elaborado' ? 'Mover a Inventario' : 'Mover a Stock disponible'}</button>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/inventario" className={`rounded-full px-3 py-1.5 text-2xs border ${tipoDefault === 'materia_prima' ? 'bg-acento text-white border-acento' : 'border-fondo-borde text-texto-apagado'}`}>Inventario</Link>
           <Link href="/stock" className={`rounded-full px-3 py-1.5 text-2xs border ${tipoDefault === 'elaborado' ? 'bg-acento text-white border-acento' : 'border-fondo-borde text-texto-apagado'}`}>Stock disponible</Link>
@@ -211,6 +259,8 @@ export default function ProductosOperativosCliente({
               producto={producto}
               onEditar={() => setProductoEditar(producto)}
               onAjustar={() => setProductoAjuste(producto)}
+              seleccionado={seleccionados.includes(producto.id)}
+              onSeleccionar={() => setSeleccionados((actual) => actual.includes(producto.id) ? actual.filter((id) => id !== producto.id) : [...actual, producto.id])}
             />
           ))}
         </section>
@@ -219,7 +269,7 @@ export default function ProductosOperativosCliente({
       {mostrarNuevo ? (
         <NuevoProductoCliente
           onClose={() => setMostrarNuevo(false)}
-          tiposDisponibles={tiposOperativos}
+          tiposDisponibles={['materia_prima','insumo','elaborado']}
           tipoDefault={tipoDefault}
         />
       ) : null}

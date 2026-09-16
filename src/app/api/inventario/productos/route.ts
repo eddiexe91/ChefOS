@@ -39,6 +39,7 @@ export async function POST(request: Request) {
   const peso = body.peso_unitario_gramos == null ? undefined : Number(body.peso_unitario_gramos)
   const categoriaId = typeof body.categoria_id === 'string' && body.categoria_id.trim() !== '' ? body.categoria_id.trim() : null
   const tipoOperativo = typeof body.tipo_operativo === 'string' ? body.tipo_operativo.trim() : 'materia_prima'
+  const unidadesPorEmpaque = body.unidades_por_empaque == null ? null : Number(body.unidades_por_empaque)
 
   if (!nombre || !UNIDADES.includes(unidad as UnidadEntrada)) return errorJSON('Nombre y unidad válida son obligatorios.', 400)
   if (!TIPOS_OPERATIVOS.includes(tipoOperativo as TipoOperativoProducto)) return errorJSON('El tipo operativo no es válido.', 400)
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     peso_unitario_gramos: peso ?? null,
     categoria_id: categoriaId,
     activo: true,
-    metadata: { tipo_operativo: tipoOperativo },
+    metadata: { tipo_operativo: tipoOperativo, ...(Number.isFinite(unidadesPorEmpaque) && Number(unidadesPorEmpaque) > 0 ? { unidades_por_empaque: unidadesPorEmpaque } : {}) },
   }).select().single()
   if (error || !data) return errorJSON('No se pudo crear el producto. Intenta nuevamente.', 500)
   await supabase.from('actividad_operativa').insert({

@@ -28,6 +28,8 @@ export default function OnboardingPage() {
   const [guardando, setGuardando] = useState(false)
   const [archivo, setArchivo] = useState<File | null>(null)
   const [mensaje, setMensaje] = useState('')
+  const [duplicados, setDuplicados] = useState<string[]>([])
+  const [tipoImportacionPendiente, setTipoImportacionPendiente] = useState<'productos' | 'stock'>('productos')
   const [confirmarIncompleto, setConfirmarIncompleto] = useState(false)
 
   useEffect(() => {
@@ -74,16 +76,24 @@ export default function OnboardingPage() {
     return () => window.clearTimeout(timeout)
   }, [nombre, paso, rol, zonaHoraria, inventarioListo, stockListo, confirmarIncompleto])
 
-  async function importarInventario() {
+  async function importarInventario(tipoImportacion: 'productos' | 'stock' = 'productos', resolver?: 'mantener' | 'sumar' | 'omitir') {
     if (!archivo) return
     setGuardando(true)
     const form = new FormData()
     form.set('archivo', archivo)
-    form.set('tipo', 'productos')
+    form.set('tipo', tipoImportacion)
+    if (resolver) form.set('resolver_duplicados', resolver)
     const response = await fetch('/api/onboarding/importar', { method: 'POST', body: form })
-    const data = await response.json().catch(() => ({ error: 'No se pudo importar.' })) as { importados?: number; error?: string }
+    const data = await response.json().catch(() => ({ error: 'No se pudo importar.' })) as { importados?: number; error?: string; duplicados?: string[]; duplicados_resueltos?: number }
     setGuardando(false)
-    setMensaje(response.ok ? `${data.importados ?? 0} registros importados al inventario.` : (data.error ?? 'No se pudo importar.'))
+    if (response.status === 409 && data.duplicados?.length) {
+      setDuplicados(data.duplicados)
+      setTipoImportacionPendiente(tipoImportacion)
+      setMensaje(`ChefOS detectó ${data.duplicados.length} producto(s) duplicado(s). Elige cómo resolverlos.`)
+      return
+    }
+    setDuplicados([])
+    setMensaje(response.ok ? `${data.importados ?? 0} registros importados. ${data.duplicados_resueltos ? `${data.duplicados_resueltos} duplicados resueltos.` : ''}` : (data.error ?? 'No se pudo importar.'))
   }
 
   async function continuar() {
@@ -159,7 +169,7 @@ export default function OnboardingPage() {
             <div className="space-y-2">
               <p className="text-xs text-texto-apagado">Si prefieres, importa un CSV con materias primas e insumos.</p>
               <input type="file" accept=".csv,text/csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} className="w-full text-xs text-texto-secundario" />
-              {archivo ? <button type="button" onClick={() => void importarInventario()} disabled={guardando} className="min-h-11 rounded-xl border border-acento px-4 text-xs text-acento disabled:opacity-50">Importar inventario</button> : null}
+              {archivo ? <button type="button" onClick={() => void importarInventario('productos')} disabled={guardando} className="min-h-11 rounded-xl border border-acento px-4 text-xs text-acento disabled:opacity-50">Importar inventario</button> : null}
               <a href="/api/onboarding/plantilla-inventario" download className="inline-flex items-center gap-1 text-xs text-acento"><Download size={13} /> Descargar plantilla CSV</a>
             </div>
           </div>
@@ -173,6 +183,9 @@ export default function OnboardingPage() {
             </div>
             <Link href="/stock" className="inline-flex items-center gap-2 rounded-xl border border-acento px-4 py-2.5 text-xs text-acento"><Soup size={15} /> Abrir Stock disponible</Link>
             <p className="text-xs text-texto-apagado">Aquí van porciones, salsas, postres porcionados y producciones terminadas.</p>
+            <input type="file" accept=".csv,text/csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} className="w-full text-xs text-texto-secundario" />
+            {archivo ? <button type="button" onClick={() => void importarInventario('stock')} disabled={guardando} className="min-h-11 rounded-xl border border-acento px-4 text-xs text-acento disabled:opacity-50">Importar Stock disponible</button> : null}
+            <a href="/api/onboarding/plantilla-inventario" download className="inline-flex items-center gap-1 text-xs text-acento"><Download size={13} /> Descargar plantilla CSV</a>
           </div>
         ) : null}
 
@@ -207,6 +220,17 @@ export default function OnboardingPage() {
       </section>
 
       {mensaje ? <p className="text-xs text-texto-secundario">{mensaje}</p> : null}
+      {duplicados.length > 0 ? (
+        <section className="rounded-xl border border-advertencia-borde bg-advertencia-suave p-4 space-y-3">
+          <p className="text-sm font-medium text-advertencia-texto">Productos duplicados detectados</p>
+          <p className="text-xs text-advertencia-texto">{duplicados.slice(0, 8).join(', ')}{duplicados.length > 8 ? '…' : ''}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'sumar')} className="rounded-lg bg-acento px-3 py-2 text-xs text-white">Sumar cantidades</button>
+            <button type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'omitir')} className="rounded-lg border border-acento px-3 py-2 text-xs text-acento">Omitir duplicados</button>
+            <button type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'mantener')} className="rounded-lg border border-fondo-borde px-3 py-2 text-xs text-texto-secundario">Mantener todos</button>
+          </div>
+        </section>
+      ) : null}
 
       <button onClick={() => void continuar()} disabled={guardando} className="w-full min-h-12 rounded-xl bg-acento text-white flex items-center justify-center gap-2 disabled:opacity-50">
         {paso === PASOS.length - 1 ? 'Finalizar onboarding' : 'Continuar'}

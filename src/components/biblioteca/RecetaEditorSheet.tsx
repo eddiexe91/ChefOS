@@ -105,6 +105,7 @@ export default function RecetaEditorSheet({
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [exito, setExito] = useState('')
+  const [buscarIngrediente, setBuscarIngrediente] = useState('')
 
   useEffect(() => {
     setCampos(recetaAVista(receta, modo))
@@ -145,6 +146,10 @@ export default function RecetaEditorSheet({
   const productosQuery = useProductos()
   const salidasQuery = useProductos({ tipos_operativos: ['elaborado'] })
   const productos = useMemo(() => productosQuery.data ?? [], [productosQuery.data])
+  const productosFiltrados = useMemo(() => {
+    const termino = buscarIngrediente.trim().toLowerCase()
+    return termino ? productos.filter((producto) => producto.nombre.toLowerCase().includes(termino)) : productos
+  }, [buscarIngrediente, productos])
   const productosSalida = useMemo(() => salidasQuery.data ?? [], [salidasQuery.data])
 
   const titulo = receta
@@ -363,6 +368,7 @@ export default function RecetaEditorSheet({
               <Plus size={14} /> Agregar ingrediente
             </button>
           </div>
+          <input type="search" value={buscarIngrediente} onChange={(e) => setBuscarIngrediente(e.target.value)} className="campo-input" placeholder="Buscar ingrediente por nombre…" />
           {ingredientes.map((ingrediente, index) => (
             <div key={ingrediente.key} className="rounded-xl border border-fondo-borde bg-fondo-elevado p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -373,7 +379,7 @@ export default function RecetaEditorSheet({
                 <span className="text-xs font-medium text-texto-secundario">Producto</span>
                 <select value={ingrediente.producto_id} onChange={(e) => setIngredientes((prev) => prev.map((item) => item.key === ingrediente.key ? { ...item, producto_id: e.target.value } : item))} className="campo-input">
                   <option value="">{productosQuery.isPending ? 'Cargando productos…' : 'Seleccionar producto'}</option>
-                  {productos.map((producto: Producto) => (
+                  {productosFiltrados.map((producto: Producto) => (
                     <option key={producto.id} value={producto.id}>{producto.nombre} · {etiquetaTipoOperativo(producto.tipo_operativo)}</option>
                   ))}
                 </select>
