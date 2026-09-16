@@ -23,10 +23,13 @@ function crearQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime:            1000 * 60 * 2,
+        // Los datos operativos deben reflejar inmediatamente altas y ajustes
+        // realizados desde otro dispositivo o desde otra pantalla.
+        staleTime:            0,
         gcTime:               1000 * 60 * 10,
         retry:                1,
-        refetchOnWindowFocus: false,
+        refetchOnWindowFocus: true,
+        refetchOnMount:       'always',
         refetchOnReconnect:   true,
       },
       mutations: {

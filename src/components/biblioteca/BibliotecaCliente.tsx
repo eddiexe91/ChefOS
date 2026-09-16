@@ -10,7 +10,9 @@ import { useReceta, useRecetas } from '@/hooks/useDominio'
 export default function BibliotecaCliente() {
   const [mostrarNueva, setMostrarNueva] = useState(false)
   const [recetaEditarId, setRecetaEditarId] = useState<string | null>(null)
-  const recetasQuery = useRecetas({ es_produccion: true, activa: true })
+  // Recetas muestra todas las fichas del restaurante. Producción aplica su
+  // propio filtro es_produccion=true al seleccionar un lote.
+  const recetasQuery = useRecetas()
   const recetaEditarQuery = useReceta(recetaEditarId ?? '')
   const [busqueda, setBusqueda] = useState('')
   const [soloEnCarta, setSoloEnCarta] = useState(false)
