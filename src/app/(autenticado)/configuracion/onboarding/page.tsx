@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Check, ChevronRight, Download, PackagePlus, Soup, UtensilsCrossed } from 'lucide-react'
 
@@ -41,27 +41,7 @@ export default function OnboardingPage() {
   const stockListo = cantidadStock > 0
   const puedeCerrar = inventarioListo && stockListo
 
-  if (ONBOARDING_TEMPORALMENTE_DESACTIVADO) {
-    return (
-      <div className="px-4 pt-8 pb-36 max-w-lg mx-auto space-y-6">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-acento">Configuración inicial</p>
-          <h1 className="text-2xl font-display font-bold text-texto-primario mt-1">Onboarding temporalmente desactivado</h1>
-          <p className="text-sm text-texto-secundario mt-2">Se ocultó para facilitar el testeo mientras Inventario, Stock disponible, Carta y Producción terminan de estabilizarse.</p>
-        </div>
-        <section className="rounded-2xl border border-fondo-borde bg-fondo-elevado p-5 space-y-3">
-          <p className="text-sm text-texto-primario">Puedes seguir probando directamente estos módulos:</p>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/inventario" className="inline-flex items-center gap-2 rounded-xl border border-acento px-4 py-2.5 text-xs text-acento"><PackagePlus size={15} /> Inventario</Link>
-            <Link href="/stock" className="inline-flex items-center gap-2 rounded-xl border border-acento px-4 py-2.5 text-xs text-acento"><Soup size={15} /> Stock disponible</Link>
-            <Link href="/biblioteca" className="inline-flex items-center gap-2 rounded-xl border border-acento px-4 py-2.5 text-xs text-acento"><UtensilsCrossed size={15} /> Recetas</Link>
-          </div>
-        </section>
-      </div>
-    )
-  }
-
-  async function guardarAvance(completar = false, silencioso = false) {
+  const guardarAvance = useCallback(async (completar = false, silencioso = false) => {
     if (!restaurante?.id) return
     if (!silencioso) setGuardando(true)
     const response = await fetch('/api/onboarding/configurar', {
@@ -86,14 +66,35 @@ export default function OnboardingPage() {
     }
     if (!silencioso) setMensaje(completar ? 'Onboarding guardado correctamente.' : 'Avance guardado.')
     return true
-  }
+  }, [confirmarIncompleto, inventarioListo, nombre, paso, restaurante?.id, rol, stockListo, zonaHoraria])
 
   useEffect(() => {
+    if (ONBOARDING_TEMPORALMENTE_DESACTIVADO) return
     const timeout = window.setTimeout(() => {
       void guardarAvance(false, true)
     }, 500)
     return () => window.clearTimeout(timeout)
-  }, [nombre, paso, rol, zonaHoraria, inventarioListo, stockListo, confirmarIncompleto])
+  }, [guardarAvance])
+
+  if (ONBOARDING_TEMPORALMENTE_DESACTIVADO) {
+    return (
+      <div className="px-4 pt-8 pb-36 max-w-lg mx-auto space-y-6">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-acento">Configuración inicial</p>
+          <h1 className="text-2xl font-display font-bold text-texto-primario mt-1">Onboarding temporalmente desactivado</h1>
+          <p className="text-sm text-texto-secundario mt-2">Se ocultó para facilitar el testeo mientras Inventario, Stock disponible, Carta y Producción terminan de estabilizarse.</p>
+        </div>
+        <section className="rounded-2xl border border-fondo-borde bg-fondo-elevado p-5 space-y-3">
+          <p className="text-sm text-texto-primario">Puedes seguir probando directamente estos módulos:</p>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/inventario" className="inline-flex items-center gap-2 rounded-xl border border-acento px-4 py-2.5 text-xs text-acento"><PackagePlus size={15} /> Inventario</Link>
+            <Link href="/stock" className="inline-flex items-center gap-2 rounded-xl border border-acento px-4 py-2.5 text-xs text-acento"><Soup size={15} /> Stock disponible</Link>
+            <Link href="/biblioteca" className="inline-flex items-center gap-2 rounded-xl border border-acento px-4 py-2.5 text-xs text-acento"><UtensilsCrossed size={15} /> Recetas</Link>
+          </div>
+        </section>
+      </div>
+    )
+  }
 
   async function importarInventario() {
     if (!archivo) return

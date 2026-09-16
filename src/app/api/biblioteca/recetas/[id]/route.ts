@@ -67,16 +67,26 @@ function leerNumero(valor: unknown) {
 }
 
 async function cargarProductosReceta(supabase: ReturnType<typeof crearClienteServidor>, productoIds: string[]) {
-  let resultado = await supabase
+  const resultado = await supabase
     .from('productos')
     .select('id, restaurante_id, nombre, activo, tipo_operativo, metadata, densidad_g_por_ml, peso_unitario_gramos')
     .in('id', productoIds)
 
   if (resultado.error && esErrorColumnaTipoOperativo(resultado.error)) {
-    resultado = await supabase
+    const fallback = await supabase
       .from('productos')
       .select('id, restaurante_id, nombre, activo, metadata, densidad_g_por_ml, peso_unitario_gramos')
       .in('id', productoIds)
+
+    if (fallback.error) return fallback
+
+    return {
+      data: (fallback.data ?? []).map((producto) => ({
+        ...producto,
+        tipo_operativo: normalizarTipoOperativoProducto(producto),
+      })),
+      error: null,
+    }
   }
 
   if (resultado.error) return resultado
