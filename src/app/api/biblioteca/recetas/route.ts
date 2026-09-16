@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { esErrorColumnaTipoOperativo, normalizarTipoOperativoProducto } from '@/lib/productos'
+import { esErrorColumnaTipoOperativo, obtenerTipoOperativoProducto } from '@/lib/productos'
 import { crearClienteServidor } from '@/lib/supabase/servidor'
 import { convertirAGramos, type DificultadReceta, type UnidadEntrada } from '@/types'
 
@@ -80,7 +80,7 @@ async function cargarProductosReceta(supabase: ReturnType<typeof crearClienteSer
     return {
       data: (fallback.data ?? []).map((producto) => ({
         ...producto,
-        tipo_operativo: normalizarTipoOperativoProducto(producto),
+        tipo_operativo: obtenerTipoOperativoProducto(producto),
       })),
       error: null,
     }
@@ -91,7 +91,7 @@ async function cargarProductosReceta(supabase: ReturnType<typeof crearClienteSer
   return {
     data: (resultado.data ?? []).map((producto) => ({
       ...producto,
-      tipo_operativo: normalizarTipoOperativoProducto(producto),
+      tipo_operativo: obtenerTipoOperativoProducto(producto),
     })),
     error: null,
   }

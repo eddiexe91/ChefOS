@@ -28,7 +28,7 @@
  */
 
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
-import { filtrarProductosPorTipoOperativo, normalizarTipoOperativoProducto } from '@/lib/productos'
+import { filtrarProductosPorTipoOperativo, obtenerTipoOperativoProducto } from '@/lib/productos'
 
 import type {
   Receta,
@@ -572,9 +572,13 @@ export async function fetchProductos(
 
   const productos = ((data ?? []) as Producto[]).map((producto) => ({
     ...producto,
-    tipo_operativo: normalizarTipoOperativoProducto(producto),
+    tipo_operativo: obtenerTipoOperativoProducto(producto) ?? 'materia_prima',
   }))
-  const productosFiltrados = filtrarProductosPorTipoOperativo(productos, filtros?.tipos_operativos)
+  const productosFiltrados = filtrarProductosPorTipoOperativo(
+    productos,
+    filtros?.tipos_operativos,
+    Boolean(filtros?.tipos_operativos?.every((tipo) => tipo !== 'elaborado'))
+  )
 
   if (filtros?.stock_bajo) {
     return productosFiltrados.filter((p) =>

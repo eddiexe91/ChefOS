@@ -8,7 +8,7 @@ function esTipoOperativoProducto(valor: unknown): valor is TipoOperativoProducto
   return typeof valor === 'string' && (TIPOS_OPERATIVOS_PRODUCTO as readonly string[]).includes(valor)
 }
 
-export function normalizarTipoOperativoProducto(producto: Pick<Producto, 'tipo_operativo' | 'metadata'> | Partial<Pick<Producto, 'tipo_operativo' | 'metadata'>>) {
+export function obtenerTipoOperativoProducto(producto: Pick<Producto, 'tipo_operativo' | 'metadata'> | Partial<Pick<Producto, 'tipo_operativo' | 'metadata'>>): TipoOperativoProducto | null {
   if (esTipoOperativoProducto(producto.tipo_operativo)) return producto.tipo_operativo
 
   const metadata = typeof producto.metadata === 'object' && producto.metadata !== null
@@ -18,15 +18,20 @@ export function normalizarTipoOperativoProducto(producto: Pick<Producto, 'tipo_o
   if (esTipoOperativoProducto(metadata.tipo_operativo)) return metadata.tipo_operativo
   if (metadata.es_elaborado === true) return 'elaborado'
 
-  return 'materia_prima'
+  return null
 }
 
 export function filtrarProductosPorTipoOperativo<T extends Pick<Producto, 'tipo_operativo' | 'metadata'>>(
   productos: T[],
-  tiposOperativos?: TipoOperativoProducto[]
+  tiposOperativos?: TipoOperativoProducto[],
+  incluirSinClasificar = false,
 ) {
   if (!tiposOperativos?.length) return productos
-  return productos.filter((producto) => tiposOperativos.includes(normalizarTipoOperativoProducto(producto)))
+  return productos.filter((producto) => {
+    const tipoOperativo = obtenerTipoOperativoProducto(producto)
+    if (!tipoOperativo) return incluirSinClasificar
+    return tiposOperativos.includes(tipoOperativo)
+  })
 }
 
 export function esErrorColumnaTipoOperativo(error: { message?: string | null; details?: string | null; hint?: string | null } | null | undefined) {
@@ -39,11 +44,12 @@ export function esErrorColumnaTipoOperativo(error: { message?: string | null; de
 }
 
 export function esProductoInventario(producto: Producto): boolean {
-  return TIPOS_INVENTARIO.includes(normalizarTipoOperativoProducto(producto))
+  const tipoOperativo = obtenerTipoOperativoProducto(producto)
+  return tipoOperativo ? TIPOS_INVENTARIO.includes(tipoOperativo) : true
 }
 
 export function esProductoElaborado(producto: Producto): boolean {
-  return normalizarTipoOperativoProducto(producto) === 'elaborado'
+  return obtenerTipoOperativoProducto(producto) === 'elaborado'
 }
 
 export function etiquetaTipoOperativo(tipo: TipoOperativoProducto): string {

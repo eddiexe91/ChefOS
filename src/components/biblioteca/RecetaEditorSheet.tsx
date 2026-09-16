@@ -146,7 +146,8 @@ export default function RecetaEditorSheet({
   const salidasQuery = useProductos({ tipos_operativos: ['elaborado'] })
   const productos = useMemo(() => productosQuery.data ?? [], [productosQuery.data])
   const productosSalida = useMemo(() => salidasQuery.data ?? [], [salidasQuery.data])
-  const salidaConfigurada = campos.es_produccion && campos.producto_salida_id.trim() !== ''
+  const salidaSeleccionada = campos.es_produccion && campos.producto_salida_id.trim() !== ''
+  const salidaCompleta = salidaSeleccionada && campos.cantidad_salida !== '' && campos.unidad_salida.trim() !== ''
 
   const titulo = receta
     ? (modo === 'carta' ? 'Editar elaboración de Carta' : 'Editar receta')
@@ -179,6 +180,10 @@ export default function RecetaEditorSheet({
       setError('Completa nombre, rendimiento, ingredientes y pasos antes de guardar.')
       return
     }
+    if (salidaSeleccionada && !salidaCompleta) {
+      setError('Si eliges un producto de salida, completa también la cantidad y la unidad.')
+      return
+    }
     setGuardando(true)
     setError('')
     setExito('')
@@ -193,9 +198,9 @@ export default function RecetaEditorSheet({
       precio_venta: campos.precio_venta ? Number(campos.precio_venta) : undefined,
       en_carta: modo === 'carta' ? true : campos.en_carta,
       es_produccion: campos.es_produccion,
-      producto_salida_id: salidaConfigurada ? campos.producto_salida_id : undefined,
-      cantidad_salida: salidaConfigurada && campos.cantidad_salida ? Number(campos.cantidad_salida) : undefined,
-      unidad_salida: salidaConfigurada && campos.unidad_salida ? campos.unidad_salida : undefined,
+      producto_salida_id: salidaSeleccionada ? campos.producto_salida_id : undefined,
+      cantidad_salida: salidaCompleta ? Number(campos.cantidad_salida) : undefined,
+      unidad_salida: salidaCompleta ? campos.unidad_salida : undefined,
       origen_editor: modo,
       ingredientes: ingredientes.map((ingrediente, index) => ({
         producto_id: ingrediente.producto_id,
@@ -467,11 +472,11 @@ export default function RecetaEditorSheet({
             <div className="grid grid-cols-2 gap-3">
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-texto-secundario">Cantidad de salida</span>
-                <input value={campos.cantidad_salida} onChange={(e) => setCampos((prev) => ({ ...prev, cantidad_salida: e.target.value }))} type="number" min="0" step="0.001" className="campo-input disabled:opacity-60" disabled={!salidaConfigurada} />
+                <input value={campos.cantidad_salida} onChange={(e) => setCampos((prev) => ({ ...prev, cantidad_salida: e.target.value }))} type="number" min="0" step="0.001" className="campo-input disabled:opacity-60" disabled={!salidaSeleccionada} />
               </label>
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-texto-secundario">Unidad de salida</span>
-                <select value={campos.unidad_salida} onChange={(e) => setCampos((prev) => ({ ...prev, unidad_salida: e.target.value }))} className="campo-input disabled:opacity-60" disabled={!salidaConfigurada}>
+                <select value={campos.unidad_salida} onChange={(e) => setCampos((prev) => ({ ...prev, unidad_salida: e.target.value }))} className="campo-input disabled:opacity-60" disabled={!salidaSeleccionada}>
                   {UNIDADES.map((unidad) => <option key={unidad} value={unidad}>{unidad}</option>)}
                 </select>
               </label>
