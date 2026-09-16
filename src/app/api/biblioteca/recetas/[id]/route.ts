@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { esErrorColumnaTipoOperativo, normalizarTipoOperativoProducto } from '@/lib/productos'
 import { crearClienteServidor } from '@/lib/supabase/servidor'
 import { convertirAGramos, type DificultadReceta, type UnidadEntrada } from '@/types'
 
@@ -63,6 +64,30 @@ async function obtenerContexto() {
 
 function leerNumero(valor: unknown) {
   return typeof valor === 'number' && Number.isFinite(valor) ? valor : null
+}
+
+async function cargarProductosReceta(supabase: ReturnType<typeof crearClienteServidor>, productoIds: string[]) {
+  let resultado = await supabase
+    .from('productos')
+    .select('id, restaurante_id, nombre, activo, tipo_operativo, metadata, densidad_g_por_ml, peso_unitario_gramos')
+    .in('id', productoIds)
+
+  if (resultado.error && esErrorColumnaTipoOperativo(resultado.error)) {
+    resultado = await supabase
+      .from('productos')
+      .select('id, restaurante_id, nombre, activo, metadata, densidad_g_por_ml, peso_unitario_gramos')
+      .in('id', productoIds)
+  }
+
+  if (resultado.error) return resultado
+
+  return {
+    data: (resultado.data ?? []).map((producto) => ({
+      ...producto,
+      tipo_operativo: normalizarTipoOperativoProducto(producto),
+    })),
+    error: null,
+  }
 }
 
 function parsearBody(body: Record<string, unknown>): RecetaBody {
@@ -183,10 +208,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     ...datos.ingredientes.map((ingrediente) => ingrediente.producto_id),
     ...(datos.producto_salida_id ? [datos.producto_salida_id] : []),
   ])]
-  const { data: productos } = await ctx.supabase
-    .from('productos')
-    .select('id, restaurante_id, nombre, activo, tipo_operativo, densidad_g_por_ml, peso_unitario_gramos')
-    .in('id', productoIds)
+  const { data: productos, error: productosError } = await cargarProductosReceta(ctx.supabase, productoIds)
+  if (productosError) return errorJSON('No se pudieron verificar los productos de la receta.', 500)
   if (!productos || productos.length !== productoIds.length) return errorJSON('Uno o más productos no fueron encontrados.', 404)
   const productosPorId = new Map(productos.map((producto) => [producto.id, producto]))
   for (const producto of productos) {

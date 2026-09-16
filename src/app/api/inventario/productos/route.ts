@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+
+import { esErrorColumnaTipoOperativo } from '@/lib/productos'
 import { crearClienteServidor } from '@/lib/supabase/servidor'
 import { convertirAGramos, type TipoOperativoProducto, type UnidadEntrada } from '@/types'
 
@@ -56,7 +58,7 @@ export async function POST(request: Request) {
     return errorJSON('Para unidades, cajas o bandejas debes indicar el peso unitario en gramos.', 400)
   }
 
-  const { data, error } = await supabase.from('productos').insert({
+  const payload = {
     restaurante_id: perfil.restaurante_id,
     nombre,
     nombre_normalizado: nombre.toLowerCase(),
@@ -74,7 +76,21 @@ export async function POST(request: Request) {
     categoria_id: categoriaId,
     activo: true,
     metadata: { tipo_operativo: tipoOperativo },
-  }).select().single()
+  }
+
+  let { data, error } = await supabase.from('productos').insert(payload).select().single()
+
+  if (error && esErrorColumnaTipoOperativo(error)) {
+    const fallbackPayload = { ...payload }
+    delete (fallbackPayload as Record<string, unknown>).tipo_operativo
+    const fallback = await supabase.from('productos').insert({
+      ...fallbackPayload,
+      metadata: { ...(fallbackPayload.metadata ?? {}), tipo_operativo: tipoOperativo },
+    }).select().single()
+    data = fallback.data
+    error = fallback.error
+  }
+
   if (error || !data) return errorJSON('No se pudo crear el producto. Intenta nuevamente.', 500)
   await supabase.from('actividad_operativa').insert({
     restaurante_id: perfil.restaurante_id,

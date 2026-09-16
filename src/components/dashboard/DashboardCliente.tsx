@@ -29,6 +29,7 @@ import Link                     from 'next/link'
 import { useEffect, useMemo }   from 'react'
 import { useQueryClient }       from '@tanstack/react-query'
 import { useApp }               from '@/providers/AppProvider'
+import { ONBOARDING_TEMPORALMENTE_DESACTIVADO } from '@/lib/onboarding'
 import { useActividadOperativa, useMetricasDashboard } from '@/hooks/useDominio'
 import { dashboardKeys }        from '@/lib/queries'
 import BriefingCard             from '@/components/dashboard/BriefingCard'
@@ -119,7 +120,7 @@ export default function DashboardCliente() {
         )}
       </section>
 
-      {productosQuery.isSuccess && (productosQuery.data.length === 0 || !restaurante?.onboarding_completado || conteoBase.inventario === 0 || conteoBase.stock === 0) && (
+      {!ONBOARDING_TEMPORALMENTE_DESACTIVADO && productosQuery.isSuccess && (productosQuery.data.length === 0 || !restaurante?.onboarding_completado || conteoBase.inventario === 0 || conteoBase.stock === 0) && (
         <section className="rounded-xl border border-acento/30 bg-acento-suave px-4 py-4">
           <p className="text-sm font-sans font-medium text-texto-primario">Completa Inventario y Stock disponible</p>
           <p className="text-xs text-texto-secundario mt-1 leading-relaxed">

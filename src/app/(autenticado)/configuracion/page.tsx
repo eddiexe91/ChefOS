@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BarChart3, Building2, ChevronRight, ClipboardCheck, ShieldCheck, ShoppingCart, Soup, UserRound } from 'lucide-react'
+import { ONBOARDING_TEMPORALMENTE_DESACTIVADO } from '@/lib/onboarding'
 
 export default function PaginaConfiguracion() {
   return (
@@ -32,10 +33,12 @@ export default function PaginaConfiguracion() {
           <span className="flex items-center gap-3 text-sm text-texto-primario"><Soup size={18} className="text-acento" /> Stock disponible</span>
           <ChevronRight size={17} className="text-texto-apagado" />
         </Link>
-        <Link href="/configuracion/onboarding" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
-          <span className="flex items-center gap-3 text-sm text-texto-primario"><ClipboardCheck size={18} className="text-acento" /> Configuración inicial</span>
-          <ChevronRight size={17} className="text-texto-apagado" />
-        </Link>
+        {!ONBOARDING_TEMPORALMENTE_DESACTIVADO ? (
+          <Link href="/configuracion/onboarding" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
+            <span className="flex items-center gap-3 text-sm text-texto-primario"><ClipboardCheck size={18} className="text-acento" /> Configuración inicial</span>
+            <ChevronRight size={17} className="text-texto-apagado" />
+          </Link>
+        ) : null}
         <Link href="/configuracion/restaurantes" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
           <span className="flex items-center gap-3 text-sm text-texto-primario"><Building2 size={18} className="text-acento" /> Mis restaurantes</span>
           <ChevronRight size={17} className="text-texto-apagado" />
@@ -48,10 +51,12 @@ export default function PaginaConfiguracion() {
           <span className="flex items-center gap-3 text-sm text-texto-primario"><ShieldCheck size={18} className="text-acento" /> Estado del sistema</span>
           <ChevronRight size={17} className="text-texto-apagado" />
         </Link>
-        <Link href="/configuracion/tutoriales" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
-          <span className="flex items-center gap-3 text-sm text-texto-primario"><ClipboardCheck size={18} className="text-acento" /> Tutoriales</span>
-          <ChevronRight size={17} className="text-texto-apagado" />
-        </Link>
+        {!ONBOARDING_TEMPORALMENTE_DESACTIVADO ? (
+          <Link href="/configuracion/tutoriales" className="flex items-center justify-between px-4 py-4 border-t border-fondo-borde active:bg-fondo-hover transition-colors">
+            <span className="flex items-center gap-3 text-sm text-texto-primario"><ClipboardCheck size={18} className="text-acento" /> Tutoriales</span>
+            <ChevronRight size={17} className="text-texto-apagado" />
+          </Link>
+        ) : null}
       </nav>
     </div>
   )

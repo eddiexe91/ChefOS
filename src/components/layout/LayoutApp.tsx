@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useApp } from '@/providers/AppProvider'
+import { ONBOARDING_TEMPORALMENTE_DESACTIVADO } from '@/lib/onboarding'
 import HeaderApp from '@/components/layout/HeaderApp'
 import TutorialPrimeraVez from '@/components/ui/TutorialPrimeraVez'
 import BackButtonHandler from '@/components/layout/BackButtonHandler'
@@ -127,7 +128,7 @@ export default function LayoutApp({ usuario, restaurante, children }: Props) {
         {children}
       </main>
       <BackButtonHandler />
-      {tutorial && <TutorialPrimeraVez id={tutorial[0]} titulo={tutorial[1]} texto={tutorial[2]} />}
+      {!ONBOARDING_TEMPORALMENTE_DESACTIVADO && tutorial && <TutorialPrimeraVez id={tutorial[0]} titulo={tutorial[1]} texto={tutorial[2]} />}
 
       {/* Bottom Navigation */}
       <nav

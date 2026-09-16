@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+
+import { esErrorColumnaTipoOperativo } from '@/lib/productos'
 import { crearClienteServidor } from '@/lib/supabase/servidor'
 import { convertirAGramos, type TipoOperativoProducto, type UnidadEntrada } from '@/types'
 
@@ -45,10 +47,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const { data: categoria } = await ctx.supabase.from('categorias_producto').select('id').eq('id', v.categoriaId).eq('restaurante_id', ctx.perfil.restaurante_id).eq('activa', true).maybeSingle()
       if (!categoria) return errorJSON('La categoría seleccionada no es válida.', 400)
     }
-    const { data: anterior } = await ctx.supabase.from('productos').select('nombre, stock_actual, costo_unitario_actual, categoria_id, tipo_operativo, metadata').eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).single()
+    const { data: anterior } = await ctx.supabase.from('productos').select('nombre, stock_actual, costo_unitario_actual, categoria_id, metadata').eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).single()
     if (!anterior) return errorJSON('Producto no encontrado.', 404)
     const metadataAnterior = typeof anterior.metadata === 'object' && anterior.metadata !== null ? anterior.metadata as Record<string, unknown> : {}
-    const { data, error } = await ctx.supabase.from('productos').update({ nombre:v.nombre, nombre_normalizado:v.nombre.toLowerCase(), tipo_operativo: v.tipoOperativo, unidad_medida:v.unidad, unidad_compra:v.unidad, unidad_display:v.unidad, costo_unitario_actual:v.costo, stock_actual:v.stock, stock_minimo:v.minimo, cantidad_gramos:v.stockGramos, stock_minimo_gramos:v.minimoGramos, densidad_g_por_ml:v.densidad ?? null, peso_unitario_gramos:v.peso ?? null, categoria_id: v.categoriaId, metadata: { ...metadataAnterior, tipo_operativo: v.tipoOperativo } }).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
+    const payload = { nombre:v.nombre, nombre_normalizado:v.nombre.toLowerCase(), tipo_operativo: v.tipoOperativo, unidad_medida:v.unidad, unidad_compra:v.unidad, unidad_display:v.unidad, costo_unitario_actual:v.costo, stock_actual:v.stock, stock_minimo:v.minimo, cantidad_gramos:v.stockGramos, stock_minimo_gramos:v.minimoGramos, densidad_g_por_ml:v.densidad ?? null, peso_unitario_gramos:v.peso ?? null, categoria_id: v.categoriaId, metadata: { ...metadataAnterior, tipo_operativo: v.tipoOperativo } }
+    let { data, error } = await ctx.supabase.from('productos').update(payload).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
+    if (error && esErrorColumnaTipoOperativo(error)) {
+      const fallbackPayload = { ...payload }
+      delete (fallbackPayload as Record<string, unknown>).tipo_operativo
+      const fallback = await ctx.supabase.from('productos').update(fallbackPayload).eq('id', id).eq('restaurante_id', ctx.perfil.restaurante_id).select().single()
+      data = fallback.data
+      error = fallback.error
+    }
     if (error || !data) return errorJSON('No se pudo actualizar el producto.', 500)
     await ctx.supabase.from('actividad_operativa').insert({ restaurante_id:ctx.perfil.restaurante_id, usuario_id:ctx.user.id, accion:'editar_producto', entidad_id:id, descripcion:`${ctx.user.email ?? 'Usuario'} editó ${v.tipoOperativo === 'elaborado' ? 'el stock' : 'el producto'} ${v.nombre}`, datos:{ antes: anterior, despues: v } })
     return NextResponse.json({ data, error:null })

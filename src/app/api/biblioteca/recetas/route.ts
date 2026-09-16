@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { esErrorColumnaTipoOperativo, normalizarTipoOperativoProducto } from '@/lib/productos'
 import { crearClienteServidor } from '@/lib/supabase/servidor'
 import { convertirAGramos, type DificultadReceta, type UnidadEntrada } from '@/types'
 
@@ -60,6 +61,30 @@ function leerNumero(valor: unknown) {
 
 function leerEnteroPositivo(valor: unknown) {
   return typeof valor === 'number' && Number.isFinite(valor) && Number.isInteger(valor) && valor > 0 ? valor : null
+}
+
+async function cargarProductosReceta(supabase: ReturnType<typeof crearClienteServidor>, productoIds: string[]) {
+  let resultado = await supabase
+    .from('productos')
+    .select('id, restaurante_id, nombre, activo, tipo_operativo, metadata, densidad_g_por_ml, peso_unitario_gramos')
+    .in('id', productoIds)
+
+  if (resultado.error && esErrorColumnaTipoOperativo(resultado.error)) {
+    resultado = await supabase
+      .from('productos')
+      .select('id, restaurante_id, nombre, activo, metadata, densidad_g_por_ml, peso_unitario_gramos')
+      .in('id', productoIds)
+  }
+
+  if (resultado.error) return resultado
+
+  return {
+    data: (resultado.data ?? []).map((producto) => ({
+      ...producto,
+      tipo_operativo: normalizarTipoOperativoProducto(producto),
+    })),
+    error: null,
+  }
 }
 
 function parsearBody(raw: Record<string, unknown>): BodyReceta {
@@ -208,10 +233,7 @@ export async function POST(request: NextRequest) {
     ...(datos.producto_salida_id ? [datos.producto_salida_id] : []),
   ])]
 
-  const { data: productos, error: productosError } = await supabase
-    .from('productos')
-    .select('id, restaurante_id, nombre, activo, tipo_operativo, densidad_g_por_ml, peso_unitario_gramos')
-    .in('id', productoIds)
+  const { data: productos, error: productosError } = await cargarProductosReceta(supabase, productoIds)
 
   if (productosError) return errorJSON('Error al verificar los productos de la receta.', 500)
   if (!productos || productos.length !== productoIds.length) return errorJSON('Uno o más productos de la receta no fueron encontrados.', 404)

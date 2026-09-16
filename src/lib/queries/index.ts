@@ -28,6 +28,7 @@
  */
 
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
+import { filtrarProductosPorTipoOperativo, normalizarTipoOperativoProducto } from '@/lib/productos'
 
 import type {
   Receta,
@@ -392,7 +393,7 @@ export async function fetchRecetas(
     .select(`
       *,
       categoria:categorias_receta(id, restaurante_id, nombre, orden, activa),
-      producto_salida:productos(id, nombre, tipo_operativo, unidad_medida, unidad_display, stock_actual, stock_minimo, activo)
+      producto_salida:productos(id, nombre, unidad_medida, unidad_display, stock_actual, stock_minimo, activo)
     `)
     .eq('activa', true)
     .order('nombre', { ascending: true })
@@ -486,7 +487,6 @@ export async function fetchRecetaPorId(
       producto_salida:productos(
         id,
         nombre,
-        tipo_operativo,
         unidad_medida,
         unidad_display,
         stock_actual,
@@ -562,10 +562,6 @@ export async function fetchProductos(
   if (filtros?.categoria_id) {
     query = query.eq('categoria_id', filtros.categoria_id)
   }
-  if (filtros?.tipos_operativos && filtros.tipos_operativos.length > 0) {
-    query = query.in('tipo_operativo', filtros.tipos_operativos)
-  }
-
   const { data, error } = await query
 
   if (error) {
@@ -574,17 +570,21 @@ export async function fetchProductos(
     )
   }
 
-  const productos = (data ?? []) as Producto[]
+  const productos = ((data ?? []) as Producto[]).map((producto) => ({
+    ...producto,
+    tipo_operativo: normalizarTipoOperativoProducto(producto),
+  }))
+  const productosFiltrados = filtrarProductosPorTipoOperativo(productos, filtros?.tipos_operativos)
 
   if (filtros?.stock_bajo) {
-    return productos.filter((p) =>
+    return productosFiltrados.filter((p) =>
       p.cantidad_gramos !== undefined && p.stock_minimo_gramos !== undefined
         ? p.cantidad_gramos <= p.stock_minimo_gramos
         : p.stock_actual <= p.stock_minimo
     )
   }
 
-  return productos
+  return productosFiltrados
 }
 
 export async function fetchCategoriasProducto(client: ClienteSupabase): Promise<CategoriaProducto[]> {
