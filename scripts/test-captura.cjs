@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const vm = require('node:vm')
+const ts = require('typescript')
+function cargar(archivo) {
+  const codigo = ts.transpileModule(fs.readFileSync(archivo, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  const contexto = { exports: {} }
+  vm.runInNewContext(codigo, contexto)
+  return contexto.exports
+}
+const { interpretarMerma } = cargar('src/lib/comandoVoz.ts')
+const { leerCsvVentas } = cargar('src/lib/csvVentas.ts')
+const plano = valor => JSON.parse(JSON.stringify(valor))
+assert.deepEqual(plano(interpretarMerma('ChefOS registra 2 porciones de Congrio como merma')), {cantidad:2,unidad:'porcion',producto:'congrio'})
+assert.deepEqual(plano(interpretarMerma('Registra una porción de Congrio como merma.')), {cantidad:1,unidad:'porcion',producto:'congrio'})
+assert.deepEqual(plano(interpretarMerma('registra 1 unidad de empanada como merma')), {cantidad:1,unidad:'unidad',producto:'empanada'})
+assert.deepEqual(plano(interpretarMerma('registra medio kg de siete mares como merma')), {cantidad:0.5,unidad:'kg',producto:'siete mares'})
+assert.equal(interpretarMerma('registra -2 kg de pescado como merma'), null)
+assert.equal(interpretarMerma('registra 0 kg de pescado como merma'), null)
+assert.equal(interpretarMerma('registra 2 kg de pescado como compra'), null)
+assert.deepEqual(plano(leerCsvVentas('\uFEFFnombre;cantidad;precio\r\n"Sopa; del día";2;1,50')), [['nombre','cantidad','precio'],['Sopa; del día','2','1,50']])
+assert.deepEqual(plano(leerCsvVentas('nombre,cantidad\n"Plato ""especial""",2\n')), [['nombre','cantidad'],['Plato "especial"','2']])
+assert.deepEqual(plano(leerCsvVentas('nombre,cantidad\n"Plato\ndel día",2')), [['nombre','cantidad'],['Plato\ndel día','2']])
+assert.throws(() => leerCsvVentas('nombre,cantidad\n"plato,2'))
+console.log('PASS: 11 pruebas de comandos de merma y lectura CSV.')

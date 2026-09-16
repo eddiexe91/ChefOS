@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
-import { inventarioKeys, produccionKeys, alertasKeys } from '@/lib/queries'
+import { inventarioKeys, produccionKeys, alertasKeys, bibliotecaKeys, dashboardKeys } from '@/lib/queries'
 import {
   obtenerAccionesPendientes,
   contarAccionesPendientes,
@@ -73,6 +73,22 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
   const [estaOnline,         setEstaOnline]         = useState(true)
   const [accionesPendientes, setAccionesPendientes] = useState(0)
   const sincronizando = useRef(false)
+
+  useEffect(() => {
+    const refrescar = () => {
+      for (const key of [inventarioKeys.all, bibliotecaKeys.all, produccionKeys.all, dashboardKeys.all, ['actividad-operativa']]) {
+        void queryClient.invalidateQueries({ queryKey: key })
+      }
+    }
+    const canal = supabase.channel(`operacion:${usuario.restaurante_id}`)
+    for (const table of ['productos', 'recetas', 'produccion_registros', 'mermas']) {
+      canal.on('postgres_changes', { event: '*', schema: 'public', table, filter: `restaurante_id=eq.${usuario.restaurante_id}` }, refrescar)
+    }
+    canal.subscribe()
+    // Respaldo para proyectos donde la publicación Realtime aún no incluye una tabla.
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible' && navigator.onLine) refrescar() }, 30000)
+    return () => { clearInterval(timer); void supabase.removeChannel(canal) }
+  }, [supabase, usuario.restaurante_id, queryClient])
 
   const actualizarContadorOffline = useCallback(async () => {
     if (typeof window === 'undefined' || !window.indexedDB) {

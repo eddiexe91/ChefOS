@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
-  ChefHat,
   Bell,
   User,
   Settings,
@@ -71,7 +70,7 @@ export default function HeaderApp({ usuario, restaurante }: Props) {
             className="flex items-center gap-2.5 no-seleccionar min-w-0"
           >
             <div className="w-7 h-7 rounded-lg bg-acento flex items-center justify-center flex-shrink-0">
-              <ChefHat size={14} className="text-white" />
+              <Image src="/chefos-mark.svg" alt="" width={28} height={28} className="rounded-lg" />
             </div>
             <div className="min-w-0">
               <span className="font-display font-bold text-sm text-texto-primario tracking-tight leading-none block">

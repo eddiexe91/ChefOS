@@ -392,7 +392,7 @@ export async function fetchRecetas(
     .select(`
       *,
       categoria:categorias_receta(id, restaurante_id, nombre, orden, activa),
-      producto_salida:productos(id, nombre, tipo_operativo, unidad_medida, unidad_display, stock_actual, stock_minimo, activo)
+      producto_salida:productos!recetas_producto_salida_id_fkey(id, nombre, tipo_operativo, unidad_medida, unidad_display, stock_actual, stock_minimo, activo)
     `)
     .eq('activa', true)
     .order('nombre', { ascending: true })
@@ -483,7 +483,7 @@ export async function fetchRecetaPorId(
         foto_url,
         activo
       ),
-      producto_salida:productos(
+      producto_salida:productos!recetas_producto_salida_id_fkey(
         id,
         nombre,
         tipo_operativo,

@@ -26,8 +26,9 @@
  */
 
 import Link                     from 'next/link'
-import { useEffect, useMemo }   from 'react'
-import { useQueryClient }       from '@tanstack/react-query'
+import { useMemo }   from 'react'
+import { useQuery }       from '@tanstack/react-query'
+import type { Briefing } from '@/types'
 import { useApp }               from '@/providers/AppProvider'
 import { useActividadOperativa, useMetricasDashboard } from '@/hooks/useDominio'
 import { dashboardKeys }        from '@/lib/queries'
@@ -54,14 +55,18 @@ const ETIQUETAS_ROL: Record<string, string> = {
 // ─────────────────────────────────────────────────────────────
 
 export default function DashboardCliente() {
-  const queryClient = useQueryClient()
-  const {
-    usuario,
-    restaurante,
-    estaOnline,
-    totalAlertas,
-    accionesPendientes,
-  } = useApp()
+  const { usuario, restaurante, estaOnline, totalAlertas, accionesPendientes } = useApp()
+  const briefingQuery = useQuery<Briefing>({
+    queryKey: [...dashboardKeys.all, 'operativo-actual', restaurante?.id, usuario?.id],
+    enabled: Boolean(restaurante?.id && usuario?.id && estaOnline),
+    queryFn: async () => {
+      const respuesta = await fetch('/api/ia/briefing', { method: 'POST', cache: 'no-store' })
+      const resultado = await respuesta.json()
+      if (!respuesta.ok || !resultado.data) throw new Error(resultado.error ?? 'No se pudo analizar el turno.')
+      return resultado.data
+    },
+    refetchInterval: 60000,
+  })
 
   const {
     isPending,
@@ -79,20 +84,6 @@ export default function DashboardCliente() {
     }
   }, [productosQuery.data])
 
-  useEffect(() => {
-    let activo = true
-    void (async () => {
-      try {
-        const respuesta = await fetch('/api/ia/briefing', { method: 'POST' })
-        if (activo && respuesta.ok) {
-          await queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
-        }
-      } catch {
-        // El dashboard conserva el último briefing disponible si no hay conexión.
-      }
-    })()
-    return () => { activo = false }
-  }, [queryClient])
 
   const hora   = new Date().getHours()
   const saludo =
@@ -157,6 +148,7 @@ export default function DashboardCliente() {
       {/* ── 3. Briefing ──────────────────────────────────── */}
       <section>
         <div className="flex justify-end mb-2"><GenerarBriefingButton /></div>
+        <BriefingCard briefing={briefingQuery.data ?? null} productos={productosQuery.data} pendiente={briefingQuery.isPending} />
         {isPending && (
           <div className="rounded-xl bg-fondo-elevado border border-fondo-borde p-4 space-y-3">
             <div className="h-3 rounded-full bg-fondo-hover animate-pulse w-1/3" />
@@ -168,7 +160,7 @@ export default function DashboardCliente() {
         {isError && (
           <div className="rounded-xl bg-info-suave border border-info-borde px-4 py-4">
             <p className="text-xs font-sans font-medium text-info-texto">
-              No se pudo cargar el briefing del turno.
+              No se pudieron cargar las métricas del turno.
             </p>
             <p className="text-2xs font-sans text-info-texto/70 mt-1">
               El resto del dashboard sigue disponible.
@@ -185,7 +177,6 @@ export default function DashboardCliente() {
          */}
         {isSuccess && data && (
           <>
-            <BriefingCard briefing={data.briefing} />
             <section className="grid grid-cols-2 gap-3 mt-3" aria-label="Resumen del día">
               <div className="tarjeta p-3"><p className="text-2xs text-texto-apagado uppercase">Ventas hoy</p><p className="text-lg font-mono text-texto-primario mt-1">${data.resumen.totalVentas.toLocaleString('es-CL')}</p></div>
               <div className="tarjeta p-3"><p className="text-2xs text-texto-apagado uppercase">Producción</p><p className="text-lg font-mono text-texto-primario mt-1">{data.resumen.itemsProducidos.toLocaleString('es-CL')}</p></div>
@@ -197,6 +188,7 @@ export default function DashboardCliente() {
       </section>
 
       {/* ── 4. Stock crítico ─────────────────────────────── */}
+      <Link href="/captura" className="block rounded-xl border border-acento/40 px-4 py-4 text-acento text-sm">Registrar por voz o leer una fotografía →</Link>
       <StockCriticoWidget />
 
       {actividadQuery.isSuccess && actividadQuery.data.length > 0 && (

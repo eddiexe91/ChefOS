@@ -15,6 +15,7 @@ export async function GET() {
   const { data: buckets, error: storageError } = await admin.storage.listBuckets()
   const storageOk = !storageError
   return NextResponse.json({
+    version: '1.2.0',
     ok: configuracion.supabaseUrl && configuracion.supabaseAnonKey && storageOk,
     configuracion,
     autenticado: Boolean(user),

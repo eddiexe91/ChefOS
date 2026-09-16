@@ -1,6 +1,10 @@
 # ChefOS — guía de continuación
 
-## Estado al 15-09-2026
+## Actualización 16-09-2026 — versión 1.2.0
+
+Consultar primero [RELEASE_1.2.0.md](RELEASE_1.2.0.md): reemplaza las afirmaciones de validación general de la sección histórica. Incluye causa comprobada de Recetas/Carta, briefing dinámico, migración 012 aplicada, capturas por voz/foto, pruebas y limitaciones. Sigue pendiente completar/verificar las funciones de salida de producción de 010; no considerar suficiente la presencia de columnas.
+
+## Estado histórico al 15-09-2026
 
 `main` contiene la versión validada de ChefOS. Login, onboarding con cargo, Inventario, Recetas, Carta, Producción, actividad reciente, compras, alertas, briefing y Chef IA básico están conectados al backend publicado.
 

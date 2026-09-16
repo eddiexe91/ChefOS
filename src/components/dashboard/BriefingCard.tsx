@@ -16,7 +16,8 @@
  *   compras_sugeridas, riesgos, alertas — todos confirmados.
  */
 
-import type { Briefing } from '@/types/index'
+import Link from 'next/link'
+import type { Briefing, Producto } from '@/types/index'
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -53,24 +54,26 @@ function ListaVacia() {
 
 interface Props {
   briefing: Briefing | null
+  productos?: Producto[]
+  pendiente?: boolean
 }
 
 // ─────────────────────────────────────────────────────────────
 // Componente
 // ─────────────────────────────────────────────────────────────
 
-export default function BriefingCard({ briefing }: Props) {
+export default function BriefingCard({ briefing, productos, pendiente }: Props) {
 
   if (!briefing) {
     return (
       <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-6 text-center">
         <p className="text-sm font-sans font-medium text-texto-secundario">
-          Sin briefing para hoy
+          ChefOS te acompaña en el turno
         </p>
         <p className="text-xs font-sans text-texto-apagado mt-1 leading-relaxed">
-          El briefing del turno se genera automáticamente.
-          Vuelve a consultar más tarde.
+          {productos?.length === 0 ? 'Comienza cargando Inventario y Stock disponible para preparar tu servicio.' : productos?.some((p) => p.stock_actual <= p.stock_minimo) ? `Hay ${productos.filter((p) => p.stock_actual <= p.stock_minimo).length} productos que necesitan reposición. Revisa compras y producción.` : pendiente ? 'Estoy revisando las existencias y preparaciones de tu cocina.' : 'Revisa Inventario y Stock disponible. No pude verificar todos los datos del turno; pulsa Actualizar briefing para reintentar.'}
         </p>
+        <Link href="/inventario" className="inline-block text-acento text-xs mt-3">Revisar existencias →</Link>
       </section>
     )
   }

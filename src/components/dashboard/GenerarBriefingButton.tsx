@@ -1,14 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useQueryClient, useIsFetching } from '@tanstack/react-query'
+import { dashboardKeys } from '@/lib/queries'
 import { RefreshCw } from 'lucide-react'
 
 export default function GenerarBriefingButton() {
-  const [cargando, setCargando] = useState(false)
+  const client = useQueryClient()
+  const cargando = useIsFetching({ queryKey: [...dashboardKeys.all, 'operativo-actual'] }) > 0
   async function generar() {
-    setCargando(true)
-    await fetch('/api/ia/briefing', { method: 'POST' })
-    window.location.reload()
+    await client.invalidateQueries({ queryKey: dashboardKeys.all })
   }
   return <button onClick={() => void generar()} disabled={cargando} className="text-xs text-acento flex items-center gap-1 disabled:opacity-50"><RefreshCw size={13} className={cargando ? 'animate-spin' : ''} />{cargando ? 'Generando…' : 'Actualizar briefing'}</button>
 }

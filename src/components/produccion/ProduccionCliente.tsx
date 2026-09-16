@@ -119,6 +119,7 @@ export default function ProduccionCliente() {
 
   const { isPending, isError, isSuccess, data } = useLotesProduccion()
   const recetasQuery = useRecetas({ es_produccion: true, activa: true })
+  const [categoriaProduccion, setCategoriaProduccion] = useState('todas')
   const hoy = new Date().toISOString().slice(0, 10)
   const registrosQuery = useRegistrosProduccion({ fecha_desde: hoy, fecha_hasta: hoy })
   const [abriendoLote, setAbriendoLote] = useState(false)
@@ -148,8 +149,8 @@ export default function ProduccionCliente() {
     const registradasHoy = new Set(
       (registrosQuery.data ?? []).map((registro) => registro.receta_id).filter(Boolean)
     )
-    return (recetasQuery.data ?? []).filter((receta) => !registradasHoy.has(receta.id))
-  }, [recetasQuery.data, registrosQuery.data])
+    return (recetasQuery.data ?? []).filter((receta) => !registradasHoy.has(receta.id) && (categoriaProduccion === 'todas' || receta.categoria?.nombre === categoriaProduccion))
+  }, [recetasQuery.data, registrosQuery.data, categoriaProduccion])
 
   const abrirProduccion = async (recetaId?: string) => {
     if (abriendoLote) return
@@ -218,12 +219,13 @@ export default function ProduccionCliente() {
           <p className="text-xs font-sans font-medium text-texto-secundario uppercase tracking-wide">
             Producciones pendientes
           </p>
+          <label className="block text-xs mt-3">Categoría de producción<select className="campo-input mt-1" value={categoriaProduccion} onChange={e=>setCategoriaProduccion(e.target.value)}><option value="todas">Todas las categorías</option>{Array.from(new Set(['Caldos y Bases', ...(recetasQuery.data ?? []).flatMap(r=>r.categoria?.nombre ? [r.categoria.nombre] : [])])).map(c=><option key={c} value={c}>{c}</option>)}</select></label>
           <p className="text-2xs text-texto-apagado mt-1">
             Recetas marcadas como “Es producción” que todavía no registras hoy.
           </p>
         </div>
         <div className="px-4 py-3 space-y-2">
-          {recetasQuery.isPending || registrosQuery.isPending ? (
+          {recetasQuery.isError || registrosQuery.isError ? <p className="text-xs text-peligro-texto">No se pudieron verificar las producciones. Actualiza la pantalla.</p> : recetasQuery.isPending || registrosQuery.isPending ? (
             <p className="text-xs text-texto-apagado">Cargando producciones…</p>
           ) : recetasPendientes.length === 0 ? (
             <p className="text-xs text-texto-apagado">No hay producciones pendientes para hoy.</p>

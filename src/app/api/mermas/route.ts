@@ -239,6 +239,8 @@ export async function POST(request: NextRequest) {
   const merma = Array.isArray(mermaRPC) ? mermaRPC[0] : mermaRPC
   if (mermaError || !merma) {
     console.error('[ChefOS/api/mermas] Error al registrar merma:', mermaError?.message)
+    if (mermaError?.message?.includes('Stock insuficiente')) return errorJSON('No hay stock suficiente para esa merma.', 409)
+    if (mermaError?.message?.includes('Cantidad o unidad inválida')) return errorJSON('Revisa la unidad. Para descontar porciones configura primero su peso en Stock disponible.', 400)
     return errorJSON('Error al registrar la merma. Intenta nuevamente.', 500)
   }
 

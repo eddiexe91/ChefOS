@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { crearClienteServidor } from '@/lib/supabase/servidor'
+import { leerCsvVentas } from '@/lib/csvVentas'
 
 function errorJSON(error: string, status: number) { return NextResponse.json({ data: null, error }, { status }) }
 
@@ -11,9 +12,6 @@ async function perfilActual() {
   return { supabase, perfil }
 }
 
-function csv(texto: string) {
-  return texto.split(/\r?\n/).filter(Boolean).map((linea) => linea.split(',').map((celda) => celda.trim().replace(/^"|"$/g, '')))
-}
 
 export async function GET() {
   const { supabase, perfil } = await perfilActual()
@@ -26,17 +24,24 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const { supabase, perfil } = await perfilActual()
   if (!perfil) return errorJSON('No autenticado.', 401)
-  if (!['dueño', 'administrador'].includes(perfil.rol)) return errorJSON('Sin permisos para importar ventas.', 403)
+  if (!['dueño', 'administrador'].includes(perfil.rol)) return errorJSON('Ventas requiere rol Dueño o Administración.', 403)
   const form = await request.formData()
   const archivo = form.get('archivo')
   if (!(archivo instanceof File)) return errorJSON('Debes adjuntar un archivo CSV.', 400)
-  const filas = csv(await archivo.text())
+  if (archivo.size > 5*1024*1024) return errorJSON('El CSV debe pesar menos de 5 MB.', 400)
+  let filas: string[][]
+  try { filas = leerCsvVentas(await archivo.text()) } catch(e) { return errorJSON(e instanceof Error ? e.message : 'CSV inválido.',400) }
   if (filas.length < 2) return errorJSON('El CSV no contiene registros.', 400)
   const encabezados = filas[0].map((h) => h.toLowerCase())
   const indiceNombre = encabezados.findIndex((h) => ['nombre', 'plato', 'producto', 'name'].includes(h))
   const indiceCantidad = encabezados.findIndex((h) => ['cantidad', 'cantidad_vendida', 'qty'].includes(h))
   const indicePrecio = encabezados.findIndex((h) => ['precio', 'precio_unitario', 'price'].includes(h))
   if (indiceNombre < 0 || indiceCantidad < 0) return errorJSON('El CSV debe incluir columnas nombre y cantidad.', 400)
+  const indiceEstado = encabezados.findIndex(h=>['estado','status'].includes(h))
+  const canceladas = indiceEstado<0 ? 0 : filas.slice(1).filter(f=>/^(anulad[oa]|cancelad[oa]|cancelled|canceled)$/i.test(f[indiceEstado]??'')).length
+  filas = [filas[0], ...filas.slice(1).filter(f=>indiceEstado<0 || !/^(anulad[oa]|cancelad[oa]|cancelled|canceled)$/i.test(f[indiceEstado]??''))]
+  if(filas.length<2) return errorJSON('No hay ventas vigentes: las filas anuladas se omiten.',400)
+  if(filas.slice(1).some(f=>!f[indiceNombre] || !Number.isFinite(Number(f[indiceCantidad]?.replace(',','.'))) || Number(f[indiceCantidad]?.replace(',','.'))<=0 || (indicePrecio>=0 && (!Number.isFinite(Number((f[indicePrecio]??'0').replace(',','.'))) || Number((f[indicePrecio]??'0').replace(',','.'))<0)))) return errorJSON('Revisa el CSV: todas las ventas deben tener nombre, cantidad positiva y precio no negativo.',400)
   const fecha = typeof form.get('fecha') === 'string' && form.get('fecha') ? String(form.get('fecha')) : new Date().toISOString().slice(0, 10)
   const { data: importacion, error: importError } = await supabase.from('ventas_importaciones').insert({ restaurante_id: perfil.restaurante_id, fecha_inicio: fecha, fecha_fin: fecha, origen_sistema: 'csv', estado_procesamiento: 'procesando', total_registros: filas.length - 1, procesado_por: perfil.id }).select().single()
   if (importError || !importacion) return errorJSON('No se pudo iniciar la importación.', 500)
@@ -72,5 +77,5 @@ export async function POST(request: NextRequest) {
   if (itemsError) return errorJSON('No se pudieron guardar los registros importados.', 500)
   const pendientes = items.filter((item) => item.requiere_revision).length
   const { data } = await supabase.from('ventas_importaciones').update({ estado_procesamiento: pendientes > 0 ? 'revision' : 'completado', registros_normalizados: items.length - pendientes, registros_pendientes: pendientes }).eq('id', importacion.id).select().single()
-  return NextResponse.json({ data, error: null }, { status: 201 })
+  return NextResponse.json({ data, error: null, canceladas_omitidas: canceladas }, { status: 201 })
 }

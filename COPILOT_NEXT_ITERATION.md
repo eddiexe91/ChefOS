@@ -1,5 +1,7 @@
 # ChefOS — especificación para la siguiente iteración de Copilot
 
+> Actualización 16-09-2026: consultar [RELEASE_1.2.0.md](RELEASE_1.2.0.md) antes de actuar. Las instrucciones siguientes conservan contexto histórico; varios puntos ya están implementados. Prioridad pendiente: funciones 010 de salida de producción, prueba autenticada de Recetas/Carta y validación física de voz/OCR. Migración 012 aplicada. No volver a crear pantallas existentes ni afirmar que todo está validado en teléfono.
+
 Fecha de corte: 15-09-2026  
 Repositorio y fuente de verdad: `main` de `https://github.com/eddiexe91/ChefOS`  
 Backend publicado: `https://chefos-pied.vercel.app`  

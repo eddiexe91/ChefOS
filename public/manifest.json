@@ -13,7 +13,7 @@
   "categories": ["business", "productivity", "food"],
   "icons": [
     {
-      "src": "/icons/icon.svg",
+      "src": "/chefos-mark.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

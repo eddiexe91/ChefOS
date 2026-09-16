@@ -6,8 +6,8 @@ export const metadata: Metadata = {
   description: 'Sistema operativo gastronómico para restaurantes.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/icons/icon.svg',
-    apple: '/icons/icon.svg',
+    icon: '/chefos-mark.svg',
+    apple: '/icons/icon-192.png',
   },
 }
 

@@ -11,6 +11,8 @@ type ProductoBriefing = {
   unidad_medida: string
   activo: boolean
   tipo_operativo: 'materia_prima' | 'insumo' | 'elaborado'
+  stock_actual: number
+  stock_minimo: number
 }
 
 type IngredienteCarta = {
@@ -41,10 +43,6 @@ function productoDeIngrediente(ingrediente: IngredienteCarta): ProductoBriefing 
   return Array.isArray(ingrediente.producto) ? ingrediente.producto[0] ?? null : ingrediente.producto
 }
 
-function productoSalidaDeReceta(receta: RecetaProduccion): Pick<ProductoBriefing, 'id' | 'nombre' | 'unidad_display' | 'unidad_medida'> | null {
-  return Array.isArray(receta.producto_salida) ? receta.producto_salida[0] ?? null : receta.producto_salida
-}
-
 export async function POST() {
   const supabase = crearClienteServidor()
   const { data: { user } } = await supabase.auth.getUser()
@@ -53,14 +51,20 @@ export async function POST() {
   const { data: perfil } = await supabase.from('usuarios').select('id,restaurante_id').eq('id', user.id).eq('activo', true).single()
   if (!perfil) return NextResponse.json({ error: 'Perfil no encontrado.' }, { status: 403 })
 
-  const fecha = new Date().toISOString().slice(0, 10)
-  const [{ data: stock }, { data: alertas }, { data: lotes }, { data: carta }, { data: produccion }] = await Promise.all([
-    supabase.from('productos').select('id,nombre,cantidad_gramos,stock_minimo_gramos,unidad_display,unidad_medida,activo,tipo_operativo').eq('restaurante_id', perfil.restaurante_id).eq('activo', true).limit(300),
+  const { data: restaurante } = await supabase.from('restaurantes').select('zona_horaria,onboarding_completado').eq('id', perfil.restaurante_id).single()
+  const zona = restaurante?.zona_horaria ?? 'America/Santiago'
+  const fecha = new Intl.DateTimeFormat('en-CA', { timeZone: zona }).format(new Date())
+  const resultados = await Promise.all([
+    supabase.from('productos').select('id,nombre,cantidad_gramos,stock_minimo_gramos,stock_actual,stock_minimo,unidad_display,unidad_medida,activo,tipo_operativo').eq('restaurante_id', perfil.restaurante_id).eq('activo', true).limit(1000),
     supabase.from('alertas_sistema').select('tipo,severidad,mensaje').eq('restaurante_id', perfil.restaurante_id).eq('leida', false).limit(20),
     supabase.from('produccion_lotes').select('id,turno,estado').eq('restaurante_id', perfil.restaurante_id).eq('fecha', fecha).eq('estado', 'en_progreso'),
     supabase.from('recetas').select('id,nombre,rendimiento_porciones,unidad_rendimiento,es_produccion,producto_salida_id,ingredientes:recetas_ingredientes(cantidad,cantidad_gramos,unidad_medida,producto:productos(id,nombre,cantidad_gramos,stock_minimo_gramos,unidad_display,unidad_medida,activo,tipo_operativo))').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('en_carta', true).limit(150),
-    supabase.from('recetas').select('id,nombre,producto_salida_id,producto_salida:productos(id,nombre,unidad_display,unidad_medida)').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('es_produccion', true).limit(150),
+    supabase.from('recetas').select('id,nombre,producto_salida_id,producto_salida:productos!recetas_producto_salida_id_fkey(id,nombre,unidad_display,unidad_medida)').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('es_produccion', true).limit(150),
+    supabase.from('produccion_registros').select('receta_id').eq('restaurante_id', perfil.restaurante_id).eq('fecha_produccion', fecha),
   ])
+  const [{ data: stock }, { data: alertas }, { data: lotes }, { data: carta }, { data: produccion }, { data: registros }] = resultados
+  const fuentesIncompletas = resultados.some((r) => r.error)
+  for (const resultado of resultados) if (resultado.error) console.error('[briefing] fuente:', resultado.error.code, resultado.error.message)
 
   const productos = (stock ?? []) as ProductoBriefing[]
   const recetasCarta = (carta ?? []) as RecetaCarta[]
@@ -73,11 +77,14 @@ export async function POST() {
 
   for (const receta of recetasProduccion) {
     if (receta.producto_salida_id) produccionPorSalida.set(receta.producto_salida_id, receta)
+    if (!receta.producto_salida_id && !(registros ?? []).some(r => r.receta_id === receta.id)) {
+      producciones.set(receta.id, { nombre: `Revisar producción de ${receta.nombre}`, cantidad: 1, unidad: 'lote', prioridad: 'alta', razon: 'Receta de producción sin registro hoy. Confirma la cantidad necesaria para el turno.' })
+    }
   }
 
   for (const producto of productos) {
-    const stockActual = Number(producto.cantidad_gramos ?? 0)
-    const minimo = Number(producto.stock_minimo_gramos ?? 0)
+    const stockActual = Number(producto.stock_actual ?? 0)
+    const minimo = Number(producto.stock_minimo ?? 0)
     if (stockActual > minimo) continue
     if (producto.tipo_operativo === 'elaborado') {
       const recetaSalida = produccionPorSalida.get(producto.id)
@@ -85,7 +92,7 @@ export async function POST() {
         producciones.set(recetaSalida.id, {
           nombre: `Preparar ${recetaSalida.nombre}`,
           cantidad: 1,
-          unidad: productoSalidaDeReceta(recetaSalida)?.unidad_display ?? productoSalidaDeReceta(recetaSalida)?.unidad_medida ?? 'lote',
+          unidad: 'lote',
           prioridad: stockActual <= 0 ? 'critica' : 'alta',
           razon: `Stock bajo de ${producto.nombre}.`,
         })
@@ -99,6 +106,9 @@ export async function POST() {
         razon: 'Stock bajo en Inventario.',
       })
     }
+    if (producto.tipo_operativo === 'elaborado' && !produccionPorSalida.has(producto.id)) riesgos.set(`reponer-${producto.id}`, {
+      tipo: 'produccion', descripcion: `Reponer ${producto.nombre} en Stock disponible.`, severidad: 'alta', accion_sugerida: 'Asocia una receta de producción o actualiza las existencias.',
+    })
   }
 
   for (const receta of recetasCarta) {
@@ -128,7 +138,7 @@ export async function POST() {
           producciones.set(recetaSalida.id, {
             nombre: `Preparar ${recetaSalida.nombre}`,
             cantidad: 1,
-            unidad: productoSalidaDeReceta(recetaSalida)?.unidad_display ?? productoSalidaDeReceta(recetaSalida)?.unidad_medida ?? 'lote',
+            unidad: 'lote',
             prioridad: faltante.disponible <= 0 ? 'critica' : 'alta',
             razon: `${receta.nombre} necesita ${faltante.producto.nombre}.`,
           })
@@ -144,7 +154,7 @@ export async function POST() {
         compras.set(faltante.producto.id, {
           producto: faltante.producto.nombre,
           cantidad_sugerida: Math.max(faltante.faltante, Number(faltante.producto.stock_minimo_gramos ?? 0) || 1),
-          unidad: faltante.producto.unidad_display ?? faltante.producto.unidad_medida ?? 'g',
+          unidad: 'g',
           urgencia: faltante.disponible <= 0 ? 'critica' : 'alta',
           razon: `${receta.nombre} requiere este ingrediente para salir a carta.`,
         })
@@ -161,6 +171,11 @@ export async function POST() {
     })
   }
 
+  if (fuentesIncompletas) riesgos.set('conexion', { tipo: 'gestion', descripcion: 'No se pudieron verificar todos los datos del turno.', severidad: 'alta', accion_sugerida: 'Revisa la conexión y actualiza el briefing antes del servicio.' })
+  if (!productos.some((p) => p.tipo_operativo !== 'elaborado')) riesgos.set('inventario', { tipo: 'configuracion', descripcion: 'Carga primero las materias primas de tu cocina.', severidad: 'alta', accion_sugerida: 'Completa Inventario para calcular compras y producción.' })
+  if (!productos.some((p) => p.tipo_operativo === 'elaborado')) riesgos.set('stock', { tipo: 'configuracion', descripcion: 'Registra las preparaciones listas para servir.', severidad: 'media', accion_sugerida: 'Actualiza Stock disponible.' })
+  if (!recetasCarta.length) riesgos.set('carta', { tipo: 'configuracion', descripcion: 'Añade los platos que ofrece tu restaurante.', severidad: 'media', accion_sugerida: 'Completa Carta para relacionar platos con existencias.' })
+
   const loteSugerencias = (lotes ?? []).map((lote) => ({
     nombre: `Lote ${lote.turno}`,
     cantidad: 1,
@@ -172,7 +187,7 @@ export async function POST() {
   const briefing = {
     restaurante_id: perfil.restaurante_id,
     fecha,
-    turno: new Date().getHours() < 14 ? 'mañana' : new Date().getHours() < 19 ? 'tarde' : 'noche',
+    turno: Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 14 ? 'mañana' : Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 19 ? 'tarde' : 'noche',
     confianza_estimacion: 'media',
     produccion_sugerida: [...producciones.values(), ...loteSugerencias],
     compras_sugeridas: Array.from(compras.values()),
@@ -192,6 +207,7 @@ export async function POST() {
   }
 
   const { data, error } = await supabase.from('briefings').upsert(briefing, { onConflict: 'restaurante_id,fecha,turno' }).select().single()
-  if (error) return NextResponse.json({ error: 'No se pudo guardar el briefing.' }, { status: 500 })
-  return NextResponse.json({ data })
+  // El análisis es útil incluso cuando el rol solo permite leer el historial.
+  if (error) console.error('[briefing] historial:', error.code, error.message)
+  return NextResponse.json({ data: data ?? { ...briefing, id: 'actual', comensales_esperados: null }, guardado: !error }, { headers: { 'Cache-Control': 'no-store' } })
 }

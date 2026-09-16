@@ -259,7 +259,11 @@ export async function POST(request: NextRequest) {
     p_datos: datos,
   })
   const recetaCreada = Array.isArray(recetaCreadaRPC) ? recetaCreadaRPC[0] : recetaCreadaRPC
-  if (recetaError || !recetaCreada) return errorJSON('No se pudo crear la receta completa.', 500)
+  if (recetaError || !recetaCreada) {
+    console.error('[recetas/crear]', recetaError?.code, recetaError?.message)
+    if (recetaError?.message?.includes('convertir')) return errorJSON('Un ingrediente necesita peso por porción o una unidad compatible. Revisa su ficha en Inventario o Stock disponible.', 400)
+    return errorJSON('No se pudo crear la receta completa. Revisa los ingredientes e intenta nuevamente.', 500)
+  }
 
   await supabase.from('actividad_operativa').insert({
     restaurante_id: perfil.restaurante_id,
