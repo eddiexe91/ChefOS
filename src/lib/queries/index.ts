@@ -28,7 +28,7 @@
  */
 
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
-import { filtrarProductosPorTipoOperativo, obtenerTipoOperativoProducto } from '@/lib/productos'
+import { filtrarProductosPorTipoOperativo } from '@/lib/productos'
 
 import type {
   Receta,
@@ -576,20 +576,15 @@ export async function fetchProductos(
     filtros?.tipos_operativos,
     Boolean(filtros?.tipos_operativos?.every((tipo) => tipo !== 'elaborado'))
   )
-  const productosNormalizados = productosFiltrados.map((producto) => ({
-    ...producto,
-    tipo_operativo: obtenerTipoOperativoProducto(producto) ?? 'materia_prima',
-  }))
-
   if (filtros?.stock_bajo) {
-    return productosNormalizados.filter((p) =>
+    return (productosFiltrados as Producto[]).filter((p) =>
       p.cantidad_gramos !== undefined && p.stock_minimo_gramos !== undefined
         ? p.cantidad_gramos <= p.stock_minimo_gramos
         : p.stock_actual <= p.stock_minimo
     )
   }
 
-  return productosNormalizados
+  return productosFiltrados as Producto[]
 }
 
 export async function fetchCategoriasProducto(client: ClienteSupabase): Promise<CategoriaProducto[]> {

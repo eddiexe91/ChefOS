@@ -8,7 +8,7 @@ import EditarProductoCliente from '@/components/inventario/EditarProductoCliente
 import AjusteInventarioSheet from '@/components/inventario/AjusteInventarioSheet'
 import NuevoProductoCliente from '@/components/inventario/NuevoProductoCliente'
 import { useProductos } from '@/hooks/useDominio'
-import { etiquetaTipoOperativo } from '@/lib/productos'
+import { etiquetaTipoOperativo, obtenerTipoOperativoProducto } from '@/lib/productos'
 import type { Producto, TipoOperativoProducto } from '@/types'
 
 function esCritico(producto: Producto) {
@@ -28,6 +28,7 @@ function ProductoCard({
   onAjustar: () => void
 }) {
   const critico = esCritico(producto)
+  const tipoOperativo = obtenerTipoOperativoProducto(producto)
 
   return (
     <article className="rounded-xl border border-fondo-borde bg-fondo-elevado p-4 space-y-3">
@@ -35,8 +36,8 @@ function ProductoCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-medium text-texto-primario truncate">{producto.nombre}</h3>
-            <span className={producto.tipo_operativo === 'elaborado' ? 'badge-acento' : 'badge-info'}>
-              {etiquetaTipoOperativo(producto.tipo_operativo)}
+            <span className={tipoOperativo === 'elaborado' ? 'badge-acento' : 'badge-info'}>
+              {tipoOperativo ? etiquetaTipoOperativo(tipoOperativo) : 'Sin clasificar'}
             </span>
           </div>
           <p className="text-2xs text-texto-apagado mt-1">

@@ -459,7 +459,20 @@ export default function RecetaEditorSheet({
             </div>
             <label className="block space-y-1.5">
               <span className="text-xs font-medium text-texto-secundario">Producto elaborado de salida</span>
-              <select value={campos.producto_salida_id} onChange={(e) => setCampos((prev) => ({ ...prev, producto_salida_id: e.target.value }))} className="campo-input">
+              <select
+                value={campos.producto_salida_id}
+                onChange={(e) => {
+                  const productoSalidaId = e.target.value
+                  const productoSalida = productosSalida.find((producto: Producto) => producto.id === productoSalidaId)
+                  setCampos((prev) => ({
+                    ...prev,
+                    producto_salida_id: productoSalidaId,
+                    cantidad_salida: productoSalidaId && productoSalidaId === prev.producto_salida_id ? prev.cantidad_salida : '',
+                    unidad_salida: productoSalidaId ? (productoSalida?.unidad_display ?? productoSalida?.unidad_medida ?? 'porcion') : 'porcion',
+                  }))
+                }}
+                className="campo-input"
+              >
                 <option value="">{salidasQuery.isPending ? 'Cargando stock disponible…' : 'Sin salida configurada'}</option>
                 {productosSalida.map((producto: Producto) => <option key={producto.id} value={producto.id}>{producto.nombre}</option>)}
               </select>
