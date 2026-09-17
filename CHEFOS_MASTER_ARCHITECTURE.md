@@ -1,4 +1,9 @@
 # CHEFOS — ARQUITECTURA MAESTRA
+
+## Directriz rectora vigente — 16-09-2026
+
+Leer conjuntamente [CHEFOS_NORTE_ESTRATEGICO.md](CHEFOS_NORTE_ESTRATEGICO.md). Tiene igual jerarquía y prevalece ante contradicciones de misión, UX y priorización: el producto central es el Briefing del Chef; los módulos son fuentes de datos para decisiones verificables, no fines aislados. Las capacidades futuras del Norte no deben describirse como ya implementadas. Las notas históricas siguientes no reemplazan las pruebas de las entregas actuales.
+
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
 **Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)

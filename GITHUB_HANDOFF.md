@@ -1,5 +1,11 @@
 # ChefOS — guía de continuación
 
+## Norte permanente y corrección de captura
+
+El documento rector [CHEFOS_NORTE_ESTRATEGICO.md](CHEFOS_NORTE_ESTRATEGICO.md) y `AGENTS.md` gobiernan próximas decisiones junto con la arquitectura maestra. Prioridad: Briefing accionable en menos de 30 segundos, captura fiable, cálculos explicables, incertidumbre y resultado real; no agregar módulos por cantidad.
+
+Corrección de testeo: colores base explícitos en modo oscuro y contraste de texto secundario; voz admite “registro dos porciones de merma de congrio” además de “2 porciones de congrio como merma”. Sigue siendo un intérprete determinista de variantes acotadas, con selección/revisión y confirmación; no es comprensión libre de cualquier frase. Se mantiene la APK 1.2.0 porque son cambios web, sin cambios nativos.
+
 ## Actualización 16-09-2026 — versión 1.2.0
 
 Consultar primero [RELEASE_1.2.0.md](RELEASE_1.2.0.md): reemplaza las afirmaciones de validación general de la sección histórica. Incluye causa comprobada de Recetas/Carta, briefing dinámico, migración 012 aplicada, capturas por voz/foto, pruebas y limitaciones. Las funciones pendientes de 010 ya se aplicaron: prueba transaccional PASS de consumo, salida a Stock disponible, actividad y merma. Sigue pendiente el testeo físico de la nueva versión.

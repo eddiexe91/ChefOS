@@ -1,4 +1,5 @@
 node_modules/
+.codex-remote-attachments/
 .next/
 .tools/
 .android-tools/

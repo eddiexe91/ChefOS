@@ -1,5 +1,14 @@
 # ChefOS 1.2.0 — 16 septiembre 2026
 
+## Corrección posterior al testeo de voz
+
+- La transcripción real “registro dos porciones de merma de congrio” ahora se interpreta como 2 porciones de congrio, siempre pendientes de revisión y confirmación.
+- Se acepta `registro`, `registra`, `registrar`, `anota`, `anotar` y formas acotadas de “merma de…”. No es interpretación generativa ni comprensión ilimitada. Los datos ambiguos no se ejecutan automáticamente.
+- Colores base explícitos, esquema oscuro y mayor contraste de texto secundario. La causa del negro era la ausencia de color heredado en body para títulos/etiquetas sin clase específica.
+- 17 pruebas de voz/CSV y compilación Next.js correctas. Vista SSR local con datos simulados: títulos y etiquetas calculados en rgb(242,239,232), fondo rgb(8,8,8); ancho de contenido 390px para viewport 390px, sin desborde. La captura de pantalla del navegador no estuvo disponible; no se afirma validación en Android físico.
+- Documento `CHEFOS_NORTE_ESTRATEGICO.md` incorporado como rector y enlazado desde arquitectura/AGENTS/handoff. Guía de prioridades futuras, no declaración de funciones ya terminadas.
+- Cambios exclusivamente web: no requieren otra compilación de la APK 1.2.0. Cerrar y abrir la aplicación tras el despliegue para probarlos.
+
 ## Correcciones y funciones
 
 - Recetas/Carta: relación explícita `productos!recetas_producto_salida_id_fkey`. La consulta anterior devuelve PGRST201 porque hay dos relaciones posibles; la corregida respondió HTTP 200.

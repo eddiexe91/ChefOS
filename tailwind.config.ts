@@ -19,8 +19,8 @@ const config: Config = {
         },
         texto: {
           primario:   '#F2EFE8',
-          secundario: '#8C8880',
-          apagado:    '#4A4845',
+          secundario: '#B4AFA6',
+          apagado:    '#A09C94',
           inverso:    '#0A0A0A',
         },
         acento: {

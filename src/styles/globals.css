@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: dark;
   --header-height:      56px;
   --bottom-nav-height:  64px;
   --max-content-width:  640px;
@@ -33,6 +34,8 @@ html {
 }
 
 body {
+  color: var(--color-texto-primario);
+  background-color: var(--color-fondo-base);
   overscroll-behavior: none;
   overflow-x: hidden;
 }

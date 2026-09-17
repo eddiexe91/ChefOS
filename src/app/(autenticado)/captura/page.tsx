@@ -38,7 +38,7 @@ export default function CapturaPage() {
   function interpretar() {
     setMensaje('');setBorrador(null)
     const comando=interpretarMerma(texto)
-    if(!comando || comando.cantidad<=0) {setMensaje('Prueba: ChefOS registra 2 porciones de Congrio como merma.');return}
+    if(!comando || comando.cantidad<=0) {setMensaje('No pude identificar cantidad, unidad y producto. Puedes editar el texto: “2 porciones de congrio como merma” o “2 porciones de merma de congrio”. Todavía no se ha descontado nada.');return}
     const coincidencias=(productos.data??[]).filter(p=>p.tipo_operativo==='elaborado'&&normalizarComando(p.nombre)===comando.producto)
     setBorrador({producto_id:coincidencias.length===1?coincidencias[0].id:'',cantidad:comando.cantidad,unidad_medida:comando.unidad})
     if(coincidencias.length!==1)setMensaje('Selecciona el producto exacto de Stock disponible para evitar confusiones.')
