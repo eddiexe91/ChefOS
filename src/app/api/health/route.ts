@@ -14,8 +14,10 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: buckets, error: storageError } = await admin.storage.listBuckets()
   const storageOk = !storageError
+  const { error: historialError } = await admin.from('ventas_resumen_servicios').select('fecha').limit(0)
   return NextResponse.json({
-    version: '1.2.0',
+    version: '1.3.0',
+    historialPos: { disponible: !historialError, mensaje: historialError ? 'Pendiente verificar/aplicar migraciones 013 y 014.' : 'Esquema histórico disponible.' },
     ok: configuracion.supabaseUrl && configuracion.supabaseAnonKey && storageOk,
     configuracion,
     autenticado: Boolean(user),

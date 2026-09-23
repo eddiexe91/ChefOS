@@ -16,6 +16,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run type-check
+      - run: npm run test:historial
+      - run: npm run test:historial-ui
+      - run: npm run test:captura
       - run: npm run lint
       - run: npm run build
         env:

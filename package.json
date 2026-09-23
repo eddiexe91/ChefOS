@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "test:historial": "node scripts/test-historial.cjs",
+    "test:historial-ui": "node scripts/test-historial-ui.cjs",
+    "test:captura": "node scripts/test-captura.cjs",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
     "android:build": "cd android && gradlew.bat assembleDebug"
@@ -31,6 +34,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.1",
+    "@electric-sql/pglite": "^0.5.8",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/typography": "^0.5.13",
     "@types/node": "^20.14.2",

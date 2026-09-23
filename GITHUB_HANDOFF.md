@@ -1,5 +1,17 @@
 # ChefOS — guía de continuación
 
+## Entrega de pruebas 1.3.0 — 22-09-2026
+
+Consultar [RELEASE_1.3.0.md](RELEASE_1.3.0.md) y [GUIA_TESTEO_CHEFOS_1.3.0.md](GUIA_TESTEO_CHEFOS_1.3.0.md). APK 1.3.0 compilada, con firma compatible con 1.2.0. No borrar datos ni recrear cuenta. **Activación del historial en Supabase pendiente:** el importador verifica el esquema y muestra un bloqueo explícito si falta; Inicio conserva compatibilidad con la base anterior. Las notas históricas de debajo no certifican despliegue del nuevo esquema ni pruebas físicas.
+
+## Infraestructura de historial POS
+
+Leer [HISTORIAL_POS_ARQUITECTURA.md](HISTORIAL_POS_ARQUITECTURA.md). Se amplían ventas con tickets, pagos múltiples, productos POS/mapeos, preparación por bloques, validación, confirmación atómica e idempotencia. Migraciones nuevas **013 y 014**, aún no aplicadas en producción por esta tarea. No se importó historial real.
+
+Nuevas pantallas: `/ventas/importar` (cuatro CSV), `/ventas/mapeos`, `/ventas/analitica`. El Briefing recibe contexto agregado y observaciones con período/limitaciones; no se ha calibrado un forecast ni implementado el ciclo de descongelación. Antes de activar/importar historial, aplicar y verificar ambas migraciones; el Dashboard utiliza `total_ventas_periodo` con compatibilidad limitada al esquema anterior sin historia.
+
+Pruebas locales: `npm run test:historial` (PostgreSQL en memoria, sin Supabase), `npm run test:historial-ui`, `node scripts/test-historial.cjs --scale` (50.000 líneas sintéticas), `npm run test:captura`, type-check, lint y build. Pasaron localmente; lint/build conservan advertencias documentadas. Los resultados y límites deben consultarse en el documento citado; no confundirlos con una validación en Android o en producción. Los flujos antiguos de revisión/descuento están separados del historial y las escrituras históricas directas se rechazan también en PostgreSQL.
+
 ## Norte permanente y corrección de captura
 
 El documento rector [CHEFOS_NORTE_ESTRATEGICO.md](CHEFOS_NORTE_ESTRATEGICO.md) y `AGENTS.md` gobiernan próximas decisiones junto con la arquitectura maestra. Prioridad: Briefing accionable en menos de 30 segundos, captura fiable, cálculos explicables, incertidumbre y resultado real; no agregar módulos por cantidad.

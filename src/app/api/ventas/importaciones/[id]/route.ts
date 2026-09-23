@@ -9,6 +9,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!perfil) return NextResponse.json({ error: 'Perfil no encontrado.' }, { status: 403 })
   const { data: importacion } = await supabase.from('ventas_importaciones').select('*').eq('id', params.id).eq('restaurante_id', perfil.restaurante_id).single()
   if (!importacion) return NextResponse.json({ error: 'Importación no encontrada.' }, { status: 404 })
+  if (importacion.modo === 'historico') return NextResponse.json({ data: { importacion, items: [], recetas: [] } })
   const [{ data: items }, { data: recetas }] = await Promise.all([
     supabase.from('ventas_items').select('id,nombre_original,nombre_normalizado,confianza_match,requiere_revision,cantidad_vendida,total,receta_id').eq('importacion_id', params.id).eq('restaurante_id', perfil.restaurante_id).order('nombre_original'),
     supabase.from('recetas').select('id,nombre').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).order('nombre'),

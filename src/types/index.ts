@@ -570,6 +570,7 @@ export interface AlertaSistema {
 }
 
 export interface Briefing {
+  contexto_usado?: { observaciones_ventas?: string[]; ventas?: unknown; [clave: string]: unknown }
   id: string
   restaurante_id: string
   fecha: string

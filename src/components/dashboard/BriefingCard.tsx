@@ -18,6 +18,7 @@
 
 import Link from 'next/link'
 import type { Briefing, Producto } from '@/types/index'
+import { observacionesVentas, type ContextoVentas } from '@/lib/ventas/contextoBriefing'
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -85,6 +86,8 @@ export default function BriefingCard({ briefing, productos, pendiente }: Props) 
     month:   'long',
   })
   const comprasCriticas = briefing.compras_sugeridas.filter((item) => item.urgencia === 'critica' || item.urgencia === 'alta').length
+  const ventas = briefing.contexto_usado?.ventas as ContextoVentas | undefined
+  const observaciones = briefing.contexto_usado?.observaciones_ventas ?? (ventas?.version === 'historico-v1' ? observacionesVentas(ventas) : [])
   const produccionesUrgentes = briefing.produccion_sugerida.filter((item) => item.prioridad === 'critica' || item.prioridad === 'alta').length
   const mensajeChef = comprasCriticas > 0
     ? `Hay ${comprasCriticas} compra${comprasCriticas === 1 ? '' : 's'} o pedido${comprasCriticas === 1 ? '' : 's'} crítico${comprasCriticas === 1 ? '' : 's'} por realizar.`
@@ -92,7 +95,7 @@ export default function BriefingCard({ briefing, productos, pendiente }: Props) 
       ? `Hay ${produccionesUrgentes} producción${produccionesUrgentes === 1 ? '' : 'es'} pendiente${produccionesUrgentes === 1 ? '' : 's'} urgente${produccionesUrgentes === 1 ? '' : 's'}.`
       : briefing.riesgos.length > 0
         ? `Hay ${briefing.riesgos.length} tarea${briefing.riesgos.length === 1 ? '' : 's'} de gestión que conviene revisar antes del servicio.`
-        : 'Está todo listo para el servicio. Buen turno, chef.'
+        : 'No detecté faltantes con los datos disponibles. Confirma las existencias y revisa la demanda antes del servicio.'
 
   return (
     <section className="space-y-4">
@@ -102,6 +105,7 @@ export default function BriefingCard({ briefing, productos, pendiente }: Props) 
         <p className="mt-1 text-sm font-medium text-texto-primario leading-relaxed">{mensajeChef}</p>
       </div>
 
+      {observaciones.length > 0 && <div className="tarjeta p-4 space-y-3"><h3 className="text-acento text-sm">Memoria de ventas · observaciones</h3>{observaciones.map((texto, i) => <p key={i} className="text-sm text-texto-primario">{texto}</p>)}<p className="text-xs text-texto-secundario">Confianza no calibrada. El chef decide las cantidades.</p></div>}
       {/* Encabezado */}
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-sans font-medium text-texto-secundario capitalize">

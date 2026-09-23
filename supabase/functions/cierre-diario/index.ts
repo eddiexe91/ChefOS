@@ -29,13 +29,14 @@ Deno.serve(async (request) => {
   const siguiente = new Date(`${fecha}T00:00:00.000Z`); siguiente.setUTCDate(siguiente.getUTCDate() + 1)
   for (const restaurante of restaurantes ?? []) {
     const [{ data: ventas }, { data: mermas }, { data: produccion }] = await Promise.all([
-      supabase.from('ventas_items').select('total').eq('restaurante_id', restaurante.id).eq('fecha_venta', fecha),
+      supabase.rpc('total_ventas_periodo', { p_restaurante: restaurante.id, p_desde: fecha, p_hasta: fecha }),
       supabase.from('mermas').select('costo_merma').eq('restaurante_id', restaurante.id).gte('creado_en', `${fecha}T00:00:00.000Z`).lt('creado_en', siguiente.toISOString()),
       supabase.from('produccion_registros').select('cantidad_producida,costo_real').eq('restaurante_id', restaurante.id).eq('fecha_produccion', fecha),
     ])
     const contexto = { ventas: ventas ?? [], mermas: mermas ?? [], produccion: produccion ?? [] }
     const recomendaciones = await recomendacionClaude(contexto)
-    await supabase.from('cierres_diarios').upsert({ restaurante_id: restaurante.id, fecha, total_ventas: (ventas ?? []).reduce((s, x) => s + Number(x.total), 0), total_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), costo_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), items_producidos: (produccion ?? []).reduce((s, x) => s + Number(x.cantidad_producida ?? 0), 0), costo_produccion: (produccion ?? []).reduce((s, x) => s + Number(x.costo_real ?? 0), 0), recomendaciones }, { onConflict: 'restaurante_id,fecha' })
+    if (ventas === null) continue // No publicar cero si falló la verificación de ventas.
+    await supabase.from('cierres_diarios').upsert({ restaurante_id: restaurante.id, fecha, total_ventas: Number(ventas), total_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), costo_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), items_producidos: (produccion ?? []).reduce((s, x) => s + Number(x.cantidad_producida ?? 0), 0), costo_produccion: (produccion ?? []).reduce((s, x) => s + Number(x.costo_real ?? 0), 0), recomendaciones }, { onConflict: 'restaurante_id,fecha' })
   }
   return Response.json({ ok: true, fecha })
 })

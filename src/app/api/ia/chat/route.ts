@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { crearClienteServidor } from '@/lib/supabase/servidor'
+import { totalVentasPeriodo } from '@/lib/ventas/totalVentas'
 
 type Especialista = 'tecnico' | 'ejecutivo' | 'instructor'
 
@@ -23,7 +24,7 @@ function respuestaBasica(especialista: Especialista, mensaje: string, datos: { s
     lineas.push('Acción: clasifica cada merma por causa y revisa primero las de mayor costo.')
   } else if (consulta.includes('venta') || consulta.includes('rentab') || consulta.includes('costo')) {
     const ventas = datos.ventas.reduce((total, item) => total + Number(item.total ?? 0), 0)
-    lineas.push(`Ventas disponibles: ${datos.ventas.length} líneas, total $${ventas.toLocaleString('es-CL')}.`)
+    lineas.push(`Ventas agregadas de los últimos 30 días: $${ventas.toLocaleString('es-CL')}. Incluye totales oficiales del historial y estimaciones del CSV operativo simple, si existen.`)
     lineas.push('Acción: compara los platos vendidos con su costo por porción y prioriza los de mayor margen.')
   } else if (consulta.includes('produc') || consulta.includes('turno')) {
     lineas.push(bajos.length ? `Prioridad del turno: proteger el servicio y reponer ${bajos[0].nombre}.` : 'Prioridad del turno: confirmar mise en place y cantidades previstas.')
@@ -59,10 +60,11 @@ export async function POST(request: Request) {
   const contexto = await Promise.all([
     supabase.from('productos').select('nombre, cantidad_gramos, stock_minimo_gramos').eq('restaurante_id', perfil.restaurante_id).eq('activo', true).limit(30),
     supabase.from('alertas_sistema').select('tipo, severidad, mensaje').eq('restaurante_id', perfil.restaurante_id).eq('leida', false).limit(10),
-    supabase.from('ventas_items').select('total').eq('restaurante_id', perfil.restaurante_id).gte('fecha_venta', new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)).limit(500),
+    totalVentasPeriodo(supabase, perfil.restaurante_id, new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), new Date().toISOString().slice(0, 10)),
     supabase.from('mermas').select('costo_merma').eq('restaurante_id', perfil.restaurante_id).gte('creado_en', new Date(Date.now() - 30 * 86400000).toISOString()).limit(200),
   ])
-  const datos = { stock: contexto[0].data ?? [], alertas: contexto[1].data ?? [], ventas: contexto[2].data ?? [], mermas: contexto[3].data ?? [] }
+  if (contexto[2].error) return NextResponse.json({ error: 'No se pudo verificar el agregado de ventas.' }, { status: 503 })
+  const datos = { stock: contexto[0].data ?? [], alertas: contexto[1].data ?? [], ventas: [{ total: Number(contexto[2].data ?? 0) }], mermas: contexto[3].data ?? [] }
   const contextoTexto = JSON.stringify(datos)
   let respuesta = respuestaBasica(especialista, mensaje, datos)
 

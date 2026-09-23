@@ -48,7 +48,7 @@ Deno.serve(async (request) => {
     const [{ data: stock }, { data: alertas }, { data: ventas }, { data: produccion }, { data: carta }] = await Promise.all([
       supabase.from('productos').select('id,nombre,cantidad_gramos,stock_minimo_gramos,unidad_display,activo').eq('restaurante_id', restaurante.id).eq('activo', true).limit(100),
       supabase.from('alertas_sistema').select('tipo,severidad,mensaje').eq('restaurante_id', restaurante.id).eq('leida', false).limit(20),
-      supabase.from('ventas_items').select('nombre_original,cantidad_vendida,total').eq('restaurante_id', restaurante.id).gte('fecha_venta', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(500),
+      supabase.rpc('contexto_ventas_briefing', { p_restaurante: restaurante.id, p_fecha: fecha }),
       supabase.from('produccion_registros').select('cantidad_producida,unidad,fecha_produccion').eq('restaurante_id', restaurante.id).gte('fecha_produccion', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)).limit(300),
       supabase.from('recetas').select('id,nombre,rendimiento_porciones,es_produccion,ingredientes:recetas_ingredientes(cantidad_gramos,producto:productos(id,nombre,cantidad_gramos,unidad_display,activo))').eq('restaurante_id', restaurante.id).eq('activa', true).eq('en_carta', true).limit(100),
     ])
@@ -73,9 +73,9 @@ Deno.serve(async (request) => {
     })
     const compras = Array.from(comprasPorProducto.values())
     const riesgos = (alertas ?? []).map((item) => ({ tipo: item.tipo, descripcion: item.mensaje, severidad: item.severidad, accion_sugerida: 'Revisar antes del servicio' }))
-    const contexto = { stock_bajo: compras, platos_en_carta: (carta ?? []).length, recetas_de_produccion: recetasProduccion.length, analisis_carta: produccionCarta, alertas: riesgos, ventas_28_dias: ventas ?? [], produccion_7_dias: produccion ?? [] }
+    const contexto = { stock_bajo: compras, platos_en_carta: (carta ?? []).length, recetas_de_produccion: recetasProduccion.length, analisis_carta: produccionCarta, alertas: riesgos, ventas: ventas ?? null, produccion_7_dias: produccion ?? [] }
     const ia = await consultarClaude(contexto)
-    await supabase.from('briefings').upsert({ restaurante_id: restaurante.id, fecha, turno: 'mañana', confianza_estimacion: ia ? 'alta' : 'media', produccion_sugerida: ia?.produccion_sugerida ?? produccionCarta, compras_sugeridas: ia?.compras_sugeridas ?? compras, riesgos: ia?.riesgos ?? riesgos, alertas: alertas ?? [], contexto_usado: { generado_por: ia ? 'claude' : 'reglas', ...contexto } }, { onConflict: 'restaurante_id,fecha,turno' })
+    await supabase.from('briefings').upsert({ restaurante_id: restaurante.id, fecha, turno: 'mañana', confianza_estimacion: null, produccion_sugerida: ia?.produccion_sugerida ?? produccionCarta, compras_sugeridas: ia?.compras_sugeridas ?? compras, riesgos: ia?.riesgos ?? riesgos, alertas: alertas ?? [], contexto_usado: { generado_por: ia ? 'claude' : 'reglas', ...contexto } }, { onConflict: 'restaurante_id,fecha,turno' })
   }
   return Response.json({ ok: true, fecha, restaurantes: restaurantes?.length ?? 0 })
 })

@@ -320,15 +320,19 @@ export const configuracionKeys = {
 export async function fetchMetricasDashboard(
   client: ClienteSupabase
 ): Promise<MetricasDashboard> {
-  const hoy = new Date().toISOString().split('T')[0]
+  const { data: { user } } = await client.auth.getUser()
+  const { data: perfil } = await client.from('usuarios').select('restaurante_id').eq('id', user?.id).single()
+  if (!perfil?.restaurante_id) throw new Error('No se pudo identificar el restaurante activo.')
+  const { data: restaurante } = await client.from('restaurantes').select('zona_horaria').eq('id', perfil?.restaurante_id).single()
+  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: restaurante?.zona_horaria ?? 'America/Santiago' }).format(new Date())
 
   const [briefingResult, cierreResult, ventasResult, mermasResult, produccionResult, stockResult] = await Promise.all([
-    client.from('briefings').select('*').eq('fecha', hoy).order('creado_en', { ascending: false }).limit(1).maybeSingle(),
-    client.from('cierres_diarios').select('*').eq('fecha', hoy).maybeSingle(),
-    client.from('ventas_items').select('total').eq('fecha_venta', hoy),
-    client.from('mermas').select('cantidad, costo_merma').gte('creado_en', `${hoy}T00:00:00.000Z`).lt('creado_en', `${hoy}T23:59:59.999Z`),
-    client.from('produccion_registros').select('cantidad_producida, costo_real, costo_produccion').eq('fecha_produccion', hoy),
-    client.from('productos').select('cantidad_gramos, stock_minimo_gramos').eq('activo', true),
+    client.from('briefings').select('*').eq('restaurante_id', perfil.restaurante_id).eq('fecha', hoy).order('creado_en', { ascending: false }).limit(1).maybeSingle(),
+    client.from('cierres_diarios').select('*').eq('restaurante_id', perfil.restaurante_id).eq('fecha', hoy).maybeSingle(),
+    import('@/lib/ventas/totalVentas').then(({ totalVentasPeriodo }) => totalVentasPeriodo(client, perfil.restaurante_id, hoy, hoy)),
+    client.from('mermas').select('cantidad, costo_merma').eq('restaurante_id', perfil.restaurante_id).gte('creado_en', `${hoy}T00:00:00.000Z`).lt('creado_en', `${hoy}T23:59:59.999Z`),
+    client.from('produccion_registros').select('cantidad_producida, costo_real, costo_produccion').eq('restaurante_id', perfil.restaurante_id).eq('fecha_produccion', hoy),
+    client.from('productos').select('cantidad_gramos, stock_minimo_gramos').eq('restaurante_id', perfil.restaurante_id).eq('activo', true),
   ])
 
   if (briefingResult.error || cierreResult.error || ventasResult.error || mermasResult.error || produccionResult.error || stockResult.error) {
@@ -338,7 +342,7 @@ export async function fetchMetricasDashboard(
   }
 
   const resumen: ResumenDashboard = {
-    totalVentas: (ventasResult.data ?? []).reduce((suma, item) => suma + Number(item.total ?? 0), 0),
+    totalVentas: Number(ventasResult.data ?? 0),
     totalMermas: (mermasResult.data ?? []).reduce((suma, item) => suma + Number(item.cantidad ?? 0), 0),
     costoMermas: (mermasResult.data ?? []).reduce((suma, item) => suma + Number(item.costo_merma ?? 0), 0),
     itemsProducidos: (produccionResult.data ?? []).reduce((suma, item) => suma + Number(item.cantidad_producida ?? 0), 0),

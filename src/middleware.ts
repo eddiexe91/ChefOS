@@ -90,7 +90,8 @@ export async function middleware(request: NextRequest) {
         .eq('id', user.id)
         .single()
 
-      if (!perfil || !rolesPermitidos.includes(perfil.rol)) {
+      const historialChef = ['/ventas/importar', '/ventas/mapeos', '/ventas/analitica'].some(p => ruta === p) && perfil?.rol === 'chef_ejecutivo'
+      if (!perfil || (!rolesPermitidos.includes(perfil.rol) && !historialChef)) {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
       break

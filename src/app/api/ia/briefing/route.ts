@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { crearClienteServidor } from '@/lib/supabase/servidor'
+import { observacionesVentas, type ContextoVentas } from '@/lib/ventas/contextoBriefing'
 
 type ProductoBriefing = {
   id: string
@@ -184,11 +185,13 @@ export async function POST() {
     razon: 'Lote abierto del turno actual.',
   }))
 
+  const { data: contextoVentas, error: errorVentas } = await supabase.rpc('contexto_ventas_briefing', { p_restaurante: perfil.restaurante_id, p_fecha: fecha })
+  const observaciones = errorVentas ? ['No se pudo verificar el historial de ventas. Las sugerencias actuales solo consideran datos operativos disponibles.'] : observacionesVentas(contextoVentas as ContextoVentas)
   const briefing = {
     restaurante_id: perfil.restaurante_id,
     fecha,
     turno: Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 14 ? 'mañana' : Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 19 ? 'tarde' : 'noche',
-    confianza_estimacion: 'media',
+    confianza_estimacion: null, // Sin calibración, no inventar un nivel de precisión.
     produccion_sugerida: [...producciones.values(), ...loteSugerencias],
     compras_sugeridas: Array.from(compras.values()),
     riesgos: Array.from(riesgos.values()),
@@ -203,6 +206,8 @@ export async function POST() {
       stock_disponible_activo: productos.filter((producto) => producto.tipo_operativo === 'elaborado').length,
       analisis_carta: true,
       sin_anthropic: true,
+      ventas: errorVentas ? null : contextoVentas,
+      observaciones_ventas: observaciones,
     },
   }
 
