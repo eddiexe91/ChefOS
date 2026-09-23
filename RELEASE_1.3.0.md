@@ -5,9 +5,21 @@
 ## Publicación verificada — 23-09-2026
 
 - Código, guía y APK publicados en `main`, commit `0c2a2a07762e251733565d56a9898ac157d3d981`.
-- Vercel confirmó despliegue exitoso de ese commit. `/api/health` público devuelve `version: 1.3.0`, `ok: true`, Storage accesible y `historialPos.disponible: false`.
+- Vercel confirmó despliegue exitoso. Tras la activación de Supabase del 23-09, `/api/health` devuelve `version: 1.3.0`, `ok: true`, Storage accesible y **`historialPos.disponible: true`**.
 - Se descargó la APK desde GitHub para comprobar bytes y SHA-256: coincide exactamente con el artefacto local documentado abajo.
-- El historial todavía **no está habilitado**. No comenzar el test H/importación real hasta aplicar/verificar 013 y 014. Los demás módulos pueden probarse siguiendo la guía, sin borrar la cuenta.
+- El historial ya está habilitado para el test H. Las migraciones 013/014 se aplicaron una vez con resultado `Success. No rows returned`. No borrar ni recrear cuenta.
+
+## Activación y seguridad de tareas — 23-09-2026
+
+- Verificación remota: siete tablas nuevas, siete con RLS, ocho RPC esperadas, cero permisos INSERT/UPDATE/DELETE para anon/authenticated/PUBLIC sobre tablas nuevas; confirmación ejecutable por authenticated, no anon.
+- Cero tickets históricos después de la activación. No se importaron documentos reales ni se borraron productos/recetas/cuentas.
+- Se encontró código remoto mezclado con una plantilla de ejemplo, distinto al repositorio. Se reemplazaron íntegramente `generar-briefing` y `cierre-diario`; no basta un antiguo HTTP 200 como prueba funcional.
+- Credencial aleatoria exclusiva de cron, creada con autorización expresa: Vault `chefos_cron_secret_v1` y Edge Secret `CHEFOS_CRON_SECRET`. Su valor no está en Git, archivos locales ni APK. Los handlers comprueban `x-chefos-cron-secret` antes de leer restaurantes. Falta de clave o clave incorrecta devuelve 401.
+- `verify_jwt=false` en esas dos funciones porque el mecanismo efectivo es el secreto privado, no un JWT anónimo público. `chat-ia` no se modificó.
+- Migración **015_cron_privado.sql** aplicada; helper solo administrativo. Actualiza los dos cron existentes para consultar Vault sin incrustar el secreto en sus comandos. Mantiene horarios 06:00/23:00 GMT, no hora local chilena.
+- Prueba por `pg_net` con `{"verificar":true}`: Briefing HTTP 200; cierre inicialmente 500 al consultar restaurantes, reintento HTTP 200. Ambas funciones devuelven `modo: verificacion_sin_escrituras`; se verificó el RPC de contexto/total con un restaurante, no una escritura para todos. Sin credencial: HTTP 401 en ambas.
+- Código de seguridad `88901f1` publicado en main; Vercel success. Pruebas locales nuevas `npm run test:cron` y repetidas `test:historial`, `test:historial-ui`, type-check: aprobadas.
+- Esta activación es de servidor. **No cambia el binario ni el hash de la APK 1.3.0.**
 
 ## Artefacto
 
@@ -33,10 +45,14 @@ Guía de cobertura: [GUIA_TESTEO_CHEFOS_1.3.0.md](GUIA_TESTEO_CHEFOS_1.3.0.md), 
 - Capacitor sincronizado; Gradle `assembleDebug` finalizó correctamente. APK verificada mediante aapt/apksigner.
 - No se ha realizado una prueba física en el teléfono ni una E2E autenticada remota en esta entrega.
 
-## Pendiente externo
+## Pendiente de testeo y siguientes mejoras
 
-Las migraciones 013 y 014 y las Edge Functions modificadas no se han aplicado/desplegado por esta tarea. No hay navegador conectado ni token Supabase CLI disponible; la credencial administrativa local tampoco permitió verificar el esquema remoto (HTTP 401). Esto no significa que la configuración de Vercel esté mal: su `/api/health` anterior respondió correctamente con Storage accesible.
+- Probar en Android la importación real, correspondencias, métricas y actualización manual del Briefing siguiendo la guía. No se simularon resultados del restaurante.
+- Verificar el próximo ciclo programado real, incluyendo persistencia de briefing/cierre. El diagnóstico remoto no ejecuta esas escrituras. Investigar si vuelve el 500 de consulta.
+- Acordar horarios del servicio y cierre, y adaptar calendario/zona horaria por restaurante. Los horarios conservados están en GMT; no prometer 06:00 local. El cierre actual toma por defecto la fecha UTC anterior.
+- Unificar el motor manual y el programado: comparten contexto histórico SQL, pero sus reglas operativas todavía no son idénticas. El programado conserva límites de lectura y reglas heredadas de cantidades/unidades que deben contrastarse con Inventario; no tratar sus cantidades como un forecast validado. Para este test, actualizar el Briefing manualmente y reportar cualquier cantidad incoherente.
+- La credencial administrativa de `.env.local` falló anteriormente con HTTP 401; no se sustituyó por secretos del navegador. El despliegue actual se realizó desde la sesión autorizada del Dashboard.
 
-Para habilitar el historial: conectar sesión autorizada de Supabase, comprobar qué migraciones existen, aplicar solo las pendientes en orden y verificar RPC/RLS antes de importar datos reales. Desplegar después `generar-briefing` y `cierre-diario`. No ejecutar `db push` ciegamente: migraciones anteriores se aplicaron mediante SQL Editor.
+No ejecutar `db push` ciegamente: las migraciones se aplicaron mediante SQL Editor y el registro del CLI puede diferir. No volver a aplicar 013/014. Rotar el secreto de cron requiere actualizar Vault y Edge Secrets coordinadamente; nunca usar una clave pública ni poner una clave administrativa en la APK.
 
 No se eliminaron cuentas, productos, recetas ni ventas. No es necesario empezar de cero. Mantener ensayos destructivos o de consumo ficticio fuera del restaurante real.

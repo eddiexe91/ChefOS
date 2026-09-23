@@ -2,6 +2,16 @@
 
 Fecha: 22-09-2026. Una guía de cobertura no certifica que todas las pruebas ya pasaron en tu teléfono. Anota cada resultado: OK, FALLÓ, BLOQUEADO o NO APLICA. No marcar “100% probado” si quedan casos sin ejecutar.
 
+**Actualización 23-09:** historial POS habilitado en producción; 013/014 aplicadas y verificadas. Ya puedes probar la importación manual. Las tareas automáticas tienen autenticación privada y diagnóstico remoto aprobado; su próximo ciclo completo aún debe comprobarse. No necesitas borrar tu cuenta ni instalar otra APK si ya tienes 1.3.0.
+
+## Uso diario recomendado
+
+1. Antes del servicio: abre Inicio, pulsa **Actualizar briefing**, revisa fecha y atiende las pocas acciones prioritarias. Contrasta cantidades con existencias; las estimaciones no son órdenes automáticas.
+2. Mantén Inventario como materias primas/insumos y Stock disponible como preparaciones listas. Registra conteos reales y cambios de estado sin confundir reclasificar un producto con trasladar una cantidad parcial.
+3. Mantén fichas de Recetas y Carta completas; registra solo la producción y las mermas que realmente ocurren. Recibir compras y confirmar producción/merma sí cambia existencias.
+4. Importa ventas al recibir una exportación del POS. El historial alimenta memoria y análisis, **no descuenta stock actual**. No mezcles el mismo período con el importador operativo/OCR.
+5. Después del servicio: revisa movimientos, alertas y pendientes. Refresca el Briefing para planificar; ChefOS todavía no calcula un plan fiable de descongelación ni ejecuta todas las funciones por voz.
+
 ## 1. ¿Debo borrar mi cuenta o empezar de cero?
 
 **No. Conserva tu cuenta, restaurante, inventario, recetas y movimientos.** Esta actualización es aditiva; importar historial no debe modificar las existencias actuales. No se ha solicitado una limpieza general ni es necesaria.
@@ -28,7 +38,7 @@ Si pruebas sobre el restaurante real, confirma únicamente operaciones que efect
 4. Entra con tu misma cuenta. Comprueba restaurante y rol antes de hacer cambios.
 5. Abre Configuración → Estado del sistema. La versión del backend debe ser **1.3.0**, además de la versión Android. Son dos piezas diferentes.
 6. Comprueba Supabase, sesión y Storage. “Chef IA básico” es correcto: no necesita Anthropic.
-7. En Configuración → Datos: importar historial POS, si aparece “pendiente de activar en Supabase”, **no importes historial aún**. Faltan verificar/aplicar 013 y 014. Puedes probar los módulos anteriores.
+7. En Configuración → Datos: importar historial POS, debe estar habilitada la validación: 013/014 ya están aplicadas. Si todavía aparece “pendiente de activar en Supabase”, cierra y vuelve a abrir ChefOS con conexión; si persiste, reporta el mensaje y no fuerces la importación.
 
 Instalar una APK nueva no aplica migraciones ni publica Vercel. Un backend actualizado tampoco demuestra que funcionen permisos, micrófono o teclado de tu dispositivo.
 
@@ -44,7 +54,7 @@ Instalar una APK nueva no aplica migraciones ni publica Vercel. Un backend actua
 
 ## 4. Preparar e importar Inventario y Stock disponible
 
-Hazlo en este orden: **Inventario → Stock disponible → Recetas/Carta → equivalencias POS → historial → Briefing**.
+Hazlo en este orden: **Inventario → Stock disponible → Recetas/Carta → historial → equivalencias POS → Briefing**. Los productos POS aparecen para mapear después de la primera importación.
 
 1. Configuración → Configuración inicial → paso Inventario.
 2. Descarga la plantilla CSV. Conserva la fila de encabezados.
@@ -119,7 +129,7 @@ Voz actual: **mermas**, no todas las funciones. OCR es lectura de texto, no un d
 - [ ] **L01:** Un producto bajo mínimo aparece en críticos y alertas. Cambiar filtros o marcar leída no cambia stock.
 - [ ] **L02:** Marcar una alerta leída actualiza contador y persiste al volver. “Leída” no significa “faltante resuelto”.
 
-## 9. Historial Soft Restaurant — SOLO después de activar 013/014
+## 9. Historial Soft Restaurant — activado el 23-09-2026
 
 1. Guarda una copia intacta de los cuatro archivos originales fuera del repositorio público. No adjuntes datos de clientes/empleados a incidencias públicas.
 2. Confirma restaurante activo y rol Dueño, Administración o Chef Ejecutivo.
@@ -164,7 +174,7 @@ No mezclar el mismo período mediante importación histórica, CSV operativo y O
 - [ ] **B05:** Memoria de ventas explica período y promedio por día comparable. Con menos de cuatro días comparables, datos antiguos o ausencia de ventas, informa insuficiencia en vez de inventar demanda.
 - [ ] **B06:** Si no detecta faltantes, lo expresa condicionado a datos disponibles; no garantiza que el servicio estará cubierto.
 - [ ] **B07:** Abrir Chef IA, consultar stock/mermas/ventas. El modo básico responde dentro de sus reglas, sin requerir una clave pagada. No equivale a conversación libre de Claude.
-- [ ] **B08:** Cron matutino/cierre requieren revisión al día siguiente: anotar fecha/turno. Una actualización manual correcta no demuestra que el cron haya corrido.
+- [ ] **B08:** Cron matutino/cierre requieren revisión al día siguiente: anotar fecha/turno. Siguen programados a 06:00 y 23:00 GMT, no hora local; falta acordar el horario operacional. Una actualización manual correcta o el diagnóstico de lectura no demuestra que se guardó un briefing/cierre programado. Si sus cantidades difieren del manual, reporta la diferencia: el motor operativo todavía requiere unificación.
 
 El forecast calibrado, recomendaciones precisas de descongelación, sobreproducción, afinidad entre platos y aprendizaje de decisiones siguen siendo evolución pendiente; no calificarlos como fallos de funciones prometidas en esta entrega ni como ya probados.
 

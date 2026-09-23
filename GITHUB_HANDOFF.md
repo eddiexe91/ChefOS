@@ -2,15 +2,17 @@
 
 ## Entrega de pruebas 1.3.0 — 22-09-2026
 
-Publicación verificada el 23-09: GitHub main `0c2a2a0`, APK remota con hash coincidente y backend Vercel 1.3.0 operativo. Health informa `historialPos.disponible: false`; falta Supabase antes de probar historial. No confundir publicación del código con activación del esquema.
+Activación verificada el 23-09: migraciones **013, 014 y 015 aplicadas** en Supabase. Health informa `historialPos.disponible: true`, backend Vercel 1.3.0 operativo. La APK publicada sigue siendo válida; no borrar cuenta ni reinstalar desde cero. Código de seguridad publicado en `88901f1` (Vercel success).
 
-Consultar [RELEASE_1.3.0.md](RELEASE_1.3.0.md) y [GUIA_TESTEO_CHEFOS_1.3.0.md](GUIA_TESTEO_CHEFOS_1.3.0.md). APK 1.3.0 compilada, con firma compatible con 1.2.0. No borrar datos ni recrear cuenta. **Activación del historial en Supabase pendiente:** el importador verifica el esquema y muestra un bloqueo explícito si falta; Inicio conserva compatibilidad con la base anterior. Las notas históricas de debajo no certifican despliegue del nuevo esquema ni pruebas físicas.
+Consultar [RELEASE_1.3.0.md](RELEASE_1.3.0.md) y [GUIA_TESTEO_CHEFOS_1.3.0.md](GUIA_TESTEO_CHEFOS_1.3.0.md). APK 1.3.0 compilada, con firma compatible con 1.2.0. El usuario puede iniciar el test histórico desde la app. No se importó ningún CSV real: cero tickets históricos al terminar la activación. Las notas históricas no certifican pruebas físicas.
+
+Funciones `generar-briefing` y `cierre-diario` reemplazadas por código del repositorio, protegido con credencial privada solo en Vault/Edge Secrets. Pruebas remotas sin escrituras: HTTP 200 con credencial y 401 sin ella en ambas. Cierre tuvo un primer 500 de consulta y el segundo intento pasó; no ocultar el incidente ni afirmar que ya pasó una ejecución programada completa. Los cron siguen activos a 06:00 y 23:00 **GMT**, conservando los horarios anteriores; falta acordar horario operacional local y comprobar el siguiente ciclo real. No usar la clave pública como autorización del cron. Ver release para límites del motor automático.
 
 ## Infraestructura de historial POS
 
-Leer [HISTORIAL_POS_ARQUITECTURA.md](HISTORIAL_POS_ARQUITECTURA.md). Se amplían ventas con tickets, pagos múltiples, productos POS/mapeos, preparación por bloques, validación, confirmación atómica e idempotencia. Migraciones nuevas **013 y 014**, aún no aplicadas en producción por esta tarea. No se importó historial real.
+Leer [HISTORIAL_POS_ARQUITECTURA.md](HISTORIAL_POS_ARQUITECTURA.md). Se amplían ventas con tickets, pagos múltiples, productos POS/mapeos, preparación por bloques, validación, confirmación atómica e idempotencia. **013/014 aplicadas:** siete tablas nuevas con RLS, ocho RPC presentes, sin escritura directa anon/authenticated en tablas nuevas y ejecución anónima de confirmación bloqueada. No se importó historial real.
 
-Nuevas pantallas: `/ventas/importar` (cuatro CSV), `/ventas/mapeos`, `/ventas/analitica`. El Briefing recibe contexto agregado y observaciones con período/limitaciones; no se ha calibrado un forecast ni implementado el ciclo de descongelación. Antes de activar/importar historial, aplicar y verificar ambas migraciones; el Dashboard utiliza `total_ventas_periodo` con compatibilidad limitada al esquema anterior sin historia.
+Nuevas pantallas: `/ventas/importar` (cuatro CSV), `/ventas/mapeos`, `/ventas/analitica`. El Briefing recibe contexto agregado y observaciones con período/limitaciones; no se ha calibrado un forecast ni implementado el ciclo de descongelación. No volver a ejecutar 013/014: ya existen sus tablas y funciones. El Dashboard utiliza `total_ventas_periodo`.
 
 Pruebas locales: `npm run test:historial` (PostgreSQL en memoria, sin Supabase), `npm run test:historial-ui`, `node scripts/test-historial.cjs --scale` (50.000 líneas sintéticas), `npm run test:captura`, type-check, lint y build. Pasaron localmente; lint/build conservan advertencias documentadas. Los resultados y límites deben consultarse en el documento citado; no confundirlos con una validación en Android o en producción. Los flujos antiguos de revisión/descuento están separados del historial y las escrituras históricas directas se rechazan también en PostgreSQL.
 

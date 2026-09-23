@@ -8,6 +8,10 @@ Leer conjuntamente [CHEFOS_NORTE_ESTRATEGICO.md](CHEFOS_NORTE_ESTRATEGICO.md). T
 **Estado:** Fuente de verdad permanente  
 **Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)
 
+## Control vigente — 23-09-2026
+
+Para estado real prevalecen `GITHUB_HANDOFF.md` y `RELEASE_1.3.0.md` sobre las afirmaciones históricas de este documento. Historial POS 013/014 activo, APK/backend 1.3.0 y cron privado 015 configurado. Se detectó que las funciones remotas antiguas mezclaban una plantilla con código previo: se reemplazaron y se verificó autenticación/lectura, no el ciclo automático completo de escritura. La visión y funciones futuras del Norte no se declaran terminadas. No se importaron ventas reales ni se borraron datos.
+
 ## ACTUALIZACIÓN DE CONTROL — 13-09-2026
 
 - Supabase real: migraciones, Storage, Edge Functions y `pg_cron` activos.

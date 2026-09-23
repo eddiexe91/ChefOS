@@ -19,6 +19,7 @@ jobs:
       - run: npm run test:historial
       - run: npm run test:historial-ui
       - run: npm run test:captura
+      - run: npm run test:cron
       - run: npm run lint
       - run: npm run build
         env:

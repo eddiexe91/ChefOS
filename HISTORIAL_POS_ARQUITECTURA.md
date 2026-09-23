@@ -1,6 +1,6 @@
 # Historial POS y memoria operacional
 
-Implementación local revisada el 18-09-2026. Estado de empaquetado/publicación posterior: consultar [RELEASE_1.3.0.md](RELEASE_1.3.0.md). No aplicada a Supabase por esta tarea.
+Implementación local revisada el 18-09-2026. Activación remota verificada el 23-09-2026: 013/014 aplicadas, RLS/RPC comprobadas, `historialPos.disponible=true`, sin importar ventas reales. La 015 configura autenticación privada de cron. Consultar [RELEASE_1.3.0.md](RELEASE_1.3.0.md) para pruebas y límites de las tareas programadas.
 
 ## Estado inicial y alcance
 
