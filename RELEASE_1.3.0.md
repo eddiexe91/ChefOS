@@ -2,6 +2,13 @@
 
 22-09-2026. Esta entrega no certifica el 100% de ChefOS ni sustituye el testeo Android.
 
+## Publicación verificada — 23-09-2026
+
+- Código, guía y APK publicados en `main`, commit `0c2a2a07762e251733565d56a9898ac157d3d981`.
+- Vercel confirmó despliegue exitoso de ese commit. `/api/health` público devuelve `version: 1.3.0`, `ok: true`, Storage accesible y `historialPos.disponible: false`.
+- Se descargó la APK desde GitHub para comprobar bytes y SHA-256: coincide exactamente con el artefacto local documentado abajo.
+- El historial todavía **no está habilitado**. No comenzar el test H/importación real hasta aplicar/verificar 013 y 014. Los demás módulos pueden probarse siguiendo la guía, sin borrar la cuenta.
+
 ## Artefacto
 
 - APK: [ChefOS-1.3.0-test.apk](artifacts/ChefOS-1.3.0-test.apk).

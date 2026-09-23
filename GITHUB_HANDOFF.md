@@ -2,6 +2,8 @@
 
 ## Entrega de pruebas 1.3.0 — 22-09-2026
 
+Publicación verificada el 23-09: GitHub main `0c2a2a0`, APK remota con hash coincidente y backend Vercel 1.3.0 operativo. Health informa `historialPos.disponible: false`; falta Supabase antes de probar historial. No confundir publicación del código con activación del esquema.
+
 Consultar [RELEASE_1.3.0.md](RELEASE_1.3.0.md) y [GUIA_TESTEO_CHEFOS_1.3.0.md](GUIA_TESTEO_CHEFOS_1.3.0.md). APK 1.3.0 compilada, con firma compatible con 1.2.0. No borrar datos ni recrear cuenta. **Activación del historial en Supabase pendiente:** el importador verifica el esquema y muestra un bloqueo explícito si falta; Inicio conserva compatibilidad con la base anterior. Las notas históricas de debajo no certifican despliegue del nuevo esquema ni pruebas físicas.
 
 ## Infraestructura de historial POS
