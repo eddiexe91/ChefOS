@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-type Suggestion = { producto?: string; nombre?: string; cantidad?: number; unidad?: string; urgencia?: string; prioridad?: string; razon?: string }
+type Suggestion = { producto?: string; nombre?: string; cantidad?: number; cantidad_sugerida?: number; unidad?: string; urgencia?: string; prioridad?: string; razon?: string }
 type CartaProducto = { id: string; nombre: string; cantidad_gramos: number | null; unidad_display: string | null; activo: boolean }
 type CartaIngrediente = { cantidad_gramos: number | null; producto: CartaProducto | CartaProducto[] | null }
 type CartaReceta = { id: string; nombre: string; rendimiento_porciones: number | null; es_produccion: boolean; ingredientes: CartaIngrediente[] | null }
@@ -40,10 +40,21 @@ async function consultarClaude(contexto: unknown) {
 }
 
 Deno.serve(async (request) => {
+  // Solo el programador privado puede ejecutar operaciones sobre todos los locales.
+  const cronSecret = Deno.env.get('CHEFOS_CRON_SECRET')
+  if (!cronSecret || request.headers.get('x-chefos-cron-secret') !== cronSecret) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  if (request.method !== 'POST') return Response.json({ error: 'Método no permitido' }, { status: 405 })
   const body = await request.json().catch(() => ({}))
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const fecha = body.fecha ?? new Date().toISOString().slice(0, 10)
-  const { data: restaurantes } = await supabase.from('restaurantes').select('id').eq('activo', true)
+  if (typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha)) || new Date(fecha).toISOString().slice(0, 10) !== fecha) return Response.json({ error: 'Fecha inválida' }, { status: 400 })
+  const { data: restaurantes, error: errorRestaurantes } = await supabase.from('restaurantes').select('id').eq('activo', true)
+  if (errorRestaurantes) return Response.json({ error: 'No se pudieron consultar los restaurantes' }, { status: 500 })
+  if (body.verificar === true) {
+    const r = restaurantes?.[0]
+    const { error } = r ? await supabase.rpc('contexto_ventas_briefing', { p_restaurante: r.id, p_fecha: fecha }) : { error: null }
+    return Response.json({ ok: !error, version: '1.3.0', modo: 'verificacion_sin_escrituras', restaurantes: restaurantes?.length ?? 0 }, { status: error ? 500 : 200 })
+  }
   for (const restaurante of restaurantes ?? []) {
     const [{ data: stock }, { data: alertas }, { data: ventas }, { data: produccion }, { data: carta }] = await Promise.all([
       supabase.from('productos').select('id,nombre,cantidad_gramos,stock_minimo_gramos,unidad_display,activo').eq('restaurante_id', restaurante.id).eq('activo', true).limit(100),
@@ -75,7 +86,8 @@ Deno.serve(async (request) => {
     const riesgos = (alertas ?? []).map((item) => ({ tipo: item.tipo, descripcion: item.mensaje, severidad: item.severidad, accion_sugerida: 'Revisar antes del servicio' }))
     const contexto = { stock_bajo: compras, platos_en_carta: (carta ?? []).length, recetas_de_produccion: recetasProduccion.length, analisis_carta: produccionCarta, alertas: riesgos, ventas: ventas ?? null, produccion_7_dias: produccion ?? [] }
     const ia = await consultarClaude(contexto)
-    await supabase.from('briefings').upsert({ restaurante_id: restaurante.id, fecha, turno: 'mañana', confianza_estimacion: null, produccion_sugerida: ia?.produccion_sugerida ?? produccionCarta, compras_sugeridas: ia?.compras_sugeridas ?? compras, riesgos: ia?.riesgos ?? riesgos, alertas: alertas ?? [], contexto_usado: { generado_por: ia ? 'claude' : 'reglas', ...contexto } }, { onConflict: 'restaurante_id,fecha,turno' })
+    const { error } = await supabase.from('briefings').upsert({ restaurante_id: restaurante.id, fecha, turno: 'mañana', confianza_estimacion: null, produccion_sugerida: ia?.produccion_sugerida ?? produccionCarta, compras_sugeridas: ia?.compras_sugeridas ?? compras, riesgos: ia?.riesgos ?? riesgos, alertas: alertas ?? [], contexto_usado: { generado_por: ia ? 'claude' : 'reglas', ...contexto } }, { onConflict: 'restaurante_id,fecha,turno' })
+    if (error) return Response.json({ error: 'No se pudo guardar el briefing' }, { status: 500 })
   }
   return Response.json({ ok: true, fecha, restaurantes: restaurantes?.length ?? 0 })
 })

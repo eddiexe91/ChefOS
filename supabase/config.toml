@@ -27,10 +27,11 @@ enabled = true
 site_url = "http://localhost:3000"
 
 [functions.generar-briefing]
-verify_jwt = true
+# Cron autenticado mediante CHEFOS_CRON_SECRET; rechaza llamadas públicas antes de leer datos.
+verify_jwt = false
 
 [functions.chat-ia]
 verify_jwt = true
 
 [functions.cierre-diario]
-verify_jwt = true
+verify_jwt = false

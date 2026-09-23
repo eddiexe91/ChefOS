@@ -11,6 +11,7 @@
     "test:historial": "node scripts/test-historial.cjs",
     "test:historial-ui": "node scripts/test-historial-ui.cjs",
     "test:captura": "node scripts/test-captura.cjs",
+    "test:cron": "node scripts/test-cron.cjs",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
     "android:build": "cd android && gradlew.bat assembleDebug"

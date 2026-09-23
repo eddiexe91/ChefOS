@@ -22,10 +22,20 @@ async function recomendacionClaude(contexto: unknown) {
 }
 
 Deno.serve(async (request) => {
+  const cronSecret = Deno.env.get('CHEFOS_CRON_SECRET')
+  if (!cronSecret || request.headers.get('x-chefos-cron-secret') !== cronSecret) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  if (request.method !== 'POST') return Response.json({ error: 'Método no permitido' }, { status: 405 })
   const body = await request.json().catch(() => ({}))
   const fecha = body.fecha ?? new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  if (typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha)) || new Date(fecha).toISOString().slice(0, 10) !== fecha) return Response.json({ error: 'Fecha inválida' }, { status: 400 })
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  const { data: restaurantes } = await supabase.from('restaurantes').select('id').eq('activo', true)
+  const { data: restaurantes, error: errorRestaurantes } = await supabase.from('restaurantes').select('id').eq('activo', true)
+  if (errorRestaurantes) return Response.json({ error: 'No se pudieron consultar los restaurantes' }, { status: 500 })
+  if (body.verificar === true) {
+    const r = restaurantes?.[0]
+    const { error } = r ? await supabase.rpc('total_ventas_periodo', { p_restaurante: r.id, p_desde: fecha, p_hasta: fecha }) : { error: null }
+    return Response.json({ ok: !error, version: '1.3.0', modo: 'verificacion_sin_escrituras', restaurantes: restaurantes?.length ?? 0 }, { status: error ? 500 : 200 })
+  }
   const siguiente = new Date(`${fecha}T00:00:00.000Z`); siguiente.setUTCDate(siguiente.getUTCDate() + 1)
   for (const restaurante of restaurantes ?? []) {
     const [{ data: ventas }, { data: mermas }, { data: produccion }] = await Promise.all([
@@ -35,8 +45,9 @@ Deno.serve(async (request) => {
     ])
     const contexto = { ventas: ventas ?? [], mermas: mermas ?? [], produccion: produccion ?? [] }
     const recomendaciones = await recomendacionClaude(contexto)
-    if (ventas === null) continue // No publicar cero si falló la verificación de ventas.
-    await supabase.from('cierres_diarios').upsert({ restaurante_id: restaurante.id, fecha, total_ventas: Number(ventas), total_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), costo_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), items_producidos: (produccion ?? []).reduce((s, x) => s + Number(x.cantidad_producida ?? 0), 0), costo_produccion: (produccion ?? []).reduce((s, x) => s + Number(x.costo_real ?? 0), 0), recomendaciones }, { onConflict: 'restaurante_id,fecha' })
+    if (ventas === null) return Response.json({ error: 'No se pudieron verificar las ventas' }, { status: 500 })
+    const { error } = await supabase.from('cierres_diarios').upsert({ restaurante_id: restaurante.id, fecha, total_ventas: Number(ventas), total_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), costo_mermas: (mermas ?? []).reduce((s, x) => s + Number(x.costo_merma ?? 0), 0), items_producidos: (produccion ?? []).reduce((s, x) => s + Number(x.cantidad_producida ?? 0), 0), costo_produccion: (produccion ?? []).reduce((s, x) => s + Number(x.costo_real ?? 0), 0), recomendaciones }, { onConflict: 'restaurante_id,fecha' })
+    if (error) return Response.json({ error: 'No se pudo guardar el cierre' }, { status: 500 })
   }
   return Response.json({ ok: true, fecha })
 })
