@@ -2,7 +2,7 @@
 
 ## Entrega de pruebas 1.3.1 — 27-09-2026
 
-Leer [RELEASE_1.3.1.md](RELEASE_1.3.1.md), [GUIA_TESTEO_CHEFOS_1.3.1.md](GUIA_TESTEO_CHEFOS_1.3.1.md) y [CORRECCIONES_QA_2026-09-26.md](CORRECCIONES_QA_2026-09-26.md). Backend/Android preparados como **1.3.1**, versionCode 5. Build web y Android completos, firma compatible y pantalla offline incluidas. Consultar la sección Publicación de la release para evidencia del despliegue; compilar no lo publica ni certifica Android físico.
+Leer [RELEASE_1.3.1.md](RELEASE_1.3.1.md), [GUIA_TESTEO_CHEFOS_1.3.1.md](GUIA_TESTEO_CHEFOS_1.3.1.md) y [CORRECCIONES_QA_2026-09-26.md](CORRECCIONES_QA_2026-09-26.md). Código **1.3.1 publicado en main, cb08648**, Vercel success y health remoto 1.3.1/ok/historial/Storage confirmados el 27-09. Android 1.3.1/versionCode 5 compilado, firma compatible y pantalla offline incluidas; APK local enlazada abajo. Guía accesible en GitHub. Estos checks no certifican Android físico ni escrituras E2E del restaurante.
 
 **016 aplicada** el 26-09 con autorización en SQL Editor; ocho cuerpos de funciones comparados contra el archivo local. El 27-09 el conector Supabase ya funciona: se aplicó `cierre_permisos_operativos`, cerrando permisos anónimos explícitos heredados, auxiliares internos y catálogo de unidades. Comprobación remota: cero funciones SECURITY DEFINER de aplicación ejecutables por anon; las tres RPC nuevas siguen disponibles para authenticated, con sus controles de restaurante/rol. No se importaron ventas reales ni se borraron registros.
 

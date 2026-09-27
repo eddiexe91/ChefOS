@@ -2,7 +2,7 @@
 
 ## Publicación
 
-Preparada para GitHub/Vercel; confirmar el commit/despliegue al finalizar. No confundir APK compilada con backend actualizado. La APK apunta a `https://chefos-pied.vercel.app`.
+Código publicado en `main`: [`cb08648`](https://github.com/eddiexe91/ChefOS/commit/cb08648174c8ae9f5ee7052c7e7aa6595b748169). Vercel informó **Deployment has completed / success** el 27-09 y `https://chefos-pied.vercel.app/api/health` devolvió versión **1.3.1**, `ok: true`, historial POS disponible y Storage accesible. La guía fue comprobada en GitHub con HTTP 200. La APK apunta a ese backend. Estos checks no son una prueba de escritura autenticada ni física en Android.
 
 ## Qué cambia
 
