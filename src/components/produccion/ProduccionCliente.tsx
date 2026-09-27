@@ -16,16 +16,16 @@ import { ChevronRight, X, Plus, Play } from 'lucide-react'
 import { useLotesProduccion, useRecetas, useRegistrosProduccion } from '@/hooks/useDominio'
 import { useApp }              from '@/providers/AppProvider'
 import { parsearFechaLocal }   from '@/lib/produccion'
-import { ETIQUETAS_TURNO, ETIQUETAS_ESTADO, CLASES_ESTADO } from '@/lib/produccionUI'
+import { ETIQUETAS_TURNO } from '@/lib/produccionUI'
 import type { ProduccionLote, TurnoServicio } from '@/types/index'
 
 // ─────────────────────────────────────────────────────────────
 // Tipos de filtro
 // ─────────────────────────────────────────────────────────────
 
-type EstadoLote   = ProduccionLote['estado']
+
 type FiltroTurno  = 'todos' | TurnoServicio
-type FiltroEstado = 'todos' | EstadoLote
+
 
 // ─────────────────────────────────────────────────────────────
 // Subcomponente: skeletons
@@ -64,8 +64,6 @@ function TarjetaLote({ lote }: { lote: ProduccionLote }) {
   })
 
   const etiquetaTurno  = ETIQUETAS_TURNO[lote.turno]
-  const etiquetaEstado = ETIQUETAS_ESTADO[lote.estado]
-  const clasesEstado   = CLASES_ESTADO[lote.estado]
 
   return (
     <Link
@@ -79,9 +77,6 @@ function TarjetaLote({ lote }: { lote: ProduccionLote }) {
           <p className="text-sm font-sans font-medium text-texto-primario">
             {etiquetaTurno}
           </p>
-          <span className={`px-2 py-0.5 rounded-full text-2xs font-sans font-medium ${clasesEstado}`}>
-            {etiquetaEstado}
-          </span>
         </div>
 
         <p className="text-2xs font-sans text-texto-apagado mt-0.5">
@@ -115,7 +110,6 @@ export default function ProduccionCliente() {
   const router = useRouter()
 
   const [filtroTurno,  setFiltroTurno]  = useState<FiltroTurno>('todos')
-  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos')
 
   const { isPending, isError, isSuccess, data } = useLotesProduccion()
   const recetasQuery = useRecetas({ es_produccion: true, activa: true })
@@ -132,22 +126,19 @@ export default function ProduccionCliente() {
     if (filtroTurno !== 'todos') {
       resultado = resultado.filter((l) => l.turno === filtroTurno)
     }
-    if (filtroEstado !== 'todos') {
-      resultado = resultado.filter((l) => l.estado === filtroEstado)
-    }
-    return resultado
-  }, [lotes, filtroTurno, filtroEstado])
 
-  const hayFiltros = filtroTurno !== 'todos' || filtroEstado !== 'todos'
+    return resultado
+  }, [lotes, filtroTurno])
+
+  const hayFiltros = filtroTurno !== 'todos'
 
   const limpiarFiltros = () => {
     setFiltroTurno('todos')
-    setFiltroEstado('todos')
   }
 
   const recetasPendientes = useMemo(() => {
     const registradasHoy = new Set(
-      (registrosQuery.data ?? []).map((registro) => registro.receta_id).filter(Boolean)
+      (registrosQuery.data ?? []).filter((registro) => !registro.anulado).map((registro) => registro.receta_id).filter(Boolean)
     )
     return (recetasQuery.data ?? []).filter((receta) => !registradasHoy.has(receta.id) && (categoriaProduccion === 'todas' || receta.categoria?.nombre === categoriaProduccion))
   }, [recetasQuery.data, registrosQuery.data, categoriaProduccion])
@@ -267,8 +258,8 @@ export default function ProduccionCliente() {
             }
           >
             {!estaOnline
-              ? 'Sin conexión — los registros se sincronizarán al reconectar'
-              : `Sincronizando ${accionesPendientes} acción${accionesPendientes !== 1 ? 'es' : ''} pendiente${accionesPendientes !== 1 ? 's' : ''}...`
+              ? 'Sin conexión — reconecta antes de registrar producción'
+              : `Hay ${accionesPendientes} acciones antiguas pendientes de revisión. No se repetirán automáticamente.`
             }
           </p>
         </section>
@@ -293,25 +284,6 @@ export default function ProduccionCliente() {
                             }`}
               >
                 {t === 'todos' ? 'Todos los turnos' : ETIQUETAS_TURNO[t]}
-              </button>
-            ))}
-          </div>
-
-          {/* Filtro por estado */}
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {(['todos', 'en_progreso', 'completado', 'cancelado'] as const).map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => setFiltroEstado(e)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full
-                            text-2xs font-sans font-medium border transition-colors
-                            ${filtroEstado === e
-                              ? 'bg-acento text-white border-acento'
-                              : 'bg-fondo-elevado text-texto-apagado border-fondo-borde active:bg-fondo-hover'
-                            }`}
-              >
-                {e === 'todos' ? 'Todos los estados' : ETIQUETAS_ESTADO[e]}
               </button>
             ))}
           </div>
@@ -370,7 +342,7 @@ export default function ProduccionCliente() {
       {isSuccess && lotes.length === 0 && (
         <section className="rounded-xl bg-fondo-elevado border border-fondo-borde px-4 py-8 text-center">
           <p className="text-sm font-sans font-medium text-texto-secundario">
-            No hay lotes activos
+            No hay producciones registradas
           </p>
           <p className="text-xs font-sans text-texto-apagado mt-1">
             Los lotes de producción del turno aparecerán aquí.

@@ -25,6 +25,7 @@ export default function HistorialPOSCliente() {
     setAvisoEsquema(listo ? '' : 'Historial pendiente de activar en Supabase (migraciones 013 y 014). No importes todavía estos archivos. Tu inventario existente se conserva.')
   }).catch(() => setAvisoEsquema('No se pudo verificar el historial. Comprueba internet y vuelve a abrir esta pantalla.')) }, [])
   async function preparar() {
+    if(!navigator.onLine){setEstado('Necesitas conexión para validar. Los archivos siguen seleccionados.');return}
     setOcupado(true); setEstado('Preparando archivos…'); setResumen(null)
     try {
       const actual = id ?? await enviar({ accion: 'iniciar' }); setId(actual)
@@ -66,7 +67,13 @@ export default function HistorialPOSCliente() {
     <p className="text-sm text-texto-secundario">Cuatro CSV del mismo período y restaurante. Solo análisis histórico: no modifica existencias. Las fechas se interpretan en la zona horaria del restaurante.</p>
     <p className="text-xs text-texto-secundario">Fechas admitidas: AAAA-MM-DD o DD/MM/AAAA. No se interpreta MM/DD/AAAA. Revisa las fechas de la vista previa.</p>
     <label className="block">Codificación<select className="campo-input" disabled={ocupado || !!id} value={encoding} onChange={e => setEncoding(e.target.value)}><option value="utf-8">UTF-8</option><option value="windows-1252">Windows-1252</option></select></label>
-    {ARCHIVOS_POS.map(tipo => <label key={tipo} className="block text-sm">{tipo}.csv<input className="block w-full mt-2 text-texto-primario" type="file" accept=".csv" disabled={ocupado || !!id} onChange={e => setArchivos(a => ({ ...a, [tipo]: e.target.files?.[0] }))} /></label>)}
+    <p className="text-xs text-texto-secundario">En Android se muestran todos los archivos porque algunos proveedores no identifican el tipo CSV. Elige el CSV y comprueba su nombre debajo. Si está en Drive, descárgalo primero al teléfono.</p>
+    {ARCHIVOS_POS.map(tipo => <label key={tipo} className="block text-sm">{tipo}.csv<input className="block w-full mt-2 text-texto-primario" type="file" accept="*/*" disabled={ocupado || !!id} onChange={e => {
+      const archivo=e.target.files?.[0]
+      if(!archivo){setEstado('No se recibió el archivo. Prueba desde Descargas del teléfono.');return}
+      if(!/\.csv$/i.test(archivo.name)||archivo.size===0||archivo.size>100*1024*1024){setEstado('Selecciona un CSV no vacío, de hasta 100 MB.');e.target.value='';setArchivos(a=>({...a,[tipo]:undefined}));return}
+      setArchivos(a=>({...a,[tipo]:archivo}));setEstado(`Seleccionado: ${archivo.name}. Falta validar su contenido.`)
+    }}/><span aria-live="polite" className="block mt-2 text-acento">{archivos[tipo]?`${archivos[tipo]!.name} · ${(archivos[tipo]!.size/1024).toFixed(1)} KB`:'Ningún archivo seleccionado'}</span></label>)}
     <button className="btn-primario w-full" disabled={!habilitado || ocupado || completado || ARCHIVOS_POS.some(t => !archivos[t])} onClick={preparar}>{ocupado ? 'Procesando…' : id ? 'Reintentar validación' : 'Validar y ver vista previa'}</button>
     {resumen && <dl className="text-sm space-y-2">{Object.entries(resumen).map(([k, v]) => <div key={k}><dt className="text-texto-secundario">{k.replaceAll('_', ' ')}</dt><dd className="break-words">{Array.isArray(v) ? <ul className="space-y-2">{v.map((fila, i) => <li key={i} className="border border-fondo-borde rounded p-2">{Object.entries(fila).map(([n, c]) => `${n}: ${c}`).join(' · ')}</li>)}</ul> : v && typeof v === 'object' ? Object.entries(v as Record<string, number>).map(([n, c]) => `${n}: ${c}`).join(' · ') : String(v ?? 'Sin datos')}</dd></div>)}</dl>}
     {Number(resumen?.tickets_con_diferencia_pagos) > 0 && <p className="text-advertencia text-sm">Hay diferencias entre pagos y totales oficiales. Revisa propinas, moneda y tipo de cambio antes de confirmar; ChefOS no ajustará las cabeceras.</p>}

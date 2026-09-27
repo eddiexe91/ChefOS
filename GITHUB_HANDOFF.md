@@ -1,5 +1,17 @@
 # ChefOS — guía de continuación
 
+## Entrega de pruebas 1.3.1 — 27-09-2026
+
+Leer [RELEASE_1.3.1.md](RELEASE_1.3.1.md), [GUIA_TESTEO_CHEFOS_1.3.1.md](GUIA_TESTEO_CHEFOS_1.3.1.md) y [CORRECCIONES_QA_2026-09-26.md](CORRECCIONES_QA_2026-09-26.md). Backend/Android preparados como **1.3.1**, versionCode 5. Build web y Android completos, firma compatible y pantalla offline incluidas. Consultar la sección Publicación de la release para evidencia del despliegue; compilar no lo publica ni certifica Android físico.
+
+**016 aplicada** el 26-09 con autorización en SQL Editor; ocho cuerpos de funciones comparados contra el archivo local. El 27-09 el conector Supabase ya funciona: se aplicó `cierre_permisos_operativos`, cerrando permisos anónimos explícitos heredados, auxiliares internos y catálogo de unidades. Comprobación remota: cero funciones SECURITY DEFINER de aplicación ejecutables por anon; las tres RPC nuevas siguen disponibles para authenticated, con sus controles de restaurante/rol. No se importaron ventas reales ni se borraron registros.
+
+No repetir 013/014/015/016 ni borrar datos. La 016 no repara automáticamente duplicados o rendimientos históricos ambiguos. Los tests usan PostgreSQL en memoria y datos ficticios. Faltan pruebas E2E autenticadas de negocio remotas y físicas. El historial de migraciones de Supabase solo refleja 001–005 y el complemento nuevo; varias migraciones se aplicaron por SQL Editor. **No ejecutar db push a ciegas**: conciliar primero el registro con objetos reales. El complemento local `20260927120202_cierre_permisos_operativos.sql` corresponde a versión remota `20260927122308` con el mismo contenido.
+
+Excel debe ser multiformato, no específico de Cocina Puerto. [IMPORTACION_PLANILLAS_FLEXIBLES.md](IMPORTACION_PLANILLAS_FLEXIBLES.md) define el asistente de columnas, unidades, vista previa e importación idempotente. **Diseño pendiente de implementación**, no venderlo como capacidad actual. Una muestra del usuario amplía casos de prueba, no es requisito del diseño.
+
+APK local: `artifacts/ChefOS-1.3.1-test.apk`, 4.120.798 bytes, SHA-256 `bba33ad77aabe9dbe3773bd706c4171c38be91f3e75016b8ea8b10943358a439`. Mantener firma existente. No requiere borrar cuenta ni datos. Para reproducir usar sincronización completa: `scripts/build-android.ps1 -BackendUrl https://chefos-pied.vercel.app`; no usar `-SkipCapacitorSync` porque su rama histórica no incorpora `server.errorPath`.
+
 ## Entrega de pruebas 1.3.0 — 22-09-2026
 
 Activación verificada el 23-09: migraciones **013, 014 y 015 aplicadas** en Supabase. Health informa `historialPos.disponible: true`, backend Vercel 1.3.0 operativo. La APK publicada sigue siendo válida; no borrar cuenta ni reinstalar desde cero. Código de seguridad publicado en `88901f1` (Vercel success).
@@ -57,7 +69,7 @@ Si cambia el esquema, aplicar la nueva migración en el SQL Editor de Supabase a
 ## Generar APK
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1 -BackendUrl https://chefos-pied.vercel.app -SkipCapacitorSync
+powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1 -BackendUrl https://chefos-pied.vercel.app
 ```
 
 Resultado esperado: `artifacts/ChefOS-debug.apk` o `artifacts/ChefOS-debug-latest.apk`. Es una APK debug instalable en Android y necesita el backend HTTPS publicado.

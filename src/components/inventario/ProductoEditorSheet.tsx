@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Trash2, X } from 'lucide-react'
 
@@ -43,6 +43,7 @@ export default function ProductoEditorSheet({
   const [unidadesPorEmpaque, setUnidadesPorEmpaque] = useState(metadataProducto?.unidades_por_empaque ? String(metadataProducto.unidades_por_empaque) : '')
   const [categoriaId, setCategoriaId] = useState(producto?.categoria_id ?? '')
   const [guardando, setGuardando] = useState(false)
+  const ocupado = useRef(false)
   const [error, setError] = useState('')
 
   const titulo = modo === 'crear'
@@ -65,8 +66,12 @@ export default function ProductoEditorSheet({
 
   async function guardar(evento: FormEvent) {
     evento.preventDefault()
+    if (ocupado.current) return
+    if (!navigator.onLine) { setError('Sin conexión. No se ha guardado; reconecta para confirmar.'); return }
+    ocupado.current = true
     setGuardando(true)
     setError('')
+    try {
     const response = await fetch(
       modo === 'crear' ? '/api/inventario/productos' : `/api/inventario/productos/${producto?.id}`,
       {
@@ -76,7 +81,6 @@ export default function ProductoEditorSheet({
       }
     )
     const data = await response.json().catch(() => ({ error: 'No se pudo guardar.' })) as { error?: string }
-    setGuardando(false)
     if (!response.ok) {
       setError(data.error ?? 'No se pudo guardar.')
       return
@@ -84,16 +88,21 @@ export default function ProductoEditorSheet({
     await queryClient.invalidateQueries({ queryKey: inventarioKeys.all })
     await queryClient.invalidateQueries({ queryKey: ['actividad-operativa'] })
     onClose()
+    } catch {
+      setError('No se pudo confirmar el guardado. Conservamos el formulario. Al reconectar comprueba el producto antes de repetir.')
+    } finally { ocupado.current = false; setGuardando(false) }
   }
 
   async function archivar() {
-    if (!producto) return
+    if (!producto || ocupado.current) return
+    if (!navigator.onLine) { setError('Sin conexión. No se ha archivado.'); return }
     if (!window.confirm(`¿Archivar ${producto.nombre}?`)) return
     setGuardando(true)
+    ocupado.current = true
     setError('')
+    try {
     const response = await fetch(`/api/inventario/productos/${producto.id}`, { method: 'DELETE' })
     const data = await response.json().catch(() => ({ error: 'No se pudo archivar.' })) as { error?: string }
-    setGuardando(false)
     if (!response.ok) {
       setError(data.error ?? 'No se pudo archivar.')
       return
@@ -101,6 +110,9 @@ export default function ProductoEditorSheet({
     await queryClient.invalidateQueries({ queryKey: inventarioKeys.all })
     await queryClient.invalidateQueries({ queryKey: ['actividad-operativa'] })
     onClose()
+    } catch {
+      setError('No se pudo confirmar el archivo. Comprueba el producto al reconectar.')
+    } finally { ocupado.current = false; setGuardando(false) }
   }
 
   return (

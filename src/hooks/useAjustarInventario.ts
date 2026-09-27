@@ -34,7 +34,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { dashboardKeys, inventarioKeys } from '@/lib/queries'
 import type { FormAjusteInventario }   from '@/types/index'
-import { encolarAccion }               from '@/lib/offline/cola'
 
 // ─────────────────────────────────────────────────────────────
 // Tipos internos
@@ -58,6 +57,7 @@ export function useAjustarInventario(opciones?: OpcionesHook) {
 
   const mutacion = useMutation<RespuestaAPI, Error, FormAjusteInventario>({
     mutationFn: async (body: FormAjusteInventario): Promise<RespuestaAPI> => {
+      if (!navigator.onLine) throw new Error('Sin conexión. Esta operación no se ha guardado. Reconecta antes de confirmar.')
       let response: Response
       try {
         response = await fetch('/api/inventario/movimientos', {
@@ -65,16 +65,8 @@ export function useAjustarInventario(opciones?: OpcionesHook) {
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(body),
         })
-      } catch (error) {
-        if (typeof window !== 'undefined' && (!window.navigator.onLine || error instanceof TypeError)) {
-          await encolarAccion({
-            tabla: 'api/inventario/movimientos',
-            operacion: 'INSERT',
-            payload: { endpoint: '/api/inventario/movimientos', body },
-          })
-          return { data: { pendiente: true }, error: null }
-        }
-        throw error
+      } catch {
+        throw new Error('No se pudo confirmar la operación. Comprueba los movimientos al reconectar antes de repetirla.')
       }
 
       // Parseo defensivo: nunca lanzar por intentar parsear JSON.
@@ -98,7 +90,7 @@ export function useAjustarInventario(opciones?: OpcionesHook) {
         // La validación de response.ok a continuación producirá el error correcto.
       }
 
-      if (!response.ok || json.error !== null) {
+      if (!response.ok || json.error !== null || json.data == null) {
         throw new Error(
           typeof json.error === 'string' && json.error.trim() !== ''
             ? json.error

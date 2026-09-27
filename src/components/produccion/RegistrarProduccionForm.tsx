@@ -1,220 +1,33 @@
 'use client'
-
-/**
- * src/components/produccion/RegistrarProduccionForm.tsx
- *
- * Formulario de registro de producción dentro de un lote activo.
- *
- * La lógica de React Query está completamente encapsulada en:
- * src/hooks/useRegistrarProduccion.ts
- *
- * Este componente es responsable únicamente de:
- * - mantener el estado visual del formulario
- * - renderizar la interfaz
- * - llamar al hook
- */
-
-import { useMemo, useState, type ChangeEvent }           from 'react'
-import { useRegistrarProduccion, type BodyProduccion }   from '@/hooks/useRegistrarProduccion'
-import { useRecetas }                                    from '@/hooks/useDominio'
-
-// ─────────────────────────────────────────────────────────────
-// Tipos internos
-// ─────────────────────────────────────────────────────────────
-
-interface CamposForm {
-  receta_id:          string
-  cantidad_producida: string
-  unidad:             string
-  notas:              string
-}
-
-const ESTADO_INICIAL: CamposForm = {
-  receta_id:          '',
-  cantidad_producida: '',
-  unidad:             'porciones',
-  notas:              '',
-}
-
-// ─────────────────────────────────────────────────────────────
-// Props
-// ─────────────────────────────────────────────────────────────
-
-interface Props {
-  loteId: string
-  recetaInicialId?: string
-}
-
-// ─────────────────────────────────────────────────────────────
-// Componente
-// ─────────────────────────────────────────────────────────────
-
-export default function RegistrarProduccionForm({ loteId, recetaInicialId }: Props) {
-  const [campos, setCampos] = useState<CamposForm>(() => ({
-    ...ESTADO_INICIAL,
-    receta_id: recetaInicialId ?? '',
-  }))
-  const recetas = useRecetas({ es_produccion: true, activa: true })
-  const recetaSeleccionada = useMemo(
-    () => (recetas.data ?? []).find((receta) => receta.id === campos.receta_id),
-    [campos.receta_id, recetas.data]
-  )
-
-  const mutacion = useRegistrarProduccion({
-    onSuccess: () => setCampos(ESTADO_INICIAL),
-  })
-
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    // Limpiar estado de mutación al editar tras un intento
-    if (mutacion.isError || mutacion.isSuccess) {
-      mutacion.reset()
-    }
-    setCampos((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-  }
-
-  const handleSubmit = () => {
-    const body: BodyProduccion = {
-      lote_id:            loteId,
-      receta_id:          campos.receta_id.trim(),
-      cantidad_producida: Number(campos.cantidad_producida),
-      unidad:             recetaSeleccionada?.unidad_salida ?? recetaSeleccionada?.unidad_rendimiento ?? campos.unidad,
-      notas:              campos.notas.trim() !== ''
-                            ? campos.notas.trim()
-                            : null,
-    }
-    mutacion.registrar(body)
-  }
-
-  const esValido =
-    campos.receta_id !== '' &&
-    campos.cantidad_producida !== '' &&
-    Number(campos.cantidad_producida) > 0 &&
-    campos.unidad !== ''
-
-  const enviando = mutacion.isPending
-
-  return (
-    <div className="space-y-4">
-
-      {/* Selector de receta */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor="receta_id"
-          className="text-xs font-sans font-medium text-texto-secundario"
-        >
-          Receta
-        </label>
-        <select
-          id="receta_id"
-          name="receta_id"
-          value={campos.receta_id}
-          onChange={handleChange}
-          disabled={enviando}
-          className="w-full rounded-lg bg-fondo-base border border-fondo-borde
-                     px-3 py-2.5 text-sm font-sans text-texto-primario
-                     focus:outline-none focus:border-acento transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <option value="">{recetas.isPending ? 'Cargando recetas…' : 'Seleccionar receta de producción…'}</option>
-          {(recetas.data ?? []).map((receta) => <option key={receta.id} value={receta.id}>{receta.nombre}</option>)}
-        </select>
-        <p className="text-2xs font-sans text-texto-apagado">
-          Solo aparecen recetas marcadas como “Es producción”. Sus ingredientes se descontarán y la salida configurada aumentará el Stock disponible.
-        </p>
-      </div>
-
-      {/* Cantidad */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor="cantidad_producida"
-          className="text-xs font-sans font-medium text-texto-secundario"
-        >
-          Cantidad producida <span className="text-peligro">*</span>
-        </label>
-        <input
-          id="cantidad_producida"
-          name="cantidad_producida"
-          type="number"
-          inputMode="decimal"
-          min="0.001"
-          step="0.001"
-          value={campos.cantidad_producida}
-          onChange={handleChange}
-          disabled={enviando}
-          placeholder="0"
-          className="w-full rounded-lg bg-fondo-base border border-fondo-borde
-                     px-3 py-2.5 text-sm font-sans text-texto-primario
-                     placeholder:text-texto-apagado
-                     focus:outline-none focus:border-acento transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-      </div>
-
-      <div className="rounded-xl border border-fondo-borde bg-fondo-card px-4 py-3 text-xs text-texto-secundario">
-        <p><span className="font-medium text-texto-primario">Unidad registrada:</span> {recetaSeleccionada?.unidad_salida ?? recetaSeleccionada?.unidad_rendimiento ?? 'porciones'}</p>
-        <p className="mt-1"><span className="font-medium text-texto-primario">Salida configurada:</span> {recetaSeleccionada?.producto_salida?.nombre ?? 'Sin producto de salida'}</p>
-      </div>
-
-      {/* Notas */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor="notas"
-          className="text-xs font-sans font-medium text-texto-secundario"
-        >
-          Notas
-        </label>
-        <textarea
-          id="notas"
-          name="notas"
-          value={campos.notas}
-          onChange={handleChange}
-          disabled={enviando}
-          rows={2}
-          placeholder="Observaciones opcionales..."
-          className="w-full rounded-lg bg-fondo-base border border-fondo-borde
-                     px-3 py-2.5 text-sm font-sans text-texto-primario
-                     placeholder:text-texto-apagado resize-none
-                     focus:outline-none focus:border-acento transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-      </div>
-
-      {/* Mensaje de error */}
-      {mutacion.isError && (
-        <div className="rounded-lg bg-peligro-suave border border-peligro-borde px-3 py-2.5">
-          <p className="text-xs font-sans font-medium text-peligro-texto">
-            {mutacion.error instanceof Error
-              ? mutacion.error.message
-              : 'Error al registrar. Intenta nuevamente.'
-            }
-          </p>
-        </div>
-      )}
-
-      {/* Mensaje de éxito */}
-      {mutacion.isSuccess && (
-        <div className="rounded-lg bg-exito-suave border border-exito-borde px-3 py-2.5">
-          <p className="text-xs font-sans font-medium text-exito-texto">
-            Producción registrada correctamente.
-          </p>
-        </div>
-      )}
-
-      {/* Submit */}
-      <button
-        type="button"
-        disabled={!esValido || enviando}
-        onClick={handleSubmit}
-        className="w-full rounded-xl bg-acento text-white
-                   py-3 px-4 text-sm font-sans font-medium
-                   active:bg-acento/90 transition-colors
-                   disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {enviando ? 'Registrando...' : 'Registrar producción'}
-      </button>
-
-    </div>
-  )
+import {useRef,useState} from 'react'
+import {useQueryClient} from '@tanstack/react-query'
+import Link from 'next/link'
+import {useRecetas} from '@/hooks/useDominio'
+export default function RegistrarProduccionForm({loteId,recetaInicialId}:{loteId:string;recetaInicialId?:string}){
+ const recetas=useRecetas({es_produccion:true,activa:true}),cache=useQueryClient()
+ const [id,setId]=useState(recetaInicialId??''),[tandas,setTandas]=useState('1'),[real,setReal]=useState(''),[notas,setNotas]=useState(''),[estado,setEstado]=useState(''),[ocupado,setOcupado]=useState(false)
+ const intento=useRef({firma:'',id:''}),enviando=useRef(false)
+ const receta=recetas.data?.find(r=>r.id===id)
+ const prevista=Number(receta?.cantidad_salida??0)*Number(tandas)
+ const obtenida=real===''?prevista:Number(real)
+ async function guardar(){
+  if(enviando.current)return
+  if(!navigator.onLine){setEstado('Sin conexión. No se ha registrado producción.');return}
+  const body={lote_id:loteId,receta_id:id,tandas:Number(tandas),salida_real:obtenida,notas}
+  const firma=JSON.stringify(body);if(intento.current.firma!==firma)intento.current={firma,id:crypto.randomUUID()}
+  if(!window.confirm('Registrar '+tandas+' receta(s) de '+receta?.nombre+' y añadir '+obtenida+' '+receta?.unidad_salida+' a Stock disponible. Se descontarán sus ingredientes. ¿Confirmar?'))return
+  enviando.current=true;setOcupado(true);setEstado('')
+  try{const r=await fetch('/api/produccion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,solicitud_id:intento.current.id})});const j=await r.json();if(!r.ok)throw new Error(j.error)
+   await cache.invalidateQueries();setEstado('Producción terminada registrada. Ingredientes y Stock disponible actualizados.');setId('');setReal('');setTandas('1')
+  }catch(e){setEstado(e instanceof Error?e.message:'No se pudo confirmar. Revisa movimientos antes de repetir.')}finally{enviando.current=false;setOcupado(false)}
+ }
+ return <div className="space-y-4"><p className="text-sm text-texto-secundario">Registra aquí la producción que ya terminaste.</p>
+ <label className="block">Receta<select className="campo-input" value={id} disabled={ocupado} onChange={e=>{setId(e.target.value);setReal('')}}><option value="">Seleccionar receta</option>{recetas.data?.map(r=><option key={r.id} value={r.id}>{r.nombre}</option>)}</select></label>
+ <label className="block">Cantidad de recetas producidas (tandas)<input className="campo-input" type="number" min=".001" step=".001" inputMode="decimal" value={tandas} disabled={ocupado} onChange={e=>setTandas(e.target.value)}/></label>
+ {receta&&<div className="tarjeta p-3 text-sm"><p>Una receta rinde {receta.cantidad_salida??'—'} {receta.unidad_salida??''} de {receta.producto_salida?.nombre??'salida sin configurar'}.</p><p>Con {tandas||0} receta(s), la salida prevista es {prevista} {receta.unidad_salida}.</p></div>}
+ {receta&&!receta.producto_salida_id&&<Link className="block text-acento" href={'/biblioteca/'+receta.id+'/editar'}>Configurar producto de salida antes de producir →</Link>}
+ <label className="block">Cantidad realmente obtenida ({receta?.unidad_salida??'unidad de salida'})<input className="campo-input" type="number" inputMode="decimal" min=".001" step=".001" placeholder={String(prevista)} value={real} disabled={ocupado} onChange={e=>setReal(e.target.value)}/></label>
+ <p className="text-xs text-texto-secundario">Si obtuviste más o menos porciones, indica el resultado real. Los ingredientes se calculan por las tandas; no cambian al corregir el rendimiento de salida.</p>
+ <label className="block">Notas<textarea className="campo-input" value={notas} onChange={e=>setNotas(e.target.value)}/></label>
+ {estado&&<p role="status">{estado}</p>}<button className="btn-primario w-full" disabled={ocupado||!receta?.producto_salida_id||!(Number(tandas)>0)||!(obtenida>0)} onClick={()=>void guardar()}>{ocupado?'Registrando…':'Registrar producción terminada'}</button></div>
 }

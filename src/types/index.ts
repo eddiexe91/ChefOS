@@ -405,6 +405,9 @@ export interface ProduccionLote {
 
 export interface ProduccionRegistro {
   id: string
+  tandas?: number | null
+  salida_real?: number | null
+  anulado?: boolean
   restaurante_id: string
   receta_id?: string
   producto_id?: string

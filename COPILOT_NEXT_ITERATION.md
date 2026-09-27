@@ -1,5 +1,7 @@
 # ChefOS — especificación para la siguiente iteración de Copilot
 
+> Corte más reciente: 27-09-2026. Consultar `RELEASE_1.3.1.md`, `GUIA_TESTEO_CHEFOS_1.3.1.md`, `CORRECCIONES_QA_2026-09-26.md` y `GITHUB_HANDOFF.md` antes de los apartados históricos. 016 y complemento de permisos aplicados/verificados en Supabase. Builds/pruebas locales completos; testeo físico pendiente. No reaplicar migraciones ni reinterpretar registros antiguos. Excel flexible está diseñado en `IMPORTACION_PLANILLAS_FLEXIBLES.md`, no implementado. Próximas prioridades: validar esta entrega, homogeneizar briefing automático/manual, importación multiformato, tutoriales prácticos y PKCE entre dispositivos.
+
 > Actualización 16-09-2026: consultar [RELEASE_1.2.0.md](RELEASE_1.2.0.md) antes de actuar. Las instrucciones siguientes conservan contexto histórico; varios puntos ya están implementados. Funciones 010 de salida de producción aplicadas y prueba SQL transaccional PASS. Migración 012 aplicada. Prioridad pendiente: prueba autenticada de Recetas/Carta y validación física de voz/OCR. No volver a crear pantallas existentes ni afirmar que todo está validado en teléfono.
 
 Fecha de corte: 15-09-2026  

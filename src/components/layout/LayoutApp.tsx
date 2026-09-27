@@ -113,7 +113,7 @@ export default function LayoutApp({ usuario, restaurante, children }: Props) {
                 ? ` · ${accionesPendientes} pendiente${accionesPendientes !== 1 ? 's' : ''}`
                 : ''
               }`
-            : `Sincronizando ${accionesPendientes} acción${accionesPendientes !== 1 ? 'es' : ''}...`
+            : `Hay ${accionesPendientes} acciones antiguas pendientes de revisión. No se repetirán automáticamente.`
           }
         </div>
       )}

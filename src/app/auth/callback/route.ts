@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error('[auth/callback]', error.message)
     return NextResponse.redirect(
-      `${origin}/auth/login?error=${encodeURIComponent(error.message)}`
+      `${origin}/auth/login?error=${encodeURIComponent(error.message.toLowerCase().includes('code verifier') || error.message.toLowerCase().includes('pkce')
+        ? 'El enlace se abrió en otro navegador o dispositivo y no se pudo iniciar la sesión automáticamente. Prueba ingresar con tu correo y contraseña en ChefOS. Si aún pide verificar el correo, solicita un enlace nuevo desde ese dispositivo.'
+        : 'No se pudo validar el enlace. Puede haber caducado o haberse utilizado. Solicita uno nuevo desde ChefOS.')}`
     )
   }
 

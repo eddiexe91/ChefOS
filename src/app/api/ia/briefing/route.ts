@@ -58,12 +58,11 @@ export async function POST() {
   const resultados = await Promise.all([
     supabase.from('productos').select('id,nombre,cantidad_gramos,stock_minimo_gramos,stock_actual,stock_minimo,unidad_display,unidad_medida,activo,tipo_operativo').eq('restaurante_id', perfil.restaurante_id).eq('activo', true).limit(1000),
     supabase.from('alertas_sistema').select('tipo,severidad,mensaje').eq('restaurante_id', perfil.restaurante_id).eq('leida', false).limit(20),
-    supabase.from('produccion_lotes').select('id,turno,estado').eq('restaurante_id', perfil.restaurante_id).eq('fecha', fecha).eq('estado', 'en_progreso'),
     supabase.from('recetas').select('id,nombre,rendimiento_porciones,unidad_rendimiento,es_produccion,producto_salida_id,ingredientes:recetas_ingredientes(cantidad,cantidad_gramos,unidad_medida,producto:productos(id,nombre,cantidad_gramos,stock_minimo_gramos,unidad_display,unidad_medida,activo,tipo_operativo))').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('en_carta', true).limit(150),
     supabase.from('recetas').select('id,nombre,producto_salida_id,producto_salida:productos!recetas_producto_salida_id_fkey(id,nombre,unidad_display,unidad_medida)').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('es_produccion', true).limit(150),
-    supabase.from('produccion_registros').select('receta_id').eq('restaurante_id', perfil.restaurante_id).eq('fecha_produccion', fecha),
+    supabase.from('produccion_registros').select('receta_id').eq('anulado', false).eq('restaurante_id', perfil.restaurante_id).eq('fecha_produccion', fecha),
   ])
-  const [{ data: stock }, { data: alertas }, { data: lotes }, { data: carta }, { data: produccion }, { data: registros }] = resultados
+  const [{ data: stock }, { data: alertas }, { data: carta }, { data: produccion }, { data: registros }] = resultados
   const fuentesIncompletas = resultados.some((r) => r.error)
   for (const resultado of resultados) if (resultado.error) console.error('[briefing] fuente:', resultado.error.code, resultado.error.message)
 
@@ -86,7 +85,11 @@ export async function POST() {
   for (const producto of productos) {
     const stockActual = Number(producto.stock_actual ?? 0)
     const minimo = Number(producto.stock_minimo ?? 0)
-    if (stockActual > minimo) continue
+    if (minimo <= 0) {
+      if (stockActual <= 0) riesgos.set(`minimo-${producto.id}`, { tipo: 'configuracion', descripcion: `${producto.nombre}: sin existencias y sin stock mínimo configurado.`, severidad: 'alta', accion_sugerida: 'Comprueba el conteo, la unidad y el mínimo. No hay base suficiente para indicar una cantidad de compra.' })
+      continue
+    }
+    if (stockActual >= minimo) continue
     if (producto.tipo_operativo === 'elaborado') {
       const recetaSalida = produccionPorSalida.get(producto.id)
       if (recetaSalida) {
@@ -101,7 +104,7 @@ export async function POST() {
     } else {
       compras.set(producto.id, {
         producto: producto.nombre,
-        cantidad_sugerida: Math.max(minimo - stockActual, minimo || 1),
+        cantidad_sugerida: Math.max(minimo - stockActual, 0),
         unidad: producto.unidad_display ?? producto.unidad_medida ?? 'g',
         urgencia: stockActual <= 0 ? 'critica' : 'alta',
         razon: 'Stock bajo en Inventario.',
@@ -120,7 +123,7 @@ export async function POST() {
       const requerido = Number(ingrediente.cantidad_gramos ?? 0) / rendimientoBase
       const disponible = Number(producto.cantidad_gramos ?? 0)
       if (requerido <= 0 || disponible >= requerido) return []
-      return [{ producto, requerido, disponible, faltante: Math.max(requerido - disponible, 0), unidad: ingrediente.unidad_medida }]
+      return [{ producto, requerido, disponible, faltante: Math.max(requerido - disponible, 0), cantidadEnUnidad: Math.max(requerido-disponible,0)/requerido*Number(ingrediente.cantidad)/rendimientoBase, unidad: ingrediente.unidad_medida }]
     })
 
     if (faltantes.length === 0) continue
@@ -154,10 +157,10 @@ export async function POST() {
       } else {
         compras.set(faltante.producto.id, {
           producto: faltante.producto.nombre,
-          cantidad_sugerida: Math.max(faltante.faltante, Number(faltante.producto.stock_minimo_gramos ?? 0) || 1),
-          unidad: 'g',
+          cantidad_sugerida: faltante.cantidadEnUnidad,
+          unidad: faltante.unidad,
           urgencia: faltante.disponible <= 0 ? 'critica' : 'alta',
-          razon: `${receta.nombre} requiere este ingrediente para salir a carta.`,
+          razon: `Faltante para elaborar una unidad de ${receta.nombre}; no es una estimación de demanda del día.`,
         })
       }
     }
@@ -177,14 +180,6 @@ export async function POST() {
   if (!productos.some((p) => p.tipo_operativo === 'elaborado')) riesgos.set('stock', { tipo: 'configuracion', descripcion: 'Registra las preparaciones listas para servir.', severidad: 'media', accion_sugerida: 'Actualiza Stock disponible.' })
   if (!recetasCarta.length) riesgos.set('carta', { tipo: 'configuracion', descripcion: 'Añade los platos que ofrece tu restaurante.', severidad: 'media', accion_sugerida: 'Completa Carta para relacionar platos con existencias.' })
 
-  const loteSugerencias = (lotes ?? []).map((lote) => ({
-    nombre: `Lote ${lote.turno}`,
-    cantidad: 1,
-    unidad: 'lote',
-    prioridad: 'media' as const,
-    razon: 'Lote abierto del turno actual.',
-  }))
-
   const { data: contextoVentas, error: errorVentas } = await supabase.rpc('contexto_ventas_briefing', { p_restaurante: perfil.restaurante_id, p_fecha: fecha })
   const observaciones = errorVentas ? ['No se pudo verificar el historial de ventas. Las sugerencias actuales solo consideran datos operativos disponibles.'] : observacionesVentas(contextoVentas as ContextoVentas)
   const briefing = {
@@ -192,7 +187,7 @@ export async function POST() {
     fecha,
     turno: Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 14 ? 'mañana' : Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 19 ? 'tarde' : 'noche',
     confianza_estimacion: null, // Sin calibración, no inventar un nivel de precisión.
-    produccion_sugerida: [...producciones.values(), ...loteSugerencias],
+    produccion_sugerida: [...producciones.values()],
     compras_sugeridas: Array.from(compras.values()),
     riesgos: Array.from(riesgos.values()),
     alertas: alertas ?? [],

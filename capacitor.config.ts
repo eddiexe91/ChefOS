@@ -10,6 +10,7 @@ const config: CapacitorConfig = {
     url: serverUrl,
     cleartext: serverUrl.startsWith('http://'),
     allowNavigation: ['*'],
+    errorPath: 'offline.html',
   },
   android: {
     backgroundColor: '#080808',

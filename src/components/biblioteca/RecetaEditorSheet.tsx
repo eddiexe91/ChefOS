@@ -1,498 +1,157 @@
 'use client'
-
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Save, Trash2, X } from 'lucide-react'
-
 import { useProductos } from '@/hooks/useDominio'
-import { bibliotecaKeys, dashboardKeys, inventarioKeys } from '@/lib/queries'
-import { etiquetaTipoOperativo } from '@/lib/productos'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
-import type { CategoriaReceta, DificultadReceta, Producto, Receta, UnidadEntrada } from '@/types'
+import type { CategoriaReceta, Receta } from '@/types'
 
-const UNIDADES: readonly UnidadEntrada[] = [
-  'g', 'kg', 'mg', 'oz', 'lb',
-  'lt', 'ml', 'cl',
-  'unidad', 'docena', 'caja', 'bandeja', 'porcion',
-]
-const DIFICULTADES: readonly DificultadReceta[] = ['basica', 'intermedia', 'avanzada']
+const UNIDADES = ['g','kg','mg','oz','lb','lt','ml','cl','unidad','docena','caja','bandeja','porcion']
+const normalizar = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+type Ingrediente = { key: string; producto_id: string; cantidad: string; unidad_medida: string; notas: string; es_opcional: boolean }
+type Paso = { key: string; titulo: string; descripcion: string; duracion_min: string; temperatura_c: string; tecnica: string; punto_critico: boolean; foto_url?: string | null }
+const nuevoIngrediente = (): Ingrediente => ({ key: crypto.randomUUID(), producto_id:'', cantidad:'', unidad_medida:'', notas:'', es_opcional:false })
+const nuevoPaso = (): Paso => ({ key:crypto.randomUUID(),titulo:'',descripcion:'',duracion_min:'',temperatura_c:'',tecnica:'',punto_critico:false })
 
-interface IngredienteDraft {
-  key: string
-  producto_id: string
-  cantidad: string
-  unidad_medida: string
-  notas: string
-  es_opcional: boolean
+function Ventana({ titulo, children, cerrar }: { titulo: string; children: React.ReactNode; cerrar: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if(e.key==='Escape') cerrar() }
+    document.addEventListener('keydown',key)
+    return () => document.removeEventListener('keydown',key)
+  }, [cerrar])
+  return createPortal(<div role="dialog" aria-modal="true" aria-label={titulo} className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4 pb-24">
+    <section className="w-full max-w-lg max-h-[75dvh] overflow-y-auto rounded-2xl bg-fondo-elevado border border-fondo-borde p-5 text-texto-primario space-y-4">
+      <div className="flex items-center justify-between"><h2 className="font-bold">{titulo}</h2><button type="button" className="min-h-12 px-3" aria-label="Cerrar" onClick={cerrar}>✕</button></div>{children}
+    </section></div>,document.body)
 }
-
-interface PasoDraft {
-  key: string
-  titulo: string
-  descripcion: string
-  duracion_min: string
-  temperatura_c: string
-  tecnica: string
-  punto_critico: boolean
-}
-
-function nuevaFilaIngrediente(): IngredienteDraft {
-  return { key: crypto.randomUUID(), producto_id: '', cantidad: '', unidad_medida: 'g', notas: '', es_opcional: false }
-}
-
-function nuevaFilaPaso(): PasoDraft {
-  return { key: crypto.randomUUID(), titulo: '', descripcion: '', duracion_min: '', temperatura_c: '', tecnica: '', punto_critico: false }
-}
-
-function recetaAVista(receta: Receta | null | undefined, modo: 'receta' | 'carta') {
-  return {
-    nombre: receta?.nombre ?? '',
-    descripcion: receta?.descripcion ?? '',
-    categoria_id: receta?.categoria_id ?? '',
-    rendimiento_porciones: receta ? String(receta.rendimiento_porciones) : '1',
-    unidad_rendimiento: receta?.unidad_rendimiento ?? (modo === 'carta' ? 'plato' : 'porcion'),
-    tiempo_preparacion: receta?.tiempo_preparacion == null ? '' : String(receta.tiempo_preparacion),
-    dificultad: receta?.dificultad ?? '',
-    precio_venta: receta?.precio_venta == null ? '' : String(receta.precio_venta),
-    en_carta: modo === 'carta' ? true : (receta?.en_carta ?? false),
-    es_produccion: modo === 'carta' ? (receta?.es_produccion ?? false) : (receta?.es_produccion ?? true),
-    producto_salida_id: receta?.producto_salida_id ?? '',
-    cantidad_salida: receta?.cantidad_salida == null ? '' : String(receta.cantidad_salida),
-    unidad_salida: receta?.unidad_salida ?? (receta?.producto_salida?.unidad_display ?? receta?.producto_salida?.unidad_medida ?? 'porcion'),
-  }
-}
-
-export default function RecetaEditorSheet({
-  modo,
-  receta,
-  embebido = false,
-  onClose,
-  onSaved,
-}: {
-  modo: 'receta' | 'carta'
-  receta?: Receta | null
-  embebido?: boolean
-  onClose?: () => void
-  onSaved?: () => void
+export default function RecetaEditorSheet({ modo, receta, embebido=false, onClose, onSaved }: {
+  modo:'receta'|'carta'; receta?:Receta|null; embebido?:boolean; onClose?:()=>void; onSaved?:()=>void
 }) {
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const supabase = obtenerClienteNavegador()
-  const [categorias, setCategorias] = useState<CategoriaReceta[]>([])
-  const [campos, setCampos] = useState(() => recetaAVista(receta, modo))
-  const [ingredientes, setIngredientes] = useState<IngredienteDraft[]>(() => receta?.ingredientes?.length
-    ? receta.ingredientes.map((ingrediente) => ({
-        key: crypto.randomUUID(),
-        producto_id: ingrediente.producto_id,
-        cantidad: String(ingrediente.cantidad),
-        unidad_medida: ingrediente.unidad_medida,
-        notas: ingrediente.notas ?? '',
-        es_opcional: ingrediente.es_opcional,
-      }))
-    : [nuevaFilaIngrediente()])
-  const [pasos, setPasos] = useState<PasoDraft[]>(() => receta?.pasos?.length
-    ? receta.pasos.map((paso) => ({
-        key: crypto.randomUUID(),
-        titulo: paso.titulo,
-        descripcion: paso.descripcion,
-        duracion_min: paso.duracion_min == null ? '' : String(paso.duracion_min),
-        temperatura_c: paso.temperatura_c == null ? '' : String(paso.temperatura_c),
-        tecnica: paso.tecnica ?? '',
-        punto_critico: paso.punto_critico,
-      }))
-    : [nuevaFilaPaso()])
-  const [guardando, setGuardando] = useState(false)
-  const [error, setError] = useState('')
-  const [exito, setExito] = useState('')
-  const [buscarIngrediente, setBuscarIngrediente] = useState('')
-
-  useEffect(() => {
-    setCampos(recetaAVista(receta, modo))
-    setIngredientes(receta?.ingredientes?.length
-      ? receta.ingredientes.map((ingrediente) => ({
-          key: crypto.randomUUID(),
-          producto_id: ingrediente.producto_id,
-          cantidad: String(ingrediente.cantidad),
-          unidad_medida: ingrediente.unidad_medida,
-          notas: ingrediente.notas ?? '',
-          es_opcional: ingrediente.es_opcional,
-        }))
-      : [nuevaFilaIngrediente()])
-    setPasos(receta?.pasos?.length
-      ? receta.pasos.map((paso) => ({
-          key: crypto.randomUUID(),
-          titulo: paso.titulo,
-          descripcion: paso.descripcion,
-          duracion_min: paso.duracion_min == null ? '' : String(paso.duracion_min),
-          temperatura_c: paso.temperatura_c == null ? '' : String(paso.temperatura_c),
-          tecnica: paso.tecnica ?? '',
-          punto_critico: paso.punto_critico,
-        }))
-      : [nuevaFilaPaso()])
-  }, [modo, receta])
-
-  useEffect(() => {
-    let activo = true
-    void supabase
-      .from('categorias_receta')
-      .select('id, restaurante_id, nombre, orden, activa')
-      .eq('activa', true)
-      .order('orden', { ascending: true })
-      .then(({ data }) => { if (activo) setCategorias((data ?? []) as CategoriaReceta[]) })
-    return () => { activo = false }
-  }, [supabase])
-
-  const productosQuery = useProductos()
-  const salidasQuery = useProductos({ tipos_operativos: ['elaborado'] })
-  const productos = useMemo(() => productosQuery.data ?? [], [productosQuery.data])
-  const productosFiltrados = useMemo(() => {
-    const termino = buscarIngrediente.trim().toLowerCase()
-    return termino ? productos.filter((producto) => producto.nombre.toLowerCase().includes(termino)) : productos
-  }, [buscarIngrediente, productos])
-  const productosSalida = useMemo(() => salidasQuery.data ?? [], [salidasQuery.data])
-
-  const titulo = receta
-    ? (modo === 'carta' ? 'Editar elaboración de Carta' : 'Editar receta')
-    : (modo === 'carta' ? 'Nueva elaboración de Carta' : 'Añadir receta')
-
-  const textoCTA = receta
-    ? (modo === 'carta' ? 'Guardar elaboración' : 'Guardar receta')
-    : (modo === 'carta' ? 'Guardar elaboración' : 'Crear receta')
-
-  const esValido = campos.nombre.trim() !== ''
-    && campos.unidad_rendimiento.trim() !== ''
-    && Number(campos.rendimiento_porciones) > 0
-    && ingredientes.length > 0
-    && ingredientes.every((ingrediente) => ingrediente.producto_id && Number(ingrediente.cantidad) > 0 && ingrediente.unidad_medida)
-    && pasos.length > 0
-    && pasos.every((paso) => paso.titulo.trim() !== '' && paso.descripcion.trim() !== '')
-
-  async function postProcesoGuardado(enCarta: boolean) {
-    await queryClient.invalidateQueries({ queryKey: bibliotecaKeys.all })
-    await queryClient.invalidateQueries({ queryKey: inventarioKeys.all })
-    await queryClient.invalidateQueries({ queryKey: ['actividad-operativa'] })
-    if (enCarta) {
-      await fetch('/api/ia/briefing', { method: 'POST' }).catch(() => null)
-      await queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
-    }
+  const router=useRouter(), cache=useQueryClient()
+  const productosQuery=useProductos()
+  const productos=useMemo(()=>productosQuery.data??[],[productosQuery.data])
+  const [categorias,setCategorias]=useState<CategoriaReceta[]>([])
+  const [campos,setCampos]=useState({
+    nombre:receta?.nombre??'', descripcion:receta?.descripcion??'', categoria_id:receta?.categoria_id??'',
+    rendimiento_porciones:String(receta?.rendimiento_porciones??1), unidad_rendimiento:receta?.unidad_rendimiento??(modo==='carta'?'plato':'porcion'),
+    tiempo_preparacion:String(receta?.tiempo_preparacion??''), dificultad:receta?.dificultad??'', precio_venta:String(receta?.precio_venta??''),
+    en_carta:receta?.en_carta??modo==='carta', es_produccion:receta?.es_produccion??modo==='receta',
+    producto_salida_id:receta?.producto_salida_id??'', cantidad_salida:String(receta?.cantidad_salida??receta?.rendimiento_porciones??1),
+    unidad_salida:receta?.unidad_salida??'porcion', crear_salida:!receta?.producto_salida_id, nombre_salida:receta?.nombre??''
+  })
+  const [ingredientes,setIngredientes]=useState<Ingrediente[]>(()=>(receta?.ingredientes??[]).map(i=>({
+    key:crypto.randomUUID(),producto_id:i.producto_id,cantidad:String(i.cantidad),unidad_medida:i.unidad_medida,notas:i.notas??'',es_opcional:i.es_opcional
+  })))
+  const [pasos,setPasos]=useState<Paso[]>(()=>(receta?.pasos??[]).map(p=>({
+    key:crypto.randomUUID(),titulo:p.titulo,descripcion:p.descripcion,duracion_min:String(p.duracion_min??''),temperatura_c:String(p.temperatura_c??''),
+    tecnica:p.tecnica??'',punto_critico:p.punto_critico,foto_url:p.foto_url
+  })))
+  const [ingrediente,setIngrediente]=useState<Ingrediente|null>(null)
+  const [paso,setPaso]=useState<Paso|null>(null)
+  const [busqueda,setBusqueda]=useState('')
+  const [error,setError]=useState('')
+  const [guardando,setGuardando]=useState(false)
+  const ocupado=useRef(false)
+  const solicitud=useRef({firma:'',id:''})
+  useEffect(()=>{let activo=true; void obtenerClienteNavegador().from('categorias_receta').select('*').eq('activa',true).order('orden').then(({data})=>{if(activo)setCategorias(data??[])});return()=>{activo=false}},[])
+  const filtrados=productos.filter(p=>normalizar(p.nombre).includes(normalizar(busqueda)))
+  const salidas=productos.filter(p=>p.tipo_operativo==='elaborado')
+  const campo=(key:keyof typeof campos,value:string|boolean)=>setCampos(c=>({...c,[key]:value}))
+  function editarIngrediente(i?:Ingrediente){setBusqueda('');setIngrediente(i?{...i}:nuevoIngrediente())}
+  function elegirProducto(id:string) {
+    const p=productos.find(p=>p.id===id)
+    setIngrediente(i=>i?{...i,producto_id:id,unidad_medida:p?.unidad_medida??''}:i)
   }
-
-  async function guardar() {
-    if (!esValido) {
-      setError('Completa nombre, rendimiento, ingredientes y pasos antes de guardar.')
-      return
+  async function guardar(){
+    if(ocupado.current)return
+    if(!navigator.onLine){setError('Sin conexión: el formulario sigue aquí, pero aún no se ha guardado. Reconecta para guardar.');return}
+    if(!campos.nombre.trim()||!Number.isInteger(Number(campos.rendimiento_porciones))||Number(campos.rendimiento_porciones)<=0||!ingredientes.length||!pasos.length){
+      setError('Completa nombre, rendimiento, al menos un ingrediente y un paso.');return
     }
-    setGuardando(true)
-    setError('')
-    setExito('')
-    const payload = {
-      nombre: campos.nombre.trim(),
-      descripcion: campos.descripcion.trim() || undefined,
-      categoria_id: campos.categoria_id || undefined,
-      rendimiento_porciones: Number(campos.rendimiento_porciones),
-      unidad_rendimiento: campos.unidad_rendimiento.trim(),
-      tiempo_preparacion: campos.tiempo_preparacion ? Number(campos.tiempo_preparacion) : undefined,
-      dificultad: campos.dificultad || undefined,
-      precio_venta: campos.precio_venta ? Number(campos.precio_venta) : undefined,
-      en_carta: modo === 'carta' ? true : campos.en_carta,
-      es_produccion: campos.es_produccion,
-      producto_salida_id: campos.es_produccion && campos.producto_salida_id ? campos.producto_salida_id : undefined,
-      cantidad_salida: campos.es_produccion && campos.cantidad_salida ? Number(campos.cantidad_salida) : undefined,
-      unidad_salida: campos.es_produccion && campos.unidad_salida ? campos.unidad_salida : undefined,
-      origen_editor: modo,
-      ingredientes: ingredientes.map((ingrediente, index) => ({
-        producto_id: ingrediente.producto_id,
-        cantidad: Number(ingrediente.cantidad),
-        unidad_medida: ingrediente.unidad_medida,
-        notas: ingrediente.notas.trim() || undefined,
-        es_opcional: ingrediente.es_opcional,
-        orden: index,
-      })),
-      pasos: pasos.map((paso, index) => ({
-        numero: index + 1,
-        titulo: paso.titulo.trim(),
-        descripcion: paso.descripcion.trim(),
-        duracion_min: paso.duracion_min ? Number(paso.duracion_min) : undefined,
-        temperatura_c: paso.temperatura_c ? Number(paso.temperatura_c) : undefined,
-        tecnica: paso.tecnica.trim() || undefined,
-        punto_critico: paso.punto_critico,
-      })),
+    if(campos.es_produccion&&(!Number(campos.cantidad_salida)||(!campos.crear_salida&&!campos.producto_salida_id))){
+      setError('Selecciona o crea el producto de salida y su cantidad por receta.');return
     }
-
-    const response = await fetch(receta ? `/api/biblioteca/recetas/${receta.id}` : '/api/biblioteca/recetas', {
-      method: receta ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    const data = await response.json().catch(() => ({ error: 'No se pudo guardar.' })) as { error?: string }
-    setGuardando(false)
-    if (!response.ok) {
-      setError(data.error ?? 'No se pudo guardar.')
-      return
+    const payload={
+      ...campos,nombre:campos.nombre.trim(),nombre_salida:campos.nombre_salida.trim()||campos.nombre.trim(),
+      rendimiento_porciones:Number(campos.rendimiento_porciones), tiempo_preparacion:campos.tiempo_preparacion?Number(campos.tiempo_preparacion):null,
+      precio_venta:campos.precio_venta?Number(campos.precio_venta):null,
+      producto_salida_id:campos.es_produccion&&!campos.crear_salida?campos.producto_salida_id:null,
+      cantidad_salida:campos.es_produccion?Number(campos.cantidad_salida):null,unidad_salida:campos.es_produccion?campos.unidad_salida:null,
+      crear_salida:campos.es_produccion&&campos.crear_salida,version_esperada:receta?.version_actual??null,origen_editor:modo,
+      ingredientes:ingredientes.map((i,n)=>({...i,cantidad:Number(i.cantidad),orden:n})),
+      pasos:pasos.map((p,n)=>({...p,numero:n+1,duracion_min:p.duracion_min?Number(p.duracion_min):null,temperatura_c:p.temperatura_c?Number(p.temperatura_c):null}))
     }
-
-    await postProcesoGuardado(payload.en_carta)
-    setExito(modo === 'carta' ? 'Elaboración guardada correctamente.' : 'Receta guardada correctamente.')
-
-    if (onSaved) onSaved()
-    if (onClose) {
-      onClose()
-      return
-    }
-    router.push(modo === 'carta' ? '/carta' : '/biblioteca')
-    router.refresh()
+    const firma=JSON.stringify(payload)
+    if(solicitud.current.firma!==firma)solicitud.current={firma,id:crypto.randomUUID()}
+    ocupado.current=true;setGuardando(true);setError('')
+    try {
+      const r=await fetch(receta?'/api/biblioteca/recetas/'+receta.id:'/api/biblioteca/recetas',{method:receta?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,solicitud_id:solicitud.current.id})})
+      const j=await r.json();if(!r.ok)throw new Error(j.error??'No se pudo guardar.')
+      await cache.invalidateQueries()
+      onSaved?.()
+      if(onClose)onClose();else {router.push(modo==='carta'?'/carta':'/biblioteca');router.refresh()}
+    } catch(e){setError(e instanceof Error?e.message:'No se pudo confirmar el guardado. Conservamos el formulario; reintentar sin cambios no duplica la receta.')}
+    finally{ocupado.current=false;setGuardando(false)}
   }
-
-  async function archivar() {
-    if (!receta) return
-    if (!window.confirm(`¿Archivar ${receta.nombre}?`)) return
-    setGuardando(true)
-    setError('')
-    const response = await fetch(`/api/biblioteca/recetas/${receta.id}`, { method: 'DELETE' })
-    const data = await response.json().catch(() => ({ error: 'No se pudo archivar.' })) as { error?: string }
-    setGuardando(false)
-    if (!response.ok) {
-      setError(data.error ?? 'No se pudo archivar.')
-      return
-    }
-    await postProcesoGuardado(receta.en_carta || modo === 'carta')
-    if (onSaved) onSaved()
-    if (onClose) {
-      onClose()
-      return
-    }
-    router.push(modo === 'carta' ? '/carta' : '/biblioteca')
-    router.refresh()
+  async function archivar(){
+    if(!receta||ocupado.current||!window.confirm('¿Archivar '+receta.nombre+'? Se conservará su historial.'))return
+    ocupado.current=true;setGuardando(true)
+    try{const r=await fetch('/api/biblioteca/recetas/'+receta.id,{method:'DELETE'});const j=await r.json();if(!r.ok)throw new Error(j.error)
+      await cache.invalidateQueries();onSaved?.();if(onClose)onClose();else router.push(modo==='carta'?'/carta':'/biblioteca')
+    }catch(e){setError(e instanceof Error?e.message:'No se pudo archivar.')}finally{ocupado.current=false;setGuardando(false)}
   }
-
-  const contenedor = embebido
-    ? 'px-4 pt-6 pb-36 max-w-lg mx-auto space-y-6'
-    : 'fixed inset-0 z-[70] bg-black/60 p-3 pb-[calc(88px+env(safe-area-inset-bottom))] md:p-6 md:pb-6 flex items-end md:items-center justify-center'
-
-  const panel = embebido
-    ? 'space-y-6'
-    : 'w-full max-w-lg max-h-[88dvh] overflow-y-auto rounded-2xl border border-fondo-borde bg-fondo-elevado p-5 shadow-xl space-y-6'
-
-  return (
-    <div className={contenedor} role={embebido ? undefined : 'dialog'} aria-modal={embebido ? undefined : true}>
-      <div className={panel}>
-        <section className="space-y-2">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-acento">{modo === 'carta' ? 'Carta' : 'Recetas'}</p>
-              <h1 className="text-xl font-display font-bold text-texto-primario">{titulo}</h1>
-              <p className="text-xs text-texto-apagado mt-1">
-                {modo === 'carta'
-                  ? 'Gestiona platos, ingredientes de Inventario y Stock disponible, y su elaboración contextual.'
-                  : 'Gestiona fichas técnicas de producción y, si aplica, su salida al Stock disponible.'}
-              </p>
-            </div>
-            {!embebido && onClose ? <button type="button" onClick={onClose} className="btn-icono" aria-label="Cerrar"><X size={18} /></button> : null}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-texto-secundario">Nombre del {modo === 'carta' ? 'plato' : 'receta'}</span>
-            <input value={campos.nombre} onChange={(e) => setCampos((prev) => ({ ...prev, nombre: e.target.value }))} className="campo-input" placeholder={modo === 'carta' ? 'Ejemplo: Cancato de corvina' : 'Ejemplo: Leche asada'} />
-          </label>
-
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-texto-secundario">Categoría</span>
-            <select value={campos.categoria_id} onChange={(e) => setCampos((prev) => ({ ...prev, categoria_id: e.target.value }))} className="campo-input">
-              <option value="">Sin categoría</option>
-              {categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>)}
-            </select>
-          </label>
-
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-texto-secundario">Descripción</span>
-            <textarea value={campos.descripcion} onChange={(e) => setCampos((prev) => ({ ...prev, descripcion: e.target.value }))} rows={3} className="campo-input min-h-24 py-3" placeholder="Qué se prepara, cuándo se usa y observaciones clave." />
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-texto-secundario">Rendimiento</span>
-              <input value={campos.rendimiento_porciones} onChange={(e) => setCampos((prev) => ({ ...prev, rendimiento_porciones: e.target.value }))} type="number" min="1" step="1" className="campo-input" />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-texto-secundario">Unidad de salida</span>
-              <input value={campos.unidad_rendimiento} onChange={(e) => setCampos((prev) => ({ ...prev, unidad_rendimiento: e.target.value }))} className="campo-input" placeholder={modo === 'carta' ? 'plato' : 'porción'} />
-            </label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-texto-secundario">Tiempo (min)</span>
-              <input value={campos.tiempo_preparacion} onChange={(e) => setCampos((prev) => ({ ...prev, tiempo_preparacion: e.target.value }))} type="number" min="0" step="1" className="campo-input" />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-texto-secundario">Dificultad</span>
-              <select value={campos.dificultad} onChange={(e) => setCampos((prev) => ({ ...prev, dificultad: e.target.value }))} className="campo-input">
-                <option value="">Sin especificar</option>
-                {DIFICULTADES.map((dificultad) => <option key={dificultad} value={dificultad}>{dificultad}</option>)}
-              </select>
-            </label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-texto-secundario">Precio de venta</span>
-              <input value={campos.precio_venta} onChange={(e) => setCampos((prev) => ({ ...prev, precio_venta: e.target.value }))} type="number" min="0" step="0.01" className="campo-input" />
-            </label>
-            <div className="rounded-xl border border-fondo-borde bg-fondo-card px-4 py-3 text-xs text-texto-secundario">
-              <p className="font-medium text-texto-primario">Estado operativo</p>
-              <p className="mt-1">{modo === 'carta' ? 'Este registro aparecerá en Carta.' : 'Esta ficha se administra desde Recetas.'}</p>
-            </div>
-          </div>
-
-          <div className="space-y-3 rounded-xl border border-fondo-borde bg-fondo-card px-4 py-3">
-            {modo !== 'carta' ? (
-              <label className="flex items-start gap-2 text-xs text-texto-secundario">
-                <input type="checkbox" checked={campos.en_carta} onChange={(e) => setCampos((prev) => ({ ...prev, en_carta: e.target.checked }))} />
-                <span><span className="font-medium text-texto-primario">Mostrar también en Carta</span><span className="block mt-1">Permite que la misma ficha aparezca en Carta sin ocultarla de Producción.</span></span>
-              </label>
-            ) : null}
-            <label className="flex items-start gap-2 text-xs text-texto-secundario">
-              <input type="checkbox" checked={campos.es_produccion} onChange={(e) => setCampos((prev) => ({ ...prev, es_produccion: e.target.checked }))} />
-              <span><span className="font-medium text-texto-primario">Usar también en Producción</span><span className="block mt-1">Solo las fichas con esta marca aparecerán en Producción y descontarán ingredientes.</span></span>
-            </label>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="seccion-titulo">Ingredientes</h2>
-            <button type="button" onClick={() => setIngredientes((prev) => [...prev, nuevaFilaIngrediente()])} className="text-xs text-acento flex items-center gap-1">
-              <Plus size={14} /> Agregar ingrediente
-            </button>
-          </div>
-          <input type="search" value={buscarIngrediente} onChange={(e) => setBuscarIngrediente(e.target.value)} className="campo-input" placeholder="Buscar ingrediente por nombre…" />
-          {ingredientes.map((ingrediente, index) => (
-            <div key={ingrediente.key} className="rounded-xl border border-fondo-borde bg-fondo-elevado p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-2xs uppercase tracking-wide text-texto-apagado">Ingrediente {index + 1}</p>
-                {ingredientes.length > 1 ? <button type="button" onClick={() => setIngredientes((prev) => prev.filter((item) => item.key !== ingrediente.key))} className="btn-icono"><X size={14} /></button> : null}
-              </div>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-texto-secundario">Producto</span>
-                <select value={ingrediente.producto_id} onChange={(e) => setIngredientes((prev) => prev.map((item) => item.key === ingrediente.key ? { ...item, producto_id: e.target.value } : item))} className="campo-input">
-                  <option value="">{productosQuery.isPending ? 'Cargando productos…' : 'Seleccionar producto'}</option>
-                  {productosFiltrados.map((producto: Producto) => (
-                    <option key={producto.id} value={producto.id}>{producto.nombre} · {etiquetaTipoOperativo(producto.tipo_operativo)}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-texto-secundario">Cantidad</span>
-                  <input value={ingrediente.cantidad} onChange={(e) => setIngredientes((prev) => prev.map((item) => item.key === ingrediente.key ? { ...item, cantidad: e.target.value } : item))} type="number" min="0" step="0.001" className="campo-input" />
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-texto-secundario">Unidad</span>
-                  <select value={ingrediente.unidad_medida} onChange={(e) => setIngredientes((prev) => prev.map((item) => item.key === ingrediente.key ? { ...item, unidad_medida: e.target.value } : item))} className="campo-input">
-                    {UNIDADES.map((unidad) => <option key={unidad} value={unidad}>{unidad}</option>)}
-                  </select>
-                </label>
-              </div>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-texto-secundario">Notas</span>
-                <input value={ingrediente.notas} onChange={(e) => setIngredientes((prev) => prev.map((item) => item.key === ingrediente.key ? { ...item, notas: e.target.value } : item))} className="campo-input" placeholder="Ejemplo: media porción, fileteado, cocida." />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-texto-secundario">
-                <input type="checkbox" checked={ingrediente.es_opcional} onChange={(e) => setIngredientes((prev) => prev.map((item) => item.key === ingrediente.key ? { ...item, es_opcional: e.target.checked } : item))} />
-                Ingrediente opcional
-              </label>
-            </div>
-          ))}
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="seccion-titulo">Pasos</h2>
-            <button type="button" onClick={() => setPasos((prev) => [...prev, nuevaFilaPaso()])} className="text-xs text-acento flex items-center gap-1">
-              <Plus size={14} /> Agregar paso
-            </button>
-          </div>
-          {pasos.map((paso, index) => (
-            <div key={paso.key} className="rounded-xl border border-fondo-borde bg-fondo-elevado p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-2xs uppercase tracking-wide text-texto-apagado">Paso {index + 1}</p>
-                {pasos.length > 1 ? <button type="button" onClick={() => setPasos((prev) => prev.filter((item) => item.key !== paso.key))} className="btn-icono"><X size={14} /></button> : null}
-              </div>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-texto-secundario">Título</span>
-                <input value={paso.titulo} onChange={(e) => setPasos((prev) => prev.map((item) => item.key === paso.key ? { ...item, titulo: e.target.value } : item))} className="campo-input" />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-texto-secundario">Descripción</span>
-                <textarea value={paso.descripcion} onChange={(e) => setPasos((prev) => prev.map((item) => item.key === paso.key ? { ...item, descripcion: e.target.value } : item))} rows={3} className="campo-input min-h-24 py-3" />
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-texto-secundario">Duración (min)</span>
-                  <input value={paso.duracion_min} onChange={(e) => setPasos((prev) => prev.map((item) => item.key === paso.key ? { ...item, duracion_min: e.target.value } : item))} type="number" min="0" step="1" className="campo-input" />
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-texto-secundario">Temperatura °C</span>
-                  <input value={paso.temperatura_c} onChange={(e) => setPasos((prev) => prev.map((item) => item.key === paso.key ? { ...item, temperatura_c: e.target.value } : item))} type="number" step="1" className="campo-input" />
-                </label>
-              </div>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-texto-secundario">Técnica</span>
-                <input value={paso.tecnica} onChange={(e) => setPasos((prev) => prev.map((item) => item.key === paso.key ? { ...item, tecnica: e.target.value } : item))} className="campo-input" />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-texto-secundario">
-                <input type="checkbox" checked={paso.punto_critico} onChange={(e) => setPasos((prev) => prev.map((item) => item.key === paso.key ? { ...item, punto_critico: e.target.checked } : item))} />
-                Punto crítico
-              </label>
-            </div>
-          ))}
-        </section>
-
-        {campos.es_produccion ? (
-          <section className="space-y-3 rounded-xl border border-fondo-borde bg-fondo-card px-4 py-4">
-            <div>
-              <h2 className="seccion-titulo">Salida al Stock disponible</h2>
-              <p className="text-xs text-texto-apagado mt-1">Al registrar producción se descontarán ingredientes y se sumará este producto elaborado si está configurado.</p>
-            </div>
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-texto-secundario">Producto elaborado de salida</span>
-              <select value={campos.producto_salida_id} onChange={(e) => setCampos((prev) => ({ ...prev, producto_salida_id: e.target.value }))} className="campo-input">
-                <option value="">{salidasQuery.isPending ? 'Cargando stock disponible…' : 'Sin salida configurada'}</option>
-                {productosSalida.map((producto: Producto) => <option key={producto.id} value={producto.id}>{producto.nombre}</option>)}
-              </select>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-texto-secundario">Cantidad de salida</span>
-                <input value={campos.cantidad_salida} onChange={(e) => setCampos((prev) => ({ ...prev, cantidad_salida: e.target.value }))} type="number" min="0" step="0.001" className="campo-input" />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-texto-secundario">Unidad de salida</span>
-                <select value={campos.unidad_salida} onChange={(e) => setCampos((prev) => ({ ...prev, unidad_salida: e.target.value }))} className="campo-input">
-                  {UNIDADES.map((unidad) => <option key={unidad} value={unidad}>{unidad}</option>)}
-                </select>
-              </label>
-            </div>
-          </section>
-        ) : null}
-
-        {error ? <div className="rounded-lg border border-peligro-borde bg-peligro-suave px-3 py-2.5 text-xs text-peligro-texto">{error}</div> : null}
-        {exito ? <div className="rounded-lg border border-exito-borde bg-exito-suave px-3 py-2.5 text-xs text-exito-texto">{exito}</div> : null}
-
-        <section className="flex flex-col-reverse gap-2 sm:flex-row">
-          {receta ? (
-            <button type="button" onClick={() => void archivar()} disabled={guardando} className="min-h-12 rounded-xl border border-peligro px-4 text-sm font-medium text-peligro flex items-center justify-center gap-2 disabled:opacity-50">
-              <Trash2 size={16} /> {modo === 'carta' ? 'Archivar plato' : 'Archivar receta'}
-            </button>
-          ) : null}
-          <button type="button" onClick={() => void guardar()} disabled={guardando} className="flex-1 min-h-12 rounded-xl bg-acento text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
-            <Save size={16} /> {guardando ? 'Guardando…' : textoCTA}
-          </button>
-        </section>
-      </div>
+  return <div className={embebido?'max-w-lg mx-auto px-4 py-6 pb-36':'fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 pb-24'} role={embebido?undefined:'dialog'} aria-modal={embebido?undefined:true}>
+    <div className={embebido?'space-y-5 text-texto-primario':'w-full max-w-lg max-h-[80dvh] overflow-y-auto rounded-2xl bg-fondo-elevado p-5 space-y-5 text-texto-primario'}>
+      <div className="flex justify-between"><h1 className="text-xl font-bold">{receta?'Editar': 'Añadir'} {modo==='carta'?'plato de Carta':'receta'}</h1>{onClose&&<button className="min-h-12 px-3" onClick={onClose}>Cerrar</button>}</div>
+      <label className="block">Nombre<input className="campo-input mt-1" value={campos.nombre} onChange={e=>campo('nombre',e.target.value)}/></label>
+      <label className="block">Categoría<select className="campo-input mt-1" value={campos.categoria_id} onChange={e=>campo('categoria_id',e.target.value)}><option value="">Sin categoría</option>{categorias.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
+      <label className="block">Descripción<textarea className="campo-input mt-1" value={campos.descripcion} onChange={e=>campo('descripcion',e.target.value)}/></label>
+      <div className="grid grid-cols-2 gap-3"><label>Rendimiento<input className="campo-input mt-1" type="number" min="1" step="1" value={campos.rendimiento_porciones} onChange={e=>campo('rendimiento_porciones',e.target.value)}/></label><label>Unidad del rendimiento<input className="campo-input mt-1" value={campos.unidad_rendimiento} onChange={e=>campo('unidad_rendimiento',e.target.value)}/></label></div>
+      <details className="tarjeta p-3"><summary className="min-h-12 cursor-pointer">Tiempo, dificultad y precio</summary>
+        <label className="block">Tiempo (min)<input className="campo-input" type="number" min="0" value={campos.tiempo_preparacion} onChange={e=>campo('tiempo_preparacion',e.target.value)}/></label>
+        <label className="block">Dificultad<select className="campo-input" value={campos.dificultad} onChange={e=>campo('dificultad',e.target.value)}><option value="">Sin especificar</option>{['basica','intermedia','avanzada'].map(v=><option key={v}>{v}</option>)}</select></label>
+        <label className="block">Precio de venta<input className="campo-input" type="number" min="0" value={campos.precio_venta} onChange={e=>campo('precio_venta',e.target.value)}/></label>
+      </details>
+      <label className="flex gap-3 min-h-12 items-center"><input type="checkbox" checked={campos.en_carta} onChange={e=>campo('en_carta',e.target.checked)}/>En Carta</label>
+      <label className="flex gap-3 min-h-12 items-center"><input type="checkbox" checked={campos.es_produccion} onChange={e=>campo('es_produccion',e.target.checked)}/>Es producción (genera Stock disponible)</label>
+      <section className="space-y-2"><h2 className="seccion-titulo">Ingredientes</h2>
+        <button type="button" className="btn-primario w-full" onClick={()=>editarIngrediente()}>+ Agregar ingrediente</button>
+        {productosQuery.isError&&<p role="alert">No se pudieron cargar productos. <button onClick={()=>void productosQuery.refetch()} className="text-acento">Reintentar</button></p>}
+        {!ingredientes.length&&<p className="text-sm text-texto-secundario">Añade un ingrediente para comenzar.</p>}
+        <ol>{ingredientes.map((i,n)=><li key={i.key} className="flex items-center justify-between gap-2 border-b border-fondo-borde"><button className="flex-1 text-left min-h-12" onClick={()=>editarIngrediente(i)}>{n+1}. {productos.find(p=>p.id===i.producto_id)?.nombre??receta?.ingredientes?.find(p=>p.producto_id===i.producto_id)?.producto?.nombre??'Producto no disponible'} · {i.cantidad} {i.unidad_medida}</button><button className="min-h-12 px-3 text-peligro" aria-label="Quitar ingrediente" onClick={()=>setIngredientes(a=>a.filter(x=>x.key!==i.key))}>✕</button></li>)}</ol>
+      </section>
+      <section className="space-y-2"><h2 className="seccion-titulo">Paso a paso / Procedimiento</h2><button className="btn-primario w-full" onClick={()=>setPaso(nuevoPaso())}>+ Agregar paso</button>
+        <ol>{pasos.map((p,n)=><li key={p.key} className="flex items-center border-b border-fondo-borde"><button className="flex-1 text-left min-h-12" onClick={()=>setPaso({...p})}>{n+1}. {p.titulo}</button><button className="min-h-12 px-3 text-peligro" aria-label="Quitar paso" onClick={()=>setPasos(a=>a.filter(x=>x.key!==p.key))}>✕</button></li>)}</ol>
+      </section>
+      {campos.es_produccion&&<section className="tarjeta p-4 space-y-3"><h2 className="font-bold">Salida al Stock disponible</h2>
+        <p className="text-sm text-texto-secundario">Por cada receta completa se obtendrá esta cantidad. Crear su ficha no añade existencias: solo producirlas lo hace.</p>
+        <label className="flex gap-2 min-h-12 items-center"><input type="checkbox" checked={campos.crear_salida} onChange={e=>campo('crear_salida',e.target.checked)}/>Crear aquí un nuevo producto elaborado</label>
+        {campos.crear_salida?<label className="block">Nombre del producto<input className="campo-input" placeholder={campos.nombre} value={campos.nombre_salida} onChange={e=>campo('nombre_salida',e.target.value)}/></label>:<label className="block">Producto existente<select className="campo-input" value={campos.producto_salida_id} onChange={e=>{const p=salidas.find(p=>p.id===e.target.value);setCampos(c=>({...c,producto_salida_id:e.target.value,unidad_salida:p?.unidad_medida??c.unidad_salida}))}}><option value="">Selecciona Stock disponible</option>{salidas.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}</select></label>}
+        <div className="grid grid-cols-2 gap-3"><label>Cantidad por receta<input className="campo-input" inputMode="decimal" type="number" min=".001" step=".001" value={campos.cantidad_salida} onChange={e=>campo('cantidad_salida',e.target.value)}/></label><label>Unidad<select className="campo-input" value={campos.unidad_salida} onChange={e=>campo('unidad_salida',e.target.value)}>{UNIDADES.map(u=><option key={u}>{u}</option>)}</select></label></div>
+      </section>}
+      {error&&<p role="alert" className="text-peligro-texto border border-peligro rounded p-3">{error}</p>}
+      <button className="btn-primario w-full" disabled={guardando} onClick={()=>void guardar()}>{guardando?'Guardando…':modo==='carta'?'Guardar plato de Carta':'Guardar receta'}</button>
+      {receta&&<button className="min-h-12 text-peligro" disabled={guardando} onClick={()=>void archivar()}>Archivar (conserva historial)</button>}
     </div>
-  )
+    {ingrediente&&<Ventana titulo="Agregar o editar ingrediente" cerrar={()=>setIngrediente(null)}>
+      <label className="block">Buscar producto<input autoFocus type="search" className="campo-input mt-1" value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Nombre, con o sin acentos"/></label>
+      {busqueda&&<div className="max-h-36 overflow-y-auto border border-fondo-borde rounded">{filtrados.slice(0,60).map(p=><button key={p.id} className="block w-full min-h-12 px-3 text-left border-b border-fondo-borde" onClick={()=>{elegirProducto(p.id);setBusqueda('')}}>{p.nombre} · {p.unidad_medida}</button>)}{!filtrados.length&&<p className="p-3">No hay coincidencias. Prueba otra palabra.</p>}</div>}
+      <label className="block">Producto<select className="campo-input mt-1" value={ingrediente.producto_id} onChange={e=>elegirProducto(e.target.value)}><option value="">Seleccionar producto</option>{productos.map(p=><option key={p.id} value={p.id}>{p.nombre} · {p.unidad_medida}</option>)}</select></label>
+      <div className="grid grid-cols-2 gap-3"><label>Cantidad<input className="campo-input" type="number" inputMode="decimal" min=".001" step=".001" value={ingrediente.cantidad} onChange={e=>setIngrediente({...ingrediente,cantidad:e.target.value})}/></label><label>Unidad<select className="campo-input" value={ingrediente.unidad_medida} onChange={e=>setIngrediente({...ingrediente,unidad_medida:e.target.value})}><option value="">Selecciona producto</option>{UNIDADES.map(u=><option key={u}>{u}</option>)}</select></label></div>
+      <details><summary className="min-h-12">Notas y opcional</summary><input aria-label="Notas del ingrediente" className="campo-input" value={ingrediente.notas} onChange={e=>setIngrediente({...ingrediente,notas:e.target.value})}/><label className="flex min-h-12 gap-2 items-center"><input type="checkbox" checked={ingrediente.es_opcional} onChange={e=>setIngrediente({...ingrediente,es_opcional:e.target.checked})}/>Ingrediente opcional</label></details>
+      <button className="btn-primario w-full" disabled={!ingrediente.producto_id||!ingrediente.unidad_medida||!(Number(ingrediente.cantidad)>0)} onClick={()=>{setIngredientes(a=>a.some(x=>x.key===ingrediente.key)?a.map(x=>x.key===ingrediente.key?ingrediente:x):[...a,ingrediente]);setIngrediente(null)}}>Listo</button>
+    </Ventana>}
+    {paso&&<Ventana titulo="Paso de elaboración" cerrar={()=>setPaso(null)}>
+      <label className="block">Título<input autoFocus className="campo-input" value={paso.titulo} onChange={e=>setPaso({...paso,titulo:e.target.value})}/></label>
+      <label className="block">Descripción<textarea className="campo-input min-h-24" value={paso.descripcion} onChange={e=>setPaso({...paso,descripcion:e.target.value})}/></label>
+      <details><summary className="min-h-12">Tiempo, temperatura y técnica</summary>
+        <label className="block">Minutos<input type="number" min="0" className="campo-input" value={paso.duracion_min} onChange={e=>setPaso({...paso,duracion_min:e.target.value})}/></label>
+        <label className="block">Temperatura °C<input type="number" className="campo-input" value={paso.temperatura_c} onChange={e=>setPaso({...paso,temperatura_c:e.target.value})}/></label>
+        <label className="block">Técnica<input className="campo-input" value={paso.tecnica} onChange={e=>setPaso({...paso,tecnica:e.target.value})}/></label>
+        <label><input type="checkbox" checked={paso.punto_critico} onChange={e=>setPaso({...paso,punto_critico:e.target.checked})}/> Punto crítico</label>
+      </details>
+      <button className="btn-primario w-full" disabled={!paso.titulo.trim()||!paso.descripcion.trim()} onClick={()=>{setPasos(a=>a.some(x=>x.key===paso.key)?a.map(x=>x.key===paso.key?paso:x):[...a,paso]);setPaso(null)}}>Listo</button>
+    </Ventana>}
+  </div>
 }

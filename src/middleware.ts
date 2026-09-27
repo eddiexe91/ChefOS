@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
   // Debe llegar siempre a su Route Handler, incluso si el navegador conserva
   // una sesión anterior; de lo contrario el middleware lo redirige antes de
   // que pueda renovar las cookies SSR.
-  if (ruta === '/api/auth/session') return response
+  if (ruta === '/api/auth/session' || ruta === '/auth/callback') return response
 
   // Las rutas API controlan su propia autorización y siempre deben recibir
   // una respuesta JSON, incluso cuando ya existe una sesión autenticada.
@@ -83,7 +83,7 @@ export async function middleware(request: NextRequest) {
   }
 
   for (const [rutaRestringida, rolesPermitidos] of Object.entries(RUTAS_RESTRINGIDAS)) {
-    if (ruta.startsWith(rutaRestringida)) {
+    if (ruta === rutaRestringida || ruta.startsWith(rutaRestringida + '/')) {
       const { data: perfil } = await supabase
         .from('usuarios')
         .select('rol')

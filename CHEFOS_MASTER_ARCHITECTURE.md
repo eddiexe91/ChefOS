@@ -8,9 +8,11 @@ Leer conjuntamente [CHEFOS_NORTE_ESTRATEGICO.md](CHEFOS_NORTE_ESTRATEGICO.md). T
 **Estado:** Fuente de verdad permanente  
 **Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)
 
-## Control vigente — 23-09-2026
+## Control vigente — 27-09-2026
 
-Para estado real prevalecen `GITHUB_HANDOFF.md` y `RELEASE_1.3.0.md` sobre las afirmaciones históricas de este documento. Historial POS 013/014 activo, APK/backend 1.3.0 y cron privado 015 configurado. Se detectó que las funciones remotas antiguas mezclaban una plantilla con código previo: se reemplazaron y se verificó autenticación/lectura, no el ciclo automático completo de escritura. La visión y funciones futuras del Norte no se declaran terminadas. No se importaron ventas reales ni se borraron datos.
+Para estado real prevalecen `GITHUB_HANDOFF.md` y `RELEASE_1.3.1.md` sobre las afirmaciones históricas. Historial 013/014 y cron privado 015 activos; 016 y su complemento de permisos aplicados. La entrega 1.3.1 incorpora guardado transaccional e idempotente de recetas, producción por tandas/salida real y correcciones compensatorias. Datos fiables y trazables alimentan el Briefing; no se certifica toda la visión. No se importaron ventas reales ni se borraron datos.
+
+La antigua afirmación de «todo en gramos» no es literal para unidades contadas sin peso: una porción sin equivalencia es una unidad operacional, no un gramo. `cantidad_operativa_producto` distingue conteo y masa; convertirlos exige equivalencia. No reinterpretar históricos automáticamente. El Briefing manual evita inventar compras con mínimo cero; el motor automático sigue pendiente de homogeneización y prueba de ciclo real. Excel multiformato y tutoriales prácticos siguen pendientes.
 
 ## ACTUALIZACIÓN DE CONTROL — 13-09-2026
 

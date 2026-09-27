@@ -1,7 +1,7 @@
 /**
  * src/hooks/useRegistrarProduccion.ts
  *
- * Hook de dominio para registrar producción en un lote activo.
+ * Hook de dominio para registrar producción terminada (contrato seguro 016).
  *
  * Encapsula completamente la lógica de React Query:
  * - useMutation con tipos explícitos
@@ -26,7 +26,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { dashboardKeys, inventarioKeys, produccionKeys } from '@/lib/queries'
-import { encolarAccion }               from '@/lib/offline/cola'
 
 // ─────────────────────────────────────────────────────────────
 // Tipos exportados
@@ -35,8 +34,9 @@ import { encolarAccion }               from '@/lib/offline/cola'
 export interface BodyProduccion {
   lote_id:            string
   receta_id:          string
-  cantidad_producida: number
-  unidad:             string
+  tandas:            number
+  salida_real:       number
+  solicitud_id:      string
   notas:              string | null
 }
 
@@ -62,6 +62,7 @@ export function useRegistrarProduccion(opciones?: OpcionesHook) {
 
   const mutacion = useMutation<RespuestaAPI, Error, BodyProduccion>({
     mutationFn: async (body: BodyProduccion): Promise<RespuestaAPI> => {
+      if (!navigator.onLine) throw new Error('Sin conexión. Esta operación no se ha guardado. Reconecta antes de confirmar.')
       let response: Response
       try {
         response = await fetch('/api/produccion', {
@@ -69,16 +70,8 @@ export function useRegistrarProduccion(opciones?: OpcionesHook) {
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(body),
         })
-      } catch (error) {
-        if (typeof window !== 'undefined' && (!window.navigator.onLine || error instanceof TypeError)) {
-          await encolarAccion({
-            tabla: 'api/produccion',
-            operacion: 'INSERT',
-            payload: { endpoint: '/api/produccion', body },
-          })
-          return { data: { pendiente: true }, error: null }
-        }
-        throw error
+      } catch {
+        throw new Error('No se pudo confirmar la operación. Comprueba los movimientos al reconectar antes de repetirla.')
       }
 
       // Parseo defensivo: nunca lanzar por intentar parsear JSON.
@@ -102,7 +95,7 @@ export function useRegistrarProduccion(opciones?: OpcionesHook) {
         // La validación de response.ok a continuación producirá el error correcto.
       }
 
-      if (!response.ok || json.error !== null) {
+      if (!response.ok || json.error !== null || json.data == null) {
         throw new Error(
           typeof json.error === 'string' && json.error.trim() !== ''
             ? json.error

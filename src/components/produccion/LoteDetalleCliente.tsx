@@ -17,7 +17,8 @@ import Link                                    from 'next/link'
 import { ChevronLeft, Package, ClipboardList } from 'lucide-react'
 import { useLoteDetalle }                      from '@/hooks/useLoteDetalle'
 import { prepararRegistros, parsearFechaLocal } from '@/lib/produccion'
-import { ETIQUETAS_TURNO, ETIQUETAS_ESTADO, CLASES_ESTADO } from '@/lib/produccionUI'
+import { ETIQUETAS_TURNO } from '@/lib/produccionUI'
+import CorregirProduccion from '@/components/produccion/CorregirProduccion'
 import RegistrarProduccionForm                 from '@/components/produccion/RegistrarProduccionForm'
 
 // ─────────────────────────────────────────────────────────────
@@ -105,13 +106,6 @@ export default function LoteDetalleCliente({ loteId, recetaInicialId }: Props) {
                   })}
                 </p>
               </div>
-              <span
-                className={`px-2.5 py-1 rounded-full text-2xs font-sans font-medium
-                            flex-shrink-0 mt-1
-                            ${CLASES_ESTADO[lote.data.estado]}`}
-              >
-                {ETIQUETAS_ESTADO[lote.data.estado]}
-              </span>
             </div>
           </section>
 
@@ -162,7 +156,7 @@ export default function LoteDetalleCliente({ loteId, recetaInicialId }: Props) {
           )}
 
           {/* Formulario de registro — solo si lote en progreso */}
-          {lote.data.estado === 'en_progreso' && (
+          {lote.data && (
             <section className="rounded-xl bg-fondo-elevado border border-fondo-borde overflow-hidden">
               <div className="px-4 py-3 border-b border-fondo-borde flex items-center gap-2">
                 <Package size={14} className="text-texto-apagado" />
@@ -231,6 +225,8 @@ export default function LoteDetalleCliente({ loteId, recetaInicialId }: Props) {
                     <p className="text-sm font-sans font-medium text-texto-primario truncate">
                       {registro.nombre}
                     </p>
+                    {registro.anulado ? <p className="text-peligro">Anulada · movimientos compensados</p> : <CorregirProduccion id={registro.id} />}
+                    {registro.tandas !== null && <p className="text-xs text-texto-secundario">{registro.tandas} recetas producidas</p>}
                     <p className="text-2xs font-sans text-texto-apagado mt-0.5">
                       {registro.cantidad} {registro.unidad}
                       {registro.porciones !== null && (

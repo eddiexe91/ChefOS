@@ -16,6 +16,8 @@ import type { ProduccionRegistro } from '@/types/index'
 
 export interface RegistroPreparado {
   id:          string
+  tandas:      number | null
+  anulado:     boolean
   nombre:      string
   cantidad:    number
   unidad:      string
@@ -67,6 +69,8 @@ export function prepararRegistros(
 ): RegistroPreparado[] {
   return registros.map((registro) => ({
     id:          registro.id,
+    tandas:      registro.tandas ?? null,
+    anulado:     registro.anulado ?? false,
     nombre:      registro.receta?.nombre ?? registro.producto?.nombre ?? 'Sin nombre',
     cantidad:    registro.cantidad_producida,
     unidad:      registro.unidad,

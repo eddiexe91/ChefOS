@@ -142,17 +142,20 @@ export default function AlertasCliente() {
 
   // Estado local para deshabilitar el botón mientras se procesa
   const [marcandoId, setMarcandoId] = useState<string | null>(null)
+  const [errorLectura, setErrorLectura] = useState('')
 
   const handleMarcarLeida = (alertaId: string) => {
     if (marcandoId !== null) return  // evitar doble tap
     setMarcandoId(alertaId)
-    void marcarAlertaLeida(alertaId).finally(() => {
+    setErrorLectura('')
+    void marcarAlertaLeida(alertaId).catch(() => setErrorLectura('No se pudo guardar la lectura. Comprueba la conexión e inténtalo de nuevo.')).finally(() => {
       setMarcandoId(null)
     })
   }
 
   return (
     <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
+      {errorLectura && <p role="alert" className="text-peligro">{errorLectura}</p>}
 
       {/* ── Encabezado ───────────────────────────────────── */}
       <section>

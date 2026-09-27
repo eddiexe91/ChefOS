@@ -4,7 +4,6 @@ import {
   useState,
   useEffect,
   useCallback,
-  useRef,
   createContext,
   useContext,
 } from 'react'
@@ -12,10 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
 import { inventarioKeys, produccionKeys, alertasKeys, bibliotecaKeys, dashboardKeys } from '@/lib/queries'
 import {
-  obtenerAccionesPendientes,
   contarAccionesPendientes,
-  eliminarAccion,
-  marcarIntento,
 } from '@/lib/offline/cola'
 import type { AlertaSistema, Usuario, Restaurante } from '@/types'
 
@@ -72,7 +68,6 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
   const [alertasNoLeidas,    setAlertasNoLeidas]   = useState<AlertaSistema[]>([])
   const [estaOnline,         setEstaOnline]         = useState(true)
   const [accionesPendientes, setAccionesPendientes] = useState(0)
-  const sincronizando = useRef(false)
 
   useEffect(() => {
     const refrescar = () => {
@@ -103,44 +98,9 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
   }, [])
 
   const sincronizarColaOffline = useCallback(async () => {
-    if (typeof window === 'undefined' || !navigator.onLine || sincronizando.current) return
-    sincronizando.current = true
-    try {
-      const acciones = await obtenerAccionesPendientes()
-      for (const accion of acciones) {
-        if (accion.intentos >= 3) {
-          await eliminarAccion(accion.id)
-          continue
-        }
-
-        const payload = accion.payload
-        if (typeof payload !== 'object' || payload === null || !('endpoint' in payload) || !('body' in payload)) {
-          await eliminarAccion(accion.id)
-          continue
-        }
-
-        const solicitud = payload as { endpoint: unknown; body: unknown }
-        if (typeof solicitud.endpoint !== 'string') {
-          await eliminarAccion(accion.id)
-          continue
-        }
-
-        await marcarIntento(accion.id)
-        try {
-          const response = await fetch(solicitud.endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(solicitud.body),
-          })
-          if (response.ok) await eliminarAccion(accion.id)
-        } catch {
-          break
-        }
-      }
-    } finally {
-      sincronizando.current = false
-      await actualizarContadorOffline()
-    }
+    // Legacy jobs lack tenant binding and reliable idempotency. Preserve them for
+    // review instead of replaying under another login or deleting after 3 failures.
+    await actualizarContadorOffline()
   }, [actualizarContadorOffline])
 
   // ── Online / Offline ─────────────────────────────────────────
@@ -269,16 +229,18 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
 
   // ── Funciones del contexto ────────────────────────────────────
   const marcarAlertaLeida = useCallback(async (alertaId: string) => {
-    await supabase
+    const { data, error } = await supabase
       .from('alertas_sistema')
       .update({
         leida:     true,
         leida_por: usuario.id,
         leida_en:  new Date().toISOString(),
       })
-      .eq('id', alertaId)
+      .eq('id', alertaId).select('id').single()
+    if (error || !data) throw new Error('No se pudo marcar la alerta como leída. Comprueba tu conexión y permisos.')
+    await queryClient.invalidateQueries({ queryKey: ['alertas'] })
     setAlertasNoLeidas((prev) => prev.filter((a) => a.id !== alertaId))
-  }, [supabase, usuario.id])
+  }, [supabase, usuario.id, queryClient])
 
   const agregarAccionPendiente = useCallback(() => {
     setAccionesPendientes((n) => n + 1)
