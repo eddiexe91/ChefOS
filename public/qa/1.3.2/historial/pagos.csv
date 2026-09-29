@@ -1,0 +1,4 @@
+﻿ticket_id,forma_pago_id,forma_pago,importe,propina,tipo_cambio
+H-QA132-1,EF,Efectivo,4000,0,1
+H-QA132-1,TJ,Tarjeta,5000,0,1
+A-QA132-1,EF,Efectivo,3000,0,1

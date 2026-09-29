@@ -59,11 +59,17 @@ export default function DashboardCliente() {
   const briefingQuery = useQuery<Briefing>({
     queryKey: [...dashboardKeys.all, 'operativo-actual', restaurante?.id, usuario?.id],
     enabled: Boolean(restaurante?.id && usuario?.id && estaOnline),
-    queryFn: async () => {
-      const respuesta = await fetch('/api/ia/briefing', { method: 'POST', cache: 'no-store' })
+    queryFn: async ({ signal }) => {
+      const controller = new AbortController()
+      const abortar = () => controller.abort()
+      signal.addEventListener('abort', abortar, { once: true })
+      const timer = window.setTimeout(abortar, 25000)
+      try {
+      const respuesta = await fetch('/api/ia/briefing', { method: 'POST', cache: 'no-store', signal: controller.signal })
       const resultado = await respuesta.json()
       if (!respuesta.ok || !resultado.data) throw new Error(resultado.error ?? 'No se pudo analizar el turno.')
       return resultado.data
+      } finally { clearTimeout(timer); signal.removeEventListener('abort', abortar) }
     },
     refetchInterval: 60000,
   })
@@ -148,6 +154,8 @@ export default function DashboardCliente() {
       {/* ── 3. Briefing ──────────────────────────────────── */}
       <section>
         <div className="flex justify-end mb-2"><GenerarBriefingButton /></div>
+        {briefingQuery.isError && <p role="alert" className="text-sm text-advertencia mb-3">No se pudo actualizar el Briefing. {briefingQuery.data ? 'Lo mostrado es el análisis anterior; no lo consideres actualizado.' : 'Comprueba existencias directamente en Inventario y Stock.'} Reintenta con conexión.</p>}
+        {briefingQuery.dataUpdatedAt > 0 && <p className="text-xs text-texto-secundario mb-2">Última respuesta: {new Date(briefingQuery.dataUpdatedAt).toLocaleTimeString('es-CL')}{briefingQuery.isFetching ? ' · actualizando…' : ''}</p>}
         <BriefingCard briefing={briefingQuery.data ?? null} productos={productosQuery.data} pendiente={briefingQuery.isPending} />
         {isPending && (
           <div className="rounded-xl bg-fondo-elevado border border-fondo-borde p-4 space-y-3">

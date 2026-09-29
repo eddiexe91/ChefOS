@@ -8,7 +8,11 @@ Leer conjuntamente [CHEFOS_NORTE_ESTRATEGICO.md](CHEFOS_NORTE_ESTRATEGICO.md). T
 **Estado:** Fuente de verdad permanente  
 **Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)
 
-## Control vigente — 27-09-2026
+## Control vigente — 29-09-2026
+
+Estado 1.3.2: ver `RELEASE_1.3.2.md` y `GITHUB_HANDOFF.md`. Permisos mediante RPC acotadas (nombre propio, configuración con rol autorizado y lectura de alertas), historial validado por seis etapas reanudables y captura de fallos explícita. Mantener la separación entre datos preparados y ventas confirmadas, y entre historial y consumo operativo. La memoria de ventas sirve al Briefing; no inventar demanda si falta historial. Pruebas físicas previas y pruebas sintéticas no certifican todas las capacidades futuras.
+
+## Control anterior — 27-09-2026
 
 Para estado real prevalecen `GITHUB_HANDOFF.md` y `RELEASE_1.3.1.md` sobre las afirmaciones históricas. Historial 013/014 y cron privado 015 activos; 016 y su complemento de permisos aplicados. La entrega 1.3.1 incorpora guardado transaccional e idempotente de recetas, producción por tandas/salida real y correcciones compensatorias. Datos fiables y trazables alimentan el Briefing; no se certifica toda la visión. No se importaron ventas reales ni se borraron datos.
 

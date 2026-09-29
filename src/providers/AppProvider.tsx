@@ -229,18 +229,12 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
 
   // ── Funciones del contexto ────────────────────────────────────
   const marcarAlertaLeida = useCallback(async (alertaId: string) => {
-    const { data, error } = await supabase
-      .from('alertas_sistema')
-      .update({
-        leida:     true,
-        leida_por: usuario.id,
-        leida_en:  new Date().toISOString(),
-      })
-      .eq('id', alertaId).select('id').single()
+    if (!navigator.onLine) throw new Error('Necesitas conexión para marcar la alerta.')
+    const { data, error } = await supabase.rpc('marcar_alerta_leida', { p_alerta: alertaId })
     if (error || !data) throw new Error('No se pudo marcar la alerta como leída. Comprueba tu conexión y permisos.')
     await queryClient.invalidateQueries({ queryKey: ['alertas'] })
     setAlertasNoLeidas((prev) => prev.filter((a) => a.id !== alertaId))
-  }, [supabase, usuario.id, queryClient])
+  }, [supabase, queryClient])
 
   const agregarAccionPendiente = useCallback(() => {
     setAccionesPendientes((n) => n + 1)

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { crearClienteServidor } from '@/lib/supabase/servidor'
 import { observacionesVentas, type ContextoVentas } from '@/lib/ventas/contextoBriefing'
+export const maxDuration = 30
 
 type ProductoBriefing = {
   id: string
@@ -180,8 +181,10 @@ export async function POST() {
   if (!productos.some((p) => p.tipo_operativo === 'elaborado')) riesgos.set('stock', { tipo: 'configuracion', descripcion: 'Registra las preparaciones listas para servir.', severidad: 'media', accion_sugerida: 'Actualiza Stock disponible.' })
   if (!recetasCarta.length) riesgos.set('carta', { tipo: 'configuracion', descripcion: 'Añade los platos que ofrece tu restaurante.', severidad: 'media', accion_sugerida: 'Completa Carta para relacionar platos con existencias.' })
 
+  // An unavailable sales context must not block today's stock/production decisions.
   const { data: contextoVentas, error: errorVentas } = await supabase.rpc('contexto_ventas_briefing', { p_restaurante: perfil.restaurante_id, p_fecha: fecha })
-  const observaciones = errorVentas ? ['No se pudo verificar el historial de ventas. Las sugerencias actuales solo consideran datos operativos disponibles.'] : observacionesVentas(contextoVentas as ContextoVentas)
+    .abortSignal(AbortSignal.timeout(3500))
+  const observaciones = errorVentas || !contextoVentas ? ['No se pudo verificar el historial de ventas. Las sugerencias actuales solo consideran datos operativos disponibles.'] : observacionesVentas(contextoVentas as ContextoVentas)
   const briefing = {
     restaurante_id: perfil.restaurante_id,
     fecha,
@@ -194,6 +197,8 @@ export async function POST() {
     actividad_reciente: [],
     contexto_usado: {
       generado_por: 'api/ia/briefing',
+      verificado_en: new Date().toISOString(),
+      fuentes_incompletas: fuentesIncompletas,
       productos_activos: productos.length,
       platos_en_carta: recetasCarta.length,
       recetas_de_produccion: recetasProduccion.length,

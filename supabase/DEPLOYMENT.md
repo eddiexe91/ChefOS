@@ -1,5 +1,9 @@
 # Despliegue real de ChefOS en Supabase
 
+## Corte vigente — 29-09-2026
+
+Ver `../RELEASE_1.3.2.md`: aplicadas por conector y verificadas `20260929030320_correcciones_qa_perfil_alertas_configuracion` y `20260929030350_historial_validacion_reanudable`. Los archivos locales coinciden con las versiones remotas. Sin importación ni limpieza de datos reales. 013–016 y otras migraciones antiguas fueron aplicadas por SQL Editor; antes de `db push` conciliar su estado, no reaplicarlas. Permisos explícitos anon cerrados; RPC authenticated con controles internos de actor/tenant/rol, no UPDATE genérico de identidad.
+
 ## Corte de estado — 13-09-2026
 
 Las tres Edge Functions y los dos cron jobs están publicados y respondieron correctamente. El puente de sesión SSR del backend Next.js fue corregido: la prueba local con tokens reales de un usuario temporal devolvió HTTP 200 y cookies de sesión. El backend Next.js está publicado en Vercel en `https://chefos-pied.vercel.app` y `/api/health` confirma Supabase y Storage operativos. La confirmación restante es el flujo completo desde el teléfono físico.

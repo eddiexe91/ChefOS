@@ -34,11 +34,16 @@ export async function POST(request: Request) {
         break
       }
       case 'validar': resultado = await db.rpc('validar_historial_pos', { p_id: b.id, p_manifiesto: b.manifiesto }); break
+      case 'validar_paso':
+        if (!Number.isInteger(b.paso) || b.paso < 0 || b.paso > 5) throw new Error('Etapa inválida.')
+        resultado = await db.rpc('validar_historial_paso', { p_id: b.id, p_manifiesto: b.manifiesto, p_paso: b.paso }); break
       case 'confirmar': resultado = await db.rpc('confirmar_historial_pos', { p_id: b.id }); break
       case 'mapear': resultado = await db.rpc('mapear_producto_pos', { p_pos: b.pos, p_estado: b.estado, p_receta: b.receta || null, p_producto: b.producto || null }); break
       default: throw new Error('Acción inválida.')
     }
-    if (resultado.error) return NextResponse.json({ error: resultado.error.message }, { status: 400 })
+    if (resultado.error) return NextResponse.json({ error: resultado.error.code === '57014'
+      ? 'La base de datos agotó el tiempo de esta etapa. Los bloques preparados siguen guardados. Recupera este paquete y reintenta; no cargues uno nuevo ni confirmes otra importación.'
+      : resultado.error.message, codigo: resultado.error.code, etapa: b.accion }, { status: 400 })
     return NextResponse.json({ data: resultado.data }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : 'No se pudo procesar.' }, { status: 400 }) }
 }
@@ -47,9 +52,17 @@ export async function GET(request: Request) {
   const db = crearClienteServidor()
   const { data: { user } } = await db.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Inicia sesión.' }, { status: 401 })
-  const { data: perfil } = await db.from('usuarios').select('restaurante_id').eq('id', user.id).eq('activo', true).single()
+  const { data: perfil } = await db.from('usuarios').select('restaurante_id,rol').eq('id', user.id).eq('activo', true).single()
   if (!perfil) return NextResponse.json({ error: 'Perfil no disponible.' }, { status: 403 })
   const u = new URL(request.url)
+  if (u.searchParams.get('vista') === 'preparaciones') {
+    if (!['dueño','administrador','chef_ejecutivo'].includes(perfil.rol)) return NextResponse.json({ error: 'Sin permisos para importar.' }, { status: 403 })
+    const { data, error } = await db.from('ventas_importaciones')
+      .select('id,creado_en,estado_procesamiento,manifiesto,resultado,validacion_parcial')
+      .eq('restaurante_id', perfil.restaurante_id).eq('modo', 'historico')
+      .order('creado_en', { ascending: false }).limit(10)
+    return NextResponse.json(error ? { error: error.message } : { data }, { status: error ? 400 : 200, headers: { 'Cache-Control': 'no-store' } })
+  }
   const pagina = Math.max(0, Number(u.searchParams.get('pagina')) || 0)
   const { data, error } = await db.from('productos_pos').select('id,nombre,id_externo,fuente,categoria,productos_pos_mapeos(estado,receta_id,producto_id)').eq('restaurante_id', perfil.restaurante_id).order('id').range(pagina * 100, pagina * 100 + 99)
   return NextResponse.json(error ? { error: error.message } : { data: (data ?? []).map(p => ({ ...p, productos_pos_mapeos: Array.isArray(p.productos_pos_mapeos) ? p.productos_pos_mapeos : p.productos_pos_mapeos ? [p.productos_pos_mapeos] : [] })) })

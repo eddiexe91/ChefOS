@@ -1,5 +1,13 @@
 # Historial POS y memoria operacional
 
+## Actualización 1.3.2 — 29-09-2026
+
+`20260929030350_historial_validacion_reanudable.sql` aplicada. Extiende el modelo existente con `ventas_importaciones.validacion_parcial`, no crea otro importador. `validar_historial_paso(id,manifiesto,paso)` divide validación en seis transacciones: completitud, duplicados, relaciones, catálogo/mapeo, registros existentes y resumen/pagos. Guarda siguiente etapa/resumen; una etapa fallida revierte solo esa llamada. Una fila de preparación nueva invalida el progreso; repetir bloques idénticos no lo invalida. La confirmación revalida siempre de forma atómica y no confía ciegamente en un resumen antiguo.
+
+Se elimina ANALYZE global de la tabla compartida; se reutilizan sus índices por importación/tipo/clave/ticket/producto. Timeouts solo por función (25 s etapa; 55 s compatibilidad/confirmación), nunca globales. La API autentica y las RPC comprueban rol/restaurante; no admiten tenant indicado por el cliente. GET de preparaciones devuelve diez últimas del restaurante para recuperar resultados, sin importar datos ni tocar stock.
+
+Estado `validado` significa vista previa, no memoria publicada. Reanudar sin manifiesto requiere los mismos archivos/codificación; con manifiesto continúa etapas. No se limpian preparaciones automáticamente. Confirmación aún monolítica: si excede el límite, falta diseñar finalización persistente con publicación atómica. Ver pruebas y límites en `RELEASE_1.3.2.md`.
+
 Implementación local revisada el 18-09-2026. Activación remota verificada el 23-09-2026: 013/014 aplicadas, RLS/RPC comprobadas, `historialPos.disponible=true`, sin importar ventas reales. La 015 configura autenticación privada de cron. Consultar [RELEASE_1.3.0.md](RELEASE_1.3.0.md) para pruebas y límites de las tareas programadas.
 
 ## Estado inicial y alcance

@@ -13,6 +13,7 @@ android/app/*.keystore
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 artifacts/*.apk
+artifacts/qa-1.3.2-builder/
 tsconfig.tsbuildinfo
 .env.local
 .env*.local

@@ -1,5 +1,15 @@
 # ChefOS — guía de continuación
 
+## Entrega 1.3.2 — 29-09-2026
+
+Consultar primero [RELEASE_1.3.2.md](RELEASE_1.3.2.md) y [GUIA_TESTEO_CHEFOS_1.3.2.md](GUIA_TESTEO_CHEFOS_1.3.2.md). Corrige nombre de perfil, configuración del Chef Ejecutivo sin autoasignación de cargo, lectura de alertas antiguas, guardado nativo de CSV, motivos/notas de merma, recuperación/validación por etapas del historial y errores visibles del Briefing manual. Ocho CSV ficticios en `public/qa/1.3.2`, accesibles desde Configuración → Archivos ficticios y guía de pruebas.
+
+**Migraciones nuevas aplicadas y verificadas:** `20260929030320_correcciones_qa_perfil_alertas_configuracion.sql` y `20260929030350_historial_validacion_reanudable.sql`. El usuario autorizó activar permisos. No se importaron ventas reales ni se eliminaron borradores/datos. Cuatro preparaciones y una vista previa validada siguen conservadas; usar Recuperar, no cargar otra copia del mismo período. La confirmación final sigue siendo atómica y tiene límites de tiempo; no está certificada con el paquete real.
+
+APK 1.3.2/versionCode 6 compilada y firma compatible, `artifacts/ChefOS-1.3.2-test.apk`. Escala sintética local de 150.000 líneas aprobada, no equivale al test físico. Ver cierre de publicación en RELEASE_1.3.2 antes de afirmar despliegue web. El testeo físico 1.3.1 del usuario confirmó recetas/Carta sin duplicados, producción/corrección/anulación y existencias; esta versión requiere nueva regresión, no una declaración del 100%.
+
+Pendientes prioritarios: prueba real de importación y contexto del Briefing, retención segura de preparaciones, unificar motor automático/manual, Excel multiformato, tutoriales prácticos y PKCE. No reimplementar recetas ni revertir unidades contadas a gramos. No tocar el archivo local ajeno `AUDITORIA_NORTE_2026-09-17.md` sin inspección/autorización.
+
 ## Entrega de pruebas 1.3.1 — 27-09-2026
 
 Leer [RELEASE_1.3.1.md](RELEASE_1.3.1.md), [GUIA_TESTEO_CHEFOS_1.3.1.md](GUIA_TESTEO_CHEFOS_1.3.1.md) y [CORRECCIONES_QA_2026-09-26.md](CORRECCIONES_QA_2026-09-26.md). Código **1.3.1 publicado en main, cb08648**, Vercel success y health remoto 1.3.1/ok/historial/Storage confirmados el 27-09. Android 1.3.1/versionCode 5 compilado, firma compatible y pantalla offline incluidas; APK local enlazada abajo. Guía accesible en GitHub. Estos checks no certifican Android físico ni escrituras E2E del restaurante.

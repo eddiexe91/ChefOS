@@ -48,6 +48,14 @@ async function main(){
   assert.equal(llamadas[0].nombre,'preparar_historial_bloque')
   assert.equal(llamadas[0].args.p_filas[0].total,10)
   assert.ok(!JSON.stringify(llamadas).includes('restaurante-inyectado'),'tenant no viene del cliente')
+  assert.equal((await ruta.POST(peticion({accion:'validar_paso',id:'qa',paso:6,manifiesto:{}}))).status,400)
+  assert.equal((await ruta.POST(peticion({accion:'validar_paso',id:'qa',paso:0,manifiesto:{}}))).status,200)
+  assert.equal(llamadas.at(-1).nombre,'validar_historial_paso')
+  const timeoutDb={...db,rpc:async()=>({data:null,error:{code:'57014',message:'canceling statement due to statement timeout'}})}
+  const timeoutRuta=cargar('src/app/api/ventas/historial/route.ts',{'@/lib/supabase/servidor':{crearClienteServidor:()=>timeoutDb}})
+  const timeout=await timeoutRuta.POST(peticion({accion:'validar_paso',id:'qa',paso:1,manifiesto:{}}))
+  assert.equal(timeout.status,400)
+  assert.match((await timeout.json()).error,/Recupera este paquete/)
   const dbLegado={...db,from:tabla=>({select(){return this},eq(){return this},single:async()=>({data:tabla==='usuarios'?{id:'usuario',restaurante_id:'tenant',rol:'administrador'}:tabla==='ventas_importaciones'?{id:'importacion',modo:'historico'}:{id:'linea',ticket_id:'ticket'}})})}
   const depsLegado={'@/lib/supabase/servidor':{crearClienteServidor:()=>dbLegado}}
   const confirmarLegado=cargar('src/app/api/ventas/importaciones/[id]/confirmar/route.ts',depsLegado)

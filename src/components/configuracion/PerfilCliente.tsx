@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { useApp } from '@/providers/AppProvider'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
 
 export default function PerfilCliente() {
   const { usuario } = useApp()
+  const router = useRouter()
   const supabase = obtenerClienteNavegador()
   const [nombre, setNombre] = useState(usuario?.nombre ?? '')
   const [guardando, setGuardando] = useState(false)
@@ -19,13 +21,15 @@ export default function PerfilCliente() {
 
     setGuardando(true)
     setMensaje(null)
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ nombre: nombre.trim() })
-      .eq('id', usuario.id)
-
-    setGuardando(false)
-    setMensaje(error ? 'No se pudo guardar el cambio.' : 'Perfil actualizado.')
+    try {
+      if (!navigator.onLine) throw new Error('Necesitas conexión para guardar tu nombre.')
+      const { data, error } = await supabase.rpc('actualizar_mi_nombre', { p_nombre: nombre.trim() })
+      if (error || !data) throw new Error(error?.message ?? 'No se confirmó el guardado.')
+      setNombre(data)
+      router.refresh()
+      setMensaje('Nombre guardado. Se actualizará también en Inicio.')
+    } catch (e) { setMensaje(e instanceof Error ? e.message : 'No se pudo guardar el cambio.') }
+    finally { setGuardando(false) }
   }
 
   return (

@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import DescargarArchivo from '@/components/ui/DescargarArchivo'
 import Link from 'next/link'
-import { Check, ChevronRight, Download, PackagePlus, Soup, UtensilsCrossed } from 'lucide-react'
+import { Check, ChevronRight, PackagePlus, Soup, UtensilsCrossed } from 'lucide-react'
 
 import { useProductos } from '@/hooks/useDominio'
 import { TIPOS_INVENTARIO } from '@/lib/productos'
@@ -17,13 +19,15 @@ const PASOS = [
 
 export default function OnboardingPage() {
   const { restaurante, usuario } = useApp()
+  const router = useRouter()
+  const colaGuardado = useRef<Promise<unknown>>(Promise.resolve())
+  const puedeConfigurar = ['dueño', 'administrador', 'chef_ejecutivo'].includes(usuario?.rol ?? '')
   const inventarioQuery = useProductos({ tipos_operativos: TIPOS_INVENTARIO, activo: true })
   const stockQuery = useProductos({ tipos_operativos: ['elaborado'], activo: true })
 
   const onboardingGuardado = useMemo(() => restaurante?.config?.onboarding ?? {}, [restaurante?.config])
   const [paso, setPaso] = useState(Number(onboardingGuardado.paso_actual ?? 0))
   const [nombre, setNombre] = useState(restaurante?.nombre ?? '')
-  const [rol, setRol] = useState<string>(usuario?.rol ?? 'dueño')
   const [zonaHoraria, setZonaHoraria] = useState(restaurante?.zona_horaria ?? 'America/Santiago')
   const [guardando, setGuardando] = useState(false)
   const [archivo, setArchivo] = useState<File | null>(null)
@@ -42,39 +46,36 @@ export default function OnboardingPage() {
   const stockListo = cantidadStock > 0
   const puedeCerrar = inventarioListo && stockListo
 
-  async function guardarAvance(completar = false, silencioso = false) {
-    if (!restaurante?.id) return
+  const guardarAvance = useCallback(async (completar = false, silencioso = false) => {
+    if (!restaurante?.id || !puedeConfigurar) return false
     if (!silencioso) setGuardando(true)
+    const body = JSON.stringify({ nombre, zona_horaria: zonaHoraria, paso_actual: paso, completar, confirmar_incompleto: confirmarIncompleto })
+    const trabajo = colaGuardado.current.catch(() => undefined).then(async () => {
+    if (!navigator.onLine) throw new Error('Sin conexión: no se guardó la configuración.')
     const response = await fetch('/api/onboarding/configurar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nombre,
-        rol,
-        zona_horaria: zonaHoraria,
-        paso_actual: paso,
-        inventario_confirmado: inventarioListo,
-        stock_confirmado: stockListo,
-        completar,
-        confirmar_incompleto: confirmarIncompleto,
-      }),
+      body,
     })
     const data = await response.json().catch(() => ({ error: 'No se pudo guardar el avance.' })) as { error?: string; estado?: { onboarding?: { completo?: boolean } } }
-    if (!silencioso) setGuardando(false)
     if (!response.ok) {
-      if (!silencioso) setMensaje(data.error ?? 'No se pudo guardar el avance.')
+      setMensaje(data.error ?? 'No se pudo guardar el avance.')
       return false
     }
     if (!silencioso) setMensaje(completar ? 'Onboarding guardado correctamente.' : 'Avance guardado.')
+    if (completar) router.refresh()
     return true
-  }
+    }).catch((e) => { setMensaje(e instanceof Error ? e.message : 'No se pudo guardar el avance.'); return false })
+    colaGuardado.current = trabajo
+    try { return await trabajo } finally { if (!silencioso) setGuardando(false) }
+  }, [restaurante?.id, puedeConfigurar, nombre, zonaHoraria, paso, confirmarIncompleto, router])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       void guardarAvance(false, true)
     }, 500)
     return () => window.clearTimeout(timeout)
-  }, [nombre, paso, rol, zonaHoraria, inventarioListo, stockListo, confirmarIncompleto])
+  }, [guardarAvance, inventarioListo, stockListo])
 
   async function importarInventario(tipoImportacion: 'productos' | 'stock' = 'productos', resolver?: 'mantener' | 'sumar' | 'omitir') {
     if (!archivo) return
@@ -123,12 +124,12 @@ export default function OnboardingPage() {
         <h2 className="text-sm font-medium text-texto-primario">Identidad del restaurante</h2>
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-texto-secundario">Nombre</span>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} className="campo-input" />
+          <input value={nombre} disabled={!puedeConfigurar} onChange={(e) => setNombre(e.target.value)} className="campo-input" />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-texto-secundario">Tu rol</span>
-            <select value={rol} onChange={(e) => setRol(e.target.value)} className="campo-input">
+            <select value={usuario?.rol ?? ''} disabled className="campo-input">
               <option value="dueño">Dueño/a</option>
               <option value="administrador">Administrador/a</option>
               <option value="chef_ejecutivo">Chef ejecutivo/a</option>
@@ -138,7 +139,7 @@ export default function OnboardingPage() {
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-texto-secundario">Zona horaria</span>
-            <select value={zonaHoraria} onChange={(e) => setZonaHoraria(e.target.value)} className="campo-input">
+            <select value={zonaHoraria} disabled={!puedeConfigurar} onChange={(e) => setZonaHoraria(e.target.value)} className="campo-input">
               <option value="America/Santiago">Chile continental</option>
               <option value="America/Argentina/Buenos_Aires">Argentina</option>
               <option value="America/Lima">Perú</option>
@@ -170,7 +171,7 @@ export default function OnboardingPage() {
               <p className="text-xs text-texto-apagado">Si prefieres, importa un CSV con materias primas e insumos.</p>
               <input type="file" accept=".csv,text/csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} className="w-full text-xs text-texto-secundario" />
               {archivo ? <button type="button" onClick={() => void importarInventario('productos')} disabled={guardando} className="min-h-11 rounded-xl border border-acento px-4 text-xs text-acento disabled:opacity-50">Importar inventario</button> : null}
-              <a href="/api/onboarding/plantilla-inventario" download className="inline-flex items-center gap-1 text-xs text-acento"><Download size={13} /> Descargar plantilla CSV</a>
+              <DescargarArchivo url="/api/onboarding/plantilla-inventario" nombre="plantilla-chefos-inventario.csv" />
             </div>
           </div>
         ) : null}
@@ -185,7 +186,7 @@ export default function OnboardingPage() {
             <p className="text-xs text-texto-apagado">Aquí van porciones, salsas, postres porcionados y producciones terminadas.</p>
             <input type="file" accept=".csv,text/csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} className="w-full text-xs text-texto-secundario" />
             {archivo ? <button type="button" onClick={() => void importarInventario('stock')} disabled={guardando} className="min-h-11 rounded-xl border border-acento px-4 text-xs text-acento disabled:opacity-50">Importar Stock disponible</button> : null}
-            <a href="/api/onboarding/plantilla-inventario" download className="inline-flex items-center gap-1 text-xs text-acento"><Download size={13} /> Descargar plantilla CSV</a>
+            <DescargarArchivo url="/api/onboarding/plantilla-inventario" nombre="plantilla-chefos-stock.csv" />
           </div>
         ) : null}
 
@@ -232,7 +233,9 @@ export default function OnboardingPage() {
         </section>
       ) : null}
 
-      <button onClick={() => void continuar()} disabled={guardando} className="w-full min-h-12 rounded-xl bg-acento text-white flex items-center justify-center gap-2 disabled:opacity-50">
+      <p className="text-xs text-texto-secundario">El cargo es un permiso de acceso, no un dato editable del perfil. No se cambia desde esta configuración. Dueño, Administración y Chef Ejecutivo pueden completar esta guía sin cambiar su cargo.</p>
+      {!puedeConfigurar && <p role="alert">Solo puedes consultar esta guía. Pide a un responsable que guarde la configuración.</p>}
+      <button onClick={() => void continuar()} disabled={guardando || (paso === PASOS.length - 1 && !puedeConfigurar)} className="w-full min-h-12 rounded-xl bg-acento text-white flex items-center justify-center gap-2 disabled:opacity-50">
         {paso === PASOS.length - 1 ? 'Finalizar onboarding' : 'Continuar'}
         <ChevronRight size={18} />
       </button>

@@ -21,6 +21,19 @@ const fixtures = {
  pagos: 'ticket_id;forma_pago_id;forma_pago;importe;propina;tipo_cambio\nH-1;EF;Efectivo;9;0;1\nH-1;TJ;Tarjeta;9;0;1\nA-1;EF;Efectivo;7;0;1\n',
 }
 async function main() {
+  const paqueteQA={}
+  for (const tipo of parser.ARCHIVOS_POS) {
+    const filas=[]
+    for await (const campos of parser.filasArchivo(new Blob([fs.readFileSync('public/qa/1.3.2/historial/'+tipo+'.csv')]))) {
+      parser.validarCabecera(tipo,Object.keys(campos)); filas.push(parser.normalizarSoftRestaurant(tipo,campos))
+    }
+    paqueteQA[tipo]=filas
+  }
+  assert.equal(paqueteQA.tickets.reduce((n,x)=>n+x.total,0),12000)
+  assert.equal(paqueteQA.ventas_detalle.reduce((n,x)=>n+x.cantidad,0),3)
+  assert.equal(paqueteQA.pagos.length,3)
+  assert.equal(paqueteQA.ventas_detalle.reduce((n,x)=>n+x.total,0),13000,'official ticket totals differ from estimated lines')
+  console.log('PASS downloadable QA package: 2 tickets, 2 lines, 3 payments, official total 12000, units 3')
   const canon = {}, raw = {}
   for (const [tipo, csv] of Object.entries(fixtures)) {
     raw[tipo] = []; canon[tipo] = []
@@ -71,7 +84,7 @@ async function main() {
     await db.exec(base)
     const auth = fs.readFileSync('supabase/migrations/007_integridad_operativa.sql','utf8')
     await db.exec(auth.slice(auth.indexOf('create or replace function public.chefos_es_miembro'), auth.indexOf('-- -----------------------------------------------------------------------------', auth.indexOf('grant execute on function public.chefos_tiene_rol'))))
-    for (const file of ['013_historial_pos.sql','014_analitica_historial.sql']) await db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'))
+    for (const file of ['013_historial_pos.sql','014_analitica_historial.sql','20260929030350_historial_validacion_reanudable.sql']) await db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'))
     const r1='00000000-0000-0000-0000-000000000001', r2='00000000-0000-0000-0000-000000000002', u1='00000000-0000-0000-0000-000000000011', u2='00000000-0000-0000-0000-000000000012'
     await db.exec(`insert into restaurantes(id,nombre,slug) values('${r1}','Sintético Uno','sintetico-uno'),('${r2}','Sintético Dos','sintetico-dos'); insert into auth.users values('${u1}'),('${u2}'); insert into usuarios(id,restaurante_id,nombre,email,rol) values('${u1}','${r1}','QA uno','qa1@example.invalid','chef_ejecutivo'),('${u2}','${r2}','QA dos','qa2@example.invalid','chef_ejecutivo'); set role authenticated; select set_config('request.jwt.claim.sub','${u1}',false);`)
     const rpc = async (name, args) => (await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) as v`,args)).rows[0].v
@@ -80,6 +93,12 @@ async function main() {
     const manifest = Object.fromEntries(Object.entries(canon).map(([k,v])=>[k,v.length]))
     const validar = id => rpc('validar_historial_pos',[id,JSON.stringify(manifest)])
     const id = await start(); await stage(id); await stage(id)
+    await assert.rejects(()=>rpc('validar_historial_paso',[id,JSON.stringify(manifest),2]),/etapa 1/)
+    const paso0=await rpc('validar_historial_paso',[id,JSON.stringify(manifest),0])
+    assert.equal(paso0.siguiente,1)
+    const paso1=await rpc('validar_historial_paso',[id,JSON.stringify(manifest),1])
+    assert.deepEqual(await rpc('validar_historial_paso',[id,JSON.stringify(manifest),1]),paso1,'reintento de etapa no duplica resultados')
+    await assert.rejects(()=>rpc('validar_historial_paso',[id,JSON.stringify(manifest),4]),/fuera de orden/)
     let preview = await validar(id); assert.equal(preview.errores,0); assert.equal(preview.productos_sin_catalogo,1)
     const resultado = await rpc('confirmar_historial_pos',[id]); assert.equal(resultado.lineas_nuevas,2); assert.equal(resultado.pagos_nuevos,3)
     assert.equal((await rpc('confirmar_historial_pos',[id])).lineas_nuevas,2,'confirmación reintentada devuelve resultado original')

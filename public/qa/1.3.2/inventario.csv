@@ -1,0 +1,3 @@
+﻿nombre,unidad,costo,stock,stock_minimo,tipo_operativo
+QA 132 Harina,kg,1000,10,0,materia_prima
+QA 132 Azucar,kg,800,3,0,materia_prima

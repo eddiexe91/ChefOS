@@ -1,0 +1,3 @@
+﻿ticket_id,movimiento,producto_id,producto,fecha,hora_producto,franja,cantidad,precio_unitario,importe_linea_estimado,descuento_linea_pct,cortesia
+H-QA132-1,1,QA132-P1,QA 132 Plato,2026-09-01,13:05,Almuerzo,2,5000,10000,0,0
+A-QA132-1,1,QA132-OLD,PRODUCTO NO VIGENTE [QA132-OLD],2026-09-02,20:10,Cena,1,3000,3000,0,0

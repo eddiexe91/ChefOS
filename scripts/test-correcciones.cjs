@@ -14,10 +14,11 @@ async function main(){
  for(const n of ['001','002','006','007','008','009','010','011','016']){
   const f=fs.readdirSync('supabase/migrations').find(x=>x.startsWith(n+'_'))
   let sql=fs.readFileSync('supabase/migrations/'+f,'utf8').replace(/^create extension.*$/gm,'').replace(/^create index.*gin_trgm_ops.*$/gm,'')
-  if(n==='007')await db.exec(`alter table restaurantes add column zona_horaria text default 'America/Santiago';`)
+  if(n==='007')await db.exec(`alter table restaurantes add column zona_horaria text default 'America/Santiago'; alter table restaurantes add column onboarding_completado boolean not null default false;`)
   await db.exec(sql)
  }
  await db.exec(fs.readFileSync('supabase/migrations/20260927120202_cierre_permisos_operativos.sql','utf8'))
+ await db.exec(fs.readFileSync('supabase/migrations/20260929030320_correcciones_qa_perfil_alertas_configuracion.sql','utf8'))
  assert.equal((await db.query(`select count(*)::int n from pg_proc where pronamespace='public'::regnamespace and prosecdef and has_function_privilege('anon',oid,'EXECUTE')`)).rows[0].n,0,'explicit anon grants must be revoked')
  assert.equal((await db.query(`select has_function_privilege('authenticated','public.inicializar_restaurante(uuid)','EXECUTE') allowed`)).rows[0].allowed,false)
  assert.equal((await db.query(`select relrowsecurity enabled from pg_class where oid='public.unidades_medida'::regclass`)).rows[0].enabled,true)
@@ -35,6 +36,25 @@ async function main(){
  await db.query('update productos set costo_unitario_actual=200 where id=$1',[portion])
  await db.query(`select set_config('request.jwt.claim.sub',$1,false)`,[uid]);await db.exec('set role authenticated')
  const rpc=async(name,args)=>(await db.query(`select to_jsonb(public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')})) as v`,args)).rows[0].v
+ assert.equal(await rpc('actualizar_mi_nombre',['Chef de prueba']),'Chef de prueba')
+ assert.equal((await db.query('select nombre,rol from usuarios where id=$1',[uid])).rows[0].nombre,'Chef de prueba')
+ assert.equal((await db.query('select rol from usuarios where id=$1',[uid])).rows[0].rol,'chef_ejecutivo')
+ await assert.rejects(()=>rpc('actualizar_mi_nombre',['  ']),/Nombre inválido/)
+ const config={nombre:'Restaurante QA',zona_horaria:'America/Santiago',paso_actual:2,completar:false}
+ assert.equal((await rpc('guardar_configuracion_inicial',[JSON.stringify(config)])).onboarding.paso_actual,2)
+ await assert.rejects(()=>rpc('guardar_configuracion_inicial',[JSON.stringify({...config,rol:'dueño'})]),/cargo no se cambia/)
+ await assert.rejects(()=>rpc('guardar_configuracion_inicial',[JSON.stringify({...config,completar:true})]),/Falta Inventario/)
+ await db.exec('reset role')
+ const alert=(await db.query("insert into alertas_sistema(restaurante_id,tipo,mensaje,creado_en) values($1,'otro','Prueba antigua','2020-01-01') returning id",[rid])).rows[0].id
+ const foreignAlert=(await db.query("insert into alertas_sistema(restaurante_id,tipo,mensaje) values($1,'otro','Ajena') returning id",[other])).rows[0].id
+ await db.exec('set role authenticated')
+ assert.equal(await rpc('marcar_alerta_leida',[alert]),alert)
+ const lectura=(await db.query('select leida,leida_por,leida_en from alertas_sistema where id=$1',[alert])).rows[0]
+ assert.equal(lectura.leida,true); assert.equal(lectura.leida_por,uid)
+ await rpc('marcar_alerta_leida',[alert])
+ assert.deepEqual((await db.query('select leida,leida_por,leida_en from alertas_sistema where id=$1',[alert])).rows[0],lectura,'retry preserves first read audit')
+ await assert.rejects(()=>rpc('marcar_alerta_leida',[foreignAlert]),/no disponible/)
+ console.log('PASS own profile persisted, no role escalation, chef onboarding and old/new alerts with tenant isolation')
  const data={solicitud_id:randomUUID(),nombre:'QA base',rendimiento_porciones:2,unidad_rendimiento:'porcion',es_produccion:true,crear_salida:true,nombre_salida:'QA listo',cantidad_salida:2,unidad_salida:'porcion',ingredientes:[{producto_id:kg,cantidad:1,unidad_medida:'kg'},{producto_id:portion,cantidad:1,unidad_medida:'porcion'}],pasos:[{titulo:'Cocer',descripcion:'Cocer ingredientes'}]}
  const save=(id,d)=>rpc('guardar_receta_atomica',[rid,uid,id,JSON.stringify(d)])
  let r=await save(null,data);assert.equal((await save(null,data)).id,r.id,'create retry idempotent')
@@ -88,6 +108,8 @@ async function main(){
  await assert.rejects(()=>rpc('registrar_merma_completa',[rid,portion,1,'g','otro',uid,'Incompatible']),/equivalencia de peso/)
  assert.equal(await stock(portion),9)
  await db.exec('reset role');await db.query("update usuarios set rol='cocinero' where id=$1",[uid]);await db.exec('set role authenticated')
+ await assert.rejects(()=>rpc('guardar_configuracion_inicial',[JSON.stringify(config)]),/Solo Dueño/)
+ assert.equal(await rpc('actualizar_mi_nombre',['Cocinero QA']),'Cocinero QA','all active members may edit only their own name')
  await assert.rejects(()=>save(null,{...data,solicitud_id:randomUUID()}),/Sin permisos/)
  assert.equal(Number((await db.query('select count(*) n from productos where restaurante_id=$1',[other])).rows[0].n),0,'RLS hides other tenant products')
  console.log('PASS production actual yield, repeat prevention, correction and compensated cancellation')
