@@ -4,7 +4,7 @@ Fecha: 29-09-2026. Esta nota separa implementación y evidencia de pruebas; no c
 
 ## Estado de entrega
 
-Supabase: las dos migraciones de esta entrega están aplicadas y sus permisos/configuración verificados. Android y Next.js compilaron localmente. Publicación GitHub/Vercel pendiente de comprobar al escribir esta sección; consultar el cierre de entrega al final antes de instalar para probar los cambios web.
+Supabase: las dos migraciones de esta entrega están aplicadas y sus permisos/configuración verificados. Android y Next.js compilaron localmente. Código publicado en **main, d466d0d**; Vercel confirmó **success** y el backend remoto responde **1.3.2, ok=true, historial POS y validación por etapas disponibles**. Guía de GitHub comprobada HTTP 200. Esto no sustituye pruebas de negocio autenticadas ni físicas.
 
 No se importaron ni confirmaron ventas reales. No se borraron preparaciones, existencias, recetas, usuarios ni cuentas. El chequeo remoto conserva cuatro paquetes preparando y uno validado, ninguno completado. Los datos de prueba publicados son exclusivamente sintéticos.
 
@@ -70,3 +70,10 @@ La APK y la clave de firma permanecen fuera de Git. No contiene secretos de serv
 ## Qué debe probar primero el usuario
 
 Seguir [GUIA_TESTEO_CHEFOS_1.3.2.md](GUIA_TESTEO_CHEFOS_1.3.2.md): perfil/configuración, descarga Android, alerta antigua, paquete POS ficticio y recuperación del validado real sin confirmar todavía. Luego regresión completa de receta/producción/stock/merma/compra y Briefing. No borrar la cuenta ni las existencias para comenzar.
+
+## Cierre de publicación — 29-09-2026
+
+- GitHub: `d466d0d4bf667c2708a50d71e7eb4b55f0133471` publicado en main con 40 archivos, documentación y ocho CSV ficticios. Adjuntos del usuario, secretos y auditoría local ajena excluidos.
+- Vercel: [despliegue verificado](https://vercel.com/eddiexe91/chefos/AEsHrmkfK8uRSPbbga34AvA7qnev), estado success. `/api/health`: 1.3.2, Storage accesible y ambas comprobaciones históricas disponibles; Chef IA sigue básico.
+- APK verificada con `apksigner`/`aapt`: versión, código, certificado y checksum indicados arriba. Incluye recuperación `offline.html` y ocho CSV; no implica soporte offline completo ni que se haya probado el selector Android en un teléfono.
+- Guía publicada accesible en GitHub. Empezar por QA; las pruebas físicas del usuario aún son necesarias antes de aprobar esta versión.
