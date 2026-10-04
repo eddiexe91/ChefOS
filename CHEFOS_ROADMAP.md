@@ -1,4 +1,10 @@
 # CHEFOS — ROADMAP MAESTRO
+
+## Corte operativo vigente — 03-10-2026
+
+Para implementación y evidencia prevalecen `RELEASE_1.3.3.md`, `GITHUB_HANDOFF.md` y guía1.3.3 sobre las notas históricas. Prioridad inmediata: validar historial grande/publicación reanudable, equivalencias de platos vigentes y riesgos del Briefing con stock real. Motor manual/automático compartido; no forecast calibrado todavía. Siguientes: retención/cancelación segura, Excel multiformato, tutoriales prácticos, confirmación OTP/PKCE y flujo de bienvenida Crear restaurante/Unirme que el usuario pidió posponer. Aprendizaje de decisiones, demanda calibrada y descongelación requieren datos recientes y evidencia. No ampliar ChefOS hacia un clon de POS.
+
+## Notas históricas
 **Versión:** 1.0 — Sprint 3 completado  
 **Estado:** Fuente de verdad permanente  
 **Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)

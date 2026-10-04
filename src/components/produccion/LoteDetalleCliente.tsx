@@ -242,7 +242,7 @@ export default function LoteDetalleCliente({ loteId, recetaInicialId }: Props) {
 
                   {registro.costo !== undefined && registro.costo !== null && (
                     <p className="text-xs font-sans font-medium text-texto-secundario flex-shrink-0">
-                      ${registro.costo.toLocaleString('es-CL')}
+                      Costo total: ${registro.costo.toLocaleString('es-CL', { maximumFractionDigits: 2 })}
                     </p>
                   )}
                 </div>

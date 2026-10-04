@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import ImportarVentasCliente from './ImportarVentasCliente'
 
 interface Importacion { id: string; fecha_inicio: string; fecha_fin: string; estado_procesamiento: string; total_registros: number; registros_pendientes: number; modo?: string }
 
@@ -11,6 +12,8 @@ export default function VentasCliente() {
   useEffect(() => { fetch('/api/ventas/importaciones').then((r) => r.json()).then((j: { data?: Importacion[] }) => setImportaciones(j.data ?? [])).finally(() => setCargando(false)) }, [])
   return <div className="px-4 pt-6 pb-28 space-y-5 max-w-lg mx-auto">
     <section className="flex items-start justify-between gap-3"><div><h1 className="text-xl font-display font-bold text-texto-primario">Ventas</h1><p className="text-xs text-texto-apagado mt-1">Historial para el Briefing e importaciones del servicio.</p></div><Link href="/ventas/importar" className="btn-primario !w-auto px-4 flex items-center">Importar</Link></section>
+    <p className="text-sm text-texto-secundario">El historial aporta memoria al Briefing sin tocar existencias. El CSV simple del servicio permite revisar ventas y confirmar su consumo de ingredientes.</p>
+    <section id="operativas" className="tarjeta p-4"><ImportarVentasCliente /></section>
     {cargando && <div className="skeleton h-20 rounded-xl" />}
     {!cargando && importaciones.length === 0 && <p className="text-sm text-texto-apagado text-center py-10">No hay importaciones.</p>}
     <div className="space-y-3">{importaciones.map((item) => {

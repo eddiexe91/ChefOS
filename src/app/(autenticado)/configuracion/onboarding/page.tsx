@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DescargarArchivo from '@/components/ui/DescargarArchivo'
+import Dialogo from '@/components/ui/Dialogo'
 import Link from 'next/link'
 import { Check, ChevronRight, PackagePlus, Soup, UtensilsCrossed } from 'lucide-react'
 
@@ -16,11 +17,13 @@ const PASOS = [
   ['Recetas y Carta', 'Crea fichas técnicas de producción y elaboraciones de Carta.'],
   ['Producción', 'Registra solo recetas con es_produccion y salida configurada.'],
 ] as const
+// Survives route unmount/remount: a late save from the previous screen must
+// not overwrite the step restored by the new screen. Scoped by account/tenant.
+const colasAvance = new Map<string, Promise<unknown>>()
 
 export default function OnboardingPage() {
   const { restaurante, usuario } = useApp()
   const router = useRouter()
-  const colaGuardado = useRef<Promise<unknown>>(Promise.resolve())
   const puedeConfigurar = ['dueño', 'administrador', 'chef_ejecutivo'].includes(usuario?.rol ?? '')
   const inventarioQuery = useProductos({ tipos_operativos: TIPOS_INVENTARIO, activo: true })
   const stockQuery = useProductos({ tipos_operativos: ['elaborado'], activo: true })
@@ -35,10 +38,23 @@ export default function OnboardingPage() {
   const [duplicados, setDuplicados] = useState<string[]>([])
   const [tipoImportacionPendiente, setTipoImportacionPendiente] = useState<'productos' | 'stock'>('productos')
   const [confirmarIncompleto, setConfirmarIncompleto] = useState(false)
+  const [restaurado, setRestaurado] = useState(false)
+  const claveAvance = `chefos:onboarding:${usuario?.id}:${restaurante?.id}`
 
   useEffect(() => {
-    setPaso(Number(onboardingGuardado.paso_actual ?? 0))
-  }, [onboardingGuardado.paso_actual])
+    if (!usuario?.id || !restaurante?.id) return
+    // Device navigation must not be reset by stale layout props. Only the step
+    // is cached, scoped to tenant/user. This does not grant any permission.
+    let guardado = Number(onboardingGuardado.paso_actual ?? 0)
+    try { const local = sessionStorage.getItem(claveAvance); if (local !== null) guardado = Number(local) } catch { /* Storage may be disabled. */ }
+    setPaso(Number.isInteger(guardado) && guardado >= 0 && guardado < PASOS.length ? guardado : 0)
+    setRestaurado(true)
+  }, [claveAvance, usuario?.id, restaurante?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function cambiarPaso(siguiente: number) {
+    try { sessionStorage.setItem(claveAvance, String(siguiente)) } catch { /* server save remains available */ }
+    setPaso(siguiente)
+  }
 
   const cantidadInventario = inventarioQuery.data?.length ?? 0
   const cantidadStock = stockQuery.data?.length ?? 0
@@ -47,15 +63,16 @@ export default function OnboardingPage() {
   const puedeCerrar = inventarioListo && stockListo
 
   const guardarAvance = useCallback(async (completar = false, silencioso = false) => {
-    if (!restaurante?.id || !puedeConfigurar) return false
+    if (!restaurado || !restaurante?.id || !puedeConfigurar) return false
     if (!silencioso) setGuardando(true)
     const body = JSON.stringify({ nombre, zona_horaria: zonaHoraria, paso_actual: paso, completar, confirmar_incompleto: confirmarIncompleto })
-    const trabajo = colaGuardado.current.catch(() => undefined).then(async () => {
+    const trabajo = (colasAvance.get(claveAvance) ?? Promise.resolve()).catch(() => undefined).then(async () => {
     if (!navigator.onLine) throw new Error('Sin conexión: no se guardó la configuración.')
     const response = await fetch('/api/onboarding/configurar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
+      keepalive: true,
     })
     const data = await response.json().catch(() => ({ error: 'No se pudo guardar el avance.' })) as { error?: string; estado?: { onboarding?: { completo?: boolean } } }
     if (!response.ok) {
@@ -66,20 +83,22 @@ export default function OnboardingPage() {
     if (completar) router.refresh()
     return true
     }).catch((e) => { setMensaje(e instanceof Error ? e.message : 'No se pudo guardar el avance.'); return false })
-    colaGuardado.current = trabajo
-    try { return await trabajo } finally { if (!silencioso) setGuardando(false) }
-  }, [restaurante?.id, puedeConfigurar, nombre, zonaHoraria, paso, confirmarIncompleto, router])
+    colasAvance.set(claveAvance, trabajo)
+    try { return await trabajo } finally {
+      if (colasAvance.get(claveAvance) === trabajo) colasAvance.delete(claveAvance)
+      if (!silencioso) setGuardando(false)
+    }
+  }, [restaurado, restaurante?.id, claveAvance, puedeConfigurar, nombre, zonaHoraria, paso, confirmarIncompleto, router])
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void guardarAvance(false, true)
-    }, 500)
-    return () => window.clearTimeout(timeout)
+    // Start immediately; navigation must not cancel a pending debounce.
+    void guardarAvance(false, true)
   }, [guardarAvance, inventarioListo, stockListo])
 
   async function importarInventario(tipoImportacion: 'productos' | 'stock' = 'productos', resolver?: 'mantener' | 'sumar' | 'omitir') {
     if (!archivo) return
     setGuardando(true)
+    try {
     const form = new FormData()
     form.set('archivo', archivo)
     form.set('tipo', tipoImportacion)
@@ -95,6 +114,9 @@ export default function OnboardingPage() {
     }
     setDuplicados([])
     setMensaje(response.ok ? `${data.importados ?? 0} registros importados. ${data.duplicados_resueltos ? `${data.duplicados_resueltos} duplicados resueltos.` : ''}` : (data.error ?? 'No se pudo importar.'))
+    if (response.ok) { await inventarioQuery.refetch(); await stockQuery.refetch() }
+    } catch { setMensaje('No se pudo verificar la importación. Consulta las existencias antes de reintentar.') }
+    finally { setGuardando(false) }
   }
 
   async function continuar() {
@@ -109,7 +131,7 @@ export default function OnboardingPage() {
     if (paso === 1 && !stockListo) {
       setMensaje('Todavía no hay Stock disponible cargado. Puedes continuar, pero el onboarding no se marcará completo.')
     }
-    setPaso((actual) => Math.min(actual + 1, PASOS.length - 1))
+    cambiarPaso(Math.min(paso + 1, PASOS.length - 1))
   }
 
   return (
@@ -222,15 +244,16 @@ export default function OnboardingPage() {
 
       {mensaje ? <p className="text-xs text-texto-secundario">{mensaje}</p> : null}
       {duplicados.length > 0 ? (
-        <section className="rounded-xl border border-advertencia-borde bg-advertencia-suave p-4 space-y-3">
+        <Dialogo titulo="Productos duplicados detectados" cerrar={() => { if (!guardando) setDuplicados([]) }}>
           <p className="text-sm font-medium text-advertencia-texto">Productos duplicados detectados</p>
           <p className="text-xs text-advertencia-texto">{duplicados.slice(0, 8).join(', ')}{duplicados.length > 8 ? '…' : ''}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'sumar')} className="rounded-lg bg-acento px-3 py-2 text-xs text-white">Sumar cantidades</button>
-            <button type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'omitir')} className="rounded-lg border border-acento px-3 py-2 text-xs text-acento">Omitir duplicados</button>
-            <button type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'mantener')} className="rounded-lg border border-fondo-borde px-3 py-2 text-xs text-texto-secundario">Mantener todos</button>
+            <button disabled={guardando} type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'sumar')} className="min-h-12 rounded-lg bg-acento px-3 text-sm text-white">Sumar cantidades</button>
+            <button disabled={guardando} type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'omitir')} className="min-h-12 rounded-lg border border-acento px-3 text-sm text-acento">Omitir duplicados</button>
+            <button disabled={guardando} type="button" onClick={() => void importarInventario(tipoImportacionPendiente, 'mantener')} className="min-h-12 rounded-lg border border-fondo-borde px-3 text-sm text-texto-secundario">Mantener todos</button>
           </div>
-        </section>
+          <p className="text-sm">Sumar aumenta las existencias. Omitir conserva las cantidades anteriores. Mantener crea fichas separadas. Cerrar cancela la decisión, sin importar.</p>
+        </Dialogo>
       ) : null}
 
       <p className="text-xs text-texto-secundario">El cargo es un permiso de acceso, no un dato editable del perfil. No se cambia desde esta configuración. Dueño, Administración y Chef Ejecutivo pueden completar esta guía sin cambiar su cargo.</p>

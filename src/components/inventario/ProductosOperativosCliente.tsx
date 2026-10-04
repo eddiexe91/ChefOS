@@ -58,8 +58,9 @@ function ProductoCard({
 
       <div className="grid grid-cols-2 gap-2 text-xs text-texto-secundario">
         <div className="rounded-lg bg-fondo-card px-3 py-2">
-          <p className="text-texto-apagado">Costo unitario</p>
-          <p className="mt-1 font-medium text-texto-primario">${Number(producto.costo_unitario_actual ?? 0).toLocaleString('es-CL')}</p>
+          <p className="text-texto-apagado">Costo por {producto.unidad_medida}</p>
+          <p className="mt-1 font-medium text-texto-primario">${Number(producto.costo_unitario_actual ?? 0).toLocaleString('es-CL', { maximumFractionDigits: 2 })}</p>
+          {producto.tipo_operativo === 'elaborado' && <p className="text-2xs mt-1">Costo total de producción ÷ cantidad obtenida. No es el costo de toda la tanda.</p>}
         </div>
         <div className="rounded-lg bg-fondo-card px-3 py-2">
           <p className="text-texto-apagado">Peso por unidad</p>

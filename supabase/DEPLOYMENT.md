@@ -1,6 +1,12 @@
 # Despliegue real de ChefOS en Supabase
 
-## Corte vigente — 29-09-2026
+## Corte vigente — 03-10-2026
+
+Ver `../RELEASE_1.3.3.md`. Cuatro complementos qa133 aplicados y permisos verificados: copias/alertas, agregado incremental, publicación por bloques y búsquedas acotadas. Versiones remotas20261004021108/109/111 y20261004023104; archivos locales conservan sus timestamps de creación. No reaplicar ni usar db push sin conciliar el historial. No se importaron/confirmaron datos reales en esta corrección ni se limpiaron preparaciones.
+
+Edge generar-briefing versión5 desplegada con `generar-briefing/index.ts`, `_shared/briefingOperativo.ts` y `_shared/contextoVentas.ts`. Autenticación privada conservada; diagnóstico200 sin escrituras, credencial incorrecta401. Mantener la credencial solo en Vault/Edge Secrets. No forzar el cron para validar stocks reales; observar ciclo futuro. La validación histórica conserva seis etapas; confirmación UI ahora usa confirmar_historial_paso, no el contrato monolítico heredado.
+
+## Corte anterior — 29-09-2026
 
 Ver `../RELEASE_1.3.2.md`: aplicadas por conector y verificadas `20260929030320_correcciones_qa_perfil_alertas_configuracion` y `20260929030350_historial_validacion_reanudable`. Los archivos locales coinciden con las versiones remotas. Sin importación ni limpieza de datos reales. 013–016 y otras migraciones antiguas fueron aplicadas por SQL Editor; antes de `db push` conciliar su estado, no reaplicarlas. Permisos explícitos anon cerrados; RPC authenticated con controles internos de actor/tenant/rol, no UPDATE genérico de identidad.
 

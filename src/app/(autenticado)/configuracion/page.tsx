@@ -14,7 +14,7 @@ export default function PaginaConfiguracion() {
       </section>
 
       <nav className="rounded-xl bg-fondo-elevado border border-fondo-borde overflow-hidden">
-        <Link href="/configuracion/pruebas" className="block px-4 py-4 border-b border-fondo-borde text-acento">Archivos ficticios y guía de pruebas 1.3.2 →</Link>
+        <Link href="/configuracion/pruebas" className="block px-4 py-4 border-b border-fondo-borde text-acento">Archivos ficticios y guía de pruebas 1.3.3 →</Link>
         <Link href="/configuracion/equipo" className="block px-4 py-4 border-b border-fondo-borde text-acento">Equipo y claves de acceso →</Link>
         <Link href="/captura" className="block px-4 py-4 border-b border-fondo-borde text-acento">Captura rápida: voz o fotografía →</Link>
         <Link href="/ventas" className="block px-4 py-4 border-b border-fondo-borde text-acento">Ventas e importaciones →</Link>

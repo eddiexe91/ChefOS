@@ -1,5 +1,9 @@
 # ChefOS
 
+## Control vigente: 1.3.3
+
+ChefOS transforma datos de cocina en decisiones operativas para el **Briefing del Chef**; no busca reemplazar el POS. Ver [release1.3.3](RELEASE_1.3.3.md), [guía de testeo](GUIA_TESTEO_CHEFOS_1.3.3.md) y [handoff](GITHUB_HANDOFF.md) para implementación y evidencia. Publicación histórica reanudable, motor manual/automático compartido, riesgos actuales y copias autorizadas de existencias. No borrar cuentas ni importar datos reales para probar; pronóstico calibrado, Excel flexible y offline completo siguen pendientes. Los apartados siguientes conservan contexto histórico.
+
 > Estado de control 15-09-2026: `main` contiene la versión validada de ChefOS. Inventario distingue materias primas/insumos de `Stock disponible` para elaborados; Carta y Recetas se gestionan por separado; Producción usa solo fichas `es_produccion` y puede aumentar el stock de salida configurado. Vercel está publicado en [https://chefos-pied.vercel.app](https://chefos-pied.vercel.app).
 
 Sistema operativo gastronómico diseñado para restaurantes.

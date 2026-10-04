@@ -44,11 +44,7 @@ export default function AnaliticaPage() {
     try {
     if (!navigator.onLine) throw new Error('Necesitas conexión para guardar una copia del stock actual.')
     const supabase = obtenerClienteNavegador()
-    const { data: actuales, count, error: errorActuales } = await supabase.from('productos').select('id,cantidad_gramos', { count: 'exact' }).eq('restaurante_id', restaurante.id).eq('activo', true).limit(1001)
-    if (errorActuales || !actuales?.length || actuales.length > 1000 || count !== actuales.length) throw new Error('No se pudo verificar el inventario completo. No se guardó la copia.')
-    const fechaCopia = new Intl.DateTimeFormat('en-CA', { timeZone: restaurante.zona_horaria || 'America/Santiago' }).format(new Date())
-    const filas = actuales.map((p) => ({ restaurante_id: restaurante.id, producto_id: p.id, fecha: fechaCopia, tipo_snapshot: 'manual', cantidad_gramos: p.cantidad_gramos, registrado_por: usuario?.id }))
-    const { error } = await supabase.from('inventario_snapshots').upsert(filas, { onConflict: 'restaurante_id,producto_id,fecha,tipo_snapshot' })
+    const { error } = await supabase.rpc('guardar_copia_existencias')
     setMensaje(error ? `No se pudo guardar: ${error.message}` : 'Copia de las existencias actuales guardada con la fecha de hoy, sin modificar stock. Otra copia manual de hoy reemplaza la anterior.')
     if (!error) await cargar()
     } catch (e) { setMensaje(e instanceof Error ? e.message : 'No se pudo guardar la copia. Comprueba la conexión.') }

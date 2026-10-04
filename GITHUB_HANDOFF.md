@@ -1,5 +1,13 @@
 # ChefOS — guía de continuación
 
+## Entrega 1.3.3 — 03-10-2026
+
+Consultar primero [RELEASE_1.3.3.md](RELEASE_1.3.3.md) y [GUIA_TESTEO_CHEFOS_1.3.3.md](GUIA_TESTEO_CHEFOS_1.3.3.md). Reemplazan el estado anterior: el usuario ya importó historial real de un año y fixtures QA. No borrar cuenta, stock ni preparaciones. Preservar regresiones aprobadas de recetas/producción/unidades.
+
+Cambios: avance onboarding inmediato, diálogo de duplicados, escalar por factor, total frente a costo por unidad, merma manual directa, historial/refresh de alertas, riesgo actual del Briefing, motor compartido manual/cron, snapshot mediante RPC segura, CSV operativo en Ventas, equivalencias buscables/filtrables y publicación histórica por bloques con RLS y métricas que ocultan filas pendientes. Cuatro migraciones nuevas; ver release para activación y pruebas concretas. No asumir que publicaciones/teléfono pasan por compilar.
+
+Pendientes: validar paquete grande real y testeo físico1.3.3; retención/cancelación segura; bienvenida Crear/Unirme solicitada para futuro; Excel flexible, tutoriales interactivos, PKCE/OTP, offline completo y modelos de previsión/decisiones. No reimplementar estos cambios ni declarar visión100%. Los archivos descargables se reutilizan de1.3.2 con nombresQA132; la guía explica cómo no duplicar existencias.
+
 ## Entrega 1.3.2 — 29-09-2026
 
 Consultar primero [RELEASE_1.3.2.md](RELEASE_1.3.2.md) y [GUIA_TESTEO_CHEFOS_1.3.2.md](GUIA_TESTEO_CHEFOS_1.3.2.md). Corrige nombre de perfil, configuración del Chef Ejecutivo sin autoasignación de cargo, lectura de alertas antiguas, guardado nativo de CSV, motivos/notas de merma, recuperación/validación por etapas del historial y errores visibles del Briefing manual. Ocho CSV ficticios en `public/qa/1.3.2`, accesibles desde Configuración → Archivos ficticios y guía de pruebas.

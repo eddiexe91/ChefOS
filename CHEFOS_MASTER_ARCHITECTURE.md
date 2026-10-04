@@ -8,7 +8,11 @@ Leer conjuntamente [CHEFOS_NORTE_ESTRATEGICO.md](CHEFOS_NORTE_ESTRATEGICO.md). T
 **Estado:** Fuente de verdad permanente  
 **Última actualización:** 13 de septiembre de 2026 (producción Vercel, APK y documentación)
 
-## Control vigente — 29-09-2026
+## Control vigente — 03-10-2026
+
+Estado1.3.3: ver `RELEASE_1.3.3.md` y `GITHUB_HANDOFF.md` para evidencia de activación/pruebas. Confirmación histórica por bloques con cursor persistente, publicación final y agregados atómicos; RLS/consultas RPC excluyen ventas y pagos pendientes. Briefing operativo manual/cron comparte reglas deterministas, riesgos de stock siempre recalculados y cantidades por mínimo/salida, no demanda inventada. Copias de existencias se derivan en servidor con autorización. No se sustituyen módulos aprobados ni se importan datos reales para testear. Norte y arquitectura mantienen su jerarquía; capacidades de previsión futuras no certificadas.
+
+## Control anterior — 29-09-2026
 
 Estado 1.3.2: ver `RELEASE_1.3.2.md` y `GITHUB_HANDOFF.md`. Permisos mediante RPC acotadas (nombre propio, configuración con rol autorizado y lectura de alertas), historial validado por seis etapas reanudables y captura de fallos explícita. Mantener la separación entre datos preparados y ventas confirmadas, y entre historial y consumo operativo. La memoria de ventas sirve al Briefing; no inventar demanda si falta historial. Pruebas físicas previas y pruebas sintéticas no certifican todas las capacidades futuras.
 

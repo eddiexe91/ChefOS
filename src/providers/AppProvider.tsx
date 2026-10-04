@@ -8,6 +8,7 @@ import {
   useContext,
 } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { usePathname } from 'next/navigation'
 import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
 import { inventarioKeys, produccionKeys, alertasKeys, bibliotecaKeys, dashboardKeys } from '@/lib/queries'
 import {
@@ -63,6 +64,7 @@ interface Props {
 
 export function AppProvider({ usuario, restaurante, children }: Props) {
   const [queryClient]         = useState(crearQueryClient)
+  const pathname = usePathname()
   const supabase              = obtenerClienteNavegador()
 
   const [alertasNoLeidas,    setAlertasNoLeidas]   = useState<AlertaSistema[]>([])
@@ -71,7 +73,7 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
 
   useEffect(() => {
     const refrescar = () => {
-      for (const key of [inventarioKeys.all, bibliotecaKeys.all, produccionKeys.all, dashboardKeys.all, ['actividad-operativa']]) {
+      for (const key of [inventarioKeys.all, bibliotecaKeys.all, produccionKeys.all, dashboardKeys.all, ['actividad-operativa'], ['alertas']]) {
         void queryClient.invalidateQueries({ queryKey: key })
       }
     }
@@ -140,8 +142,13 @@ export function AppProvider({ usuario, restaurante, children }: Props) {
         .limit(20)
       if (data) setAlertasNoLeidas(data as AlertaSistema[])
     }
-    cargar()
-  }, [supabase, usuario.restaurante_id])
+    void cargar()
+    const timer = window.setInterval(() => { if (navigator.onLine && document.visibilityState === 'visible') void cargar() }, 15000)
+    const alVolver = () => { if (document.visibilityState === 'visible' && navigator.onLine) void cargar() }
+    window.addEventListener('online', alVolver)
+    document.addEventListener('visibilitychange', alVolver)
+    return () => { clearInterval(timer); window.removeEventListener('online', alVolver); document.removeEventListener('visibilitychange', alVolver) }
+  }, [supabase, usuario.restaurante_id, pathname])
 
   // ── Realtime: alertas ─────────────────────────────────────────
   useEffect(() => {

@@ -84,7 +84,10 @@ async function main() {
     await db.exec(base)
     const auth = fs.readFileSync('supabase/migrations/007_integridad_operativa.sql','utf8')
     await db.exec(auth.slice(auth.indexOf('create or replace function public.chefos_es_miembro'), auth.indexOf('-- -----------------------------------------------------------------------------', auth.indexOf('grant execute on function public.chefos_tiene_rol'))))
-    for (const file of ['013_historial_pos.sql','014_analitica_historial.sql','20260929030350_historial_validacion_reanudable.sql']) await db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'))
+    for (const file of ['013_historial_pos.sql','014_analitica_historial.sql','20260929030350_historial_validacion_reanudable.sql','20260930020738_qa133_confirmacion_historial.sql','20261004014419_qa133_publicacion_historial_por_bloques.sql','20261004022735_qa133_busquedas_historial_acotadas.sql']) await db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'))
+    // Exercise publication restrictions even with a broad tenant read policy.
+    await db.exec(`grant select on ventas_items to authenticated;
+      create policy prueba_lectura_items on ventas_items for select to authenticated using(public.chefos_es_miembro(restaurante_id));`)
     const r1='00000000-0000-0000-0000-000000000001', r2='00000000-0000-0000-0000-000000000002', u1='00000000-0000-0000-0000-000000000011', u2='00000000-0000-0000-0000-000000000012'
     await db.exec(`insert into restaurantes(id,nombre,slug) values('${r1}','Sintético Uno','sintetico-uno'),('${r2}','Sintético Dos','sintetico-dos'); insert into auth.users values('${u1}'),('${u2}'); insert into usuarios(id,restaurante_id,nombre,email,rol) values('${u1}','${r1}','QA uno','qa1@example.invalid','chef_ejecutivo'),('${u2}','${r2}','QA dos','qa2@example.invalid','chef_ejecutivo'); set role authenticated; select set_config('request.jwt.claim.sub','${u1}',false);`)
     const rpc = async (name, args) => (await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) as v`,args)).rows[0].v
@@ -100,7 +103,20 @@ async function main() {
     assert.deepEqual(await rpc('validar_historial_paso',[id,JSON.stringify(manifest),1]),paso1,'reintento de etapa no duplica resultados')
     await assert.rejects(()=>rpc('validar_historial_paso',[id,JSON.stringify(manifest),4]),/fuera de orden/)
     let preview = await validar(id); assert.equal(preview.errores,0); assert.equal(preview.productos_sin_catalogo,1)
-    const resultado = await rpc('confirmar_historial_pos',[id]); assert.equal(resultado.lineas_nuevas,2); assert.equal(resultado.pagos_nuevos,3)
+    let parcialPublicacion=await rpc('confirmar_historial_paso',[id])
+    assert.equal(parcialPublicacion.completado,false)
+    await rpc('confirmar_historial_paso',[id]) // tickets prepared, still unpublished
+    assert.equal((await db.query('select * from ventas_tickets')).rows.length,0,'pending canonical tickets are hidden by restrictive RLS')
+    assert.equal((await rpc('metricas_historial',[r1,'2026-09-01','2026-09-30'])).tickets,0)
+    await rpc('confirmar_historial_paso',[id])
+    assert.equal((await db.query('select * from ventas_items')).rows.length,0,'pending lines are hidden even with permissive tenant policy')
+    await rpc('confirmar_historial_paso',[id])
+    assert.equal((await db.query('select * from ventas_pagos')).rows.length,0,'pending payments are hidden')
+    await assert.rejects(()=>validar(id),/incorporación está en curso/)
+    const bloqueado=await start();await stage(bloqueado);await validar(bloqueado)
+    await assert.rejects(()=>rpc('confirmar_historial_paso',[bloqueado]),/Otro paquete/)
+    while(!parcialPublicacion.completado) parcialPublicacion=await rpc('confirmar_historial_paso',[id])
+    const resultado = parcialPublicacion.resultado; assert.equal(resultado.lineas_nuevas,2); assert.equal(resultado.pagos_nuevos,3)
     assert.equal((await rpc('confirmar_historial_pos',[id])).lineas_nuevas,2,'confirmación reintentada devuelve resultado original')
     const id2 = await start(); await stage(id2); await validar(id2)
     assert.equal((await rpc('confirmar_historial_pos',[id2])).lineas_nuevas,0,'reimportación idempotente')
@@ -108,6 +124,17 @@ async function main() {
     assert.equal(metricas.tickets,2); assert.equal(metricas.facturacion,25); assert.equal(metricas.cubiertos,3)
     assert.equal(metricas.ticket_promedio,12.5, 'usa cabecera oficial y no suma de líneas')
     assert.equal(metricas.pagos.length,2)
+    const pagoNuevo=await start()
+    const datosPago={...canon,pagos:[...canon.pagos,{...canon.pagos[0],clave:'PAGO-EXTRA-SINTETICO',total:2}]}
+    await stage(pagoNuevo,datosPago)
+    await rpc('validar_historial_pos',[pagoNuevo,JSON.stringify({...manifest,pagos:4})])
+    let avancePago
+    do {avancePago=await rpc('confirmar_historial_paso',[pagoNuevo])} while(avancePago.avance.fase<4)
+    assert.equal((await db.query('select * from ventas_pagos')).rows.length,3,'new payment on a published ticket stays hidden until its own package completes')
+    assert.equal((await rpc('metricas_historial',[r1,'2026-09-01','2026-09-30'])).pagos.reduce((n,p)=>n+p.importe,0),25,'security-definer metrics also exclude pending payments')
+    assert.equal((await rpc('confirmar_historial_paso',[pagoNuevo])).resultado.pagos_nuevos,1)
+    assert.equal((await db.query('select * from ventas_pagos')).rows.length,4)
+    assert.equal((await rpc('metricas_historial',[r1,'2026-09-01','2026-09-30'])).facturacion,25,'publishing a payment never reconstructs official totals')
     assert.equal(Number(await rpc('total_ventas_periodo',[r1,'2026-09-01','2026-09-30'])),25)
     const ctx = await rpc('contexto_ventas_briefing',[r1,'2026-09-18']); assert.equal(ctx.dias_comparables,1)
     const pos = (await db.query('select id from productos_pos order by id limit 1')).rows[0].id
@@ -180,9 +207,27 @@ async function main() {
       await rpc('validar_historial_pos',[grande,JSON.stringify(Object.fromEntries(Object.entries(dataset).map(([k,v])=>[k,v.length])))])
       console.log(`Escala: validación ${(Date.now()-validacionInicio)/1000} s.`)
       const confirmacionInicio = Date.now()
-      const publicado=await rpc('confirmar_historial_pos',[grande])
+      let pasoGrande,maxPaso=0,pasos=0
+      do {
+        const tiempoPaso=Date.now();pasoGrande=await rpc('confirmar_historial_paso',[grande]);maxPaso=Math.max(maxPaso,Date.now()-tiempoPaso);pasos++
+        if(pasos%10===0||pasoGrande.completado)console.log(`Escala: publicación paso ${pasos}, fase ${pasoGrande.avance?.fase??'completada'}, cursor ${pasoGrande.avance?.inicio??'-'}, ${(Date.now()-tiempoPaso)/1000} s; máximo ${maxPaso/1000} s.`)
+        if(process.argv.includes('--plan')&&pasoGrande.avance?.fase===2&&pasoGrande.avance.inicio===0) {
+          await db.exec('reset role')
+          const plan=await db.query(`explain (analyze,buffers) select s.registro,t.id,p.id from ventas_preparacion s join ventas_tickets t on t.restaurante_id=$1 and t.fuente='soft_restaurant_8_1' and t.id_externo=s.registro->>'ticket' join productos_pos p on p.restaurante_id=$1 and p.fuente='soft_restaurant_8_1' and p.id_externo=s.registro->>'producto' where s.importacion_id=$2 and s.tipo='ventas_detalle' and s.secuencia>=0 and s.secuencia<500`,[r1,grande])
+          console.log(plan.rows.map(x=>x['QUERY PLAN']).join('\n'))
+          console.log((await db.query("select current_user, rolname as function_owner, prosecdef from pg_proc join pg_roles on proowner=pg_roles.oid where proname='confirmar_historial_paso'")).rows)
+          await db.exec('set role authenticated')
+        }
+        if(process.argv.includes('--plan')&&pasoGrande.avance?.fase===2&&pasoGrande.avance.inicio===5000) {
+          await db.exec('reset role')
+          const plan=await db.query(`explain (analyze,buffers) select 1 from ventas_preparacion s join ventas_items v on v.restaurante_id=$1 and v.fuente='soft_restaurant_8_1' and v.id_externo=s.registro->>'clave' where s.importacion_id=$2 and s.tipo='ventas_detalle' and s.secuencia>=5000 and s.secuencia<5500 and v.huella<>md5(s.registro::text)`,[r1,grande])
+          console.log(plan.rows.map(x=>x['QUERY PLAN']).join('\n'))
+          await db.exec('set role authenticated')
+        }
+      } while(!pasoGrande.completado)
+      const publicado=pasoGrande.resultado
       assert.equal(publicado.lineas_nuevas,ticketsEscala*10); assert.equal(publicado.tickets_nuevos,ticketsEscala)
-      console.log(`PASS escala sintética: ${ticketsEscala*10} líneas, ${ticketsEscala} tickets y pagos en ${((Date.now()-inicio)/1000).toFixed(1)} s; confirmación ${(Date.now()-confirmacionInicio)/1000} s (PostgreSQL local, no Vercel).`)
+      console.log(`PASS escala sintética: ${ticketsEscala*10} líneas, ${ticketsEscala} tickets y pagos en ${((Date.now()-inicio)/1000).toFixed(1)} s; confirmación ${(Date.now()-confirmacionInicio)/1000} s en ${pasos} pasos, máximo por paso ${maxPaso/1000} s (PostgreSQL local, no Vercel).`)
     }
     console.log('PASS migraciones 013/014 PostgreSQL: relaciones, pagos múltiples, idempotencia, conflictos, parciales, métricas oficiales, RLS/RPC multi-tenant, mapeo y cero movimientos.')
   } finally { await db.close() }

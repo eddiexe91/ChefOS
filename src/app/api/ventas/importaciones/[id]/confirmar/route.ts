@@ -12,5 +12,5 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (importacion.modo === 'historico') return NextResponse.json({ data: null, error: 'El historial no descuenta inventario. Revisa sus equivalencias en Productos POS.' }, { status: 409 })
   const { data, error } = await supabase.rpc('descontar_inventario_por_ventas', { p_importacion_id: params.id, p_usuario_id: perfil.id })
   if (error) return NextResponse.json({ data: null, error: 'No se pudo descontar el inventario.' }, { status: 500 })
-  return NextResponse.json({ data, error: null })
+  return NextResponse.json({ data, ya_aplicado: Number(data) === 0, error: null })
 }

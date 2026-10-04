@@ -199,7 +199,7 @@ export default function BriefingCard({ briefing, productos, pendiente }: Props) 
               <div key={i} className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-sans font-medium text-texto-secundario truncate">
-                    {riesgo.tipo}
+                    {riesgo.tipo.replaceAll('_', ' ')}
                   </p>
                   <span
                     className={`px-2 py-0.5 rounded-full text-2xs font-sans font-medium
@@ -213,7 +213,7 @@ export default function BriefingCard({ briefing, productos, pendiente }: Props) 
                 </p>
                 {riesgo.accion_sugerida && (
                   <p className="text-2xs font-sans text-acento">
-                    → {riesgo.accion_sugerida}
+                    Acción recomendada: {riesgo.accion_sugerida}
                   </p>
                 )}
               </div>

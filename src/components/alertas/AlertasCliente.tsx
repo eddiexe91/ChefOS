@@ -1,227 +1,48 @@
 'use client'
-
-/**
- * src/components/alertas/AlertasCliente.tsx
- *
- * Pantalla profesional de alertas de ChefOS.
- *
- * Fuente primaria de datos: useApp().alertasNoLeidas
- * Los datos llegan via AppProvider + Realtime — siempre disponibles.
- *
- * useAlertasActivas() se mantiene como contrato arquitectónico secundario.
- * Su estado (pending/error/success) se refleja con un aviso informativo
- * pero nunca bloquea el render ni reemplaza los datos de useApp().
- *
- * Tipos verificados contra src/types/index.ts:
- * - AlertaSistema: id, tipo, severidad, mensaje, creado_en — confirmados.
- * - TipoAlerta: 7 valores confirmados.
- * - SeveridadAlerta: 4 valores confirmados.
- *
- * marcarAlertaLeida(alertaId: string) => Promise<void>
- * confirmado en EstadoApp de AppProvider.
- */
-
-import { useState }           from 'react'
-import { Bell, CheckCheck }   from 'lucide-react'
-import { useApp }             from '@/providers/AppProvider'
-import { useAlertasActivas }  from '@/hooks/useDominio'
-import type { AlertaSistema, TipoAlerta, SeveridadAlerta } from '@/types/index'
-
-// ─────────────────────────────────────────────────────────────
-// Constantes de dominio
-// ─────────────────────────────────────────────────────────────
-
-const ETIQUETAS_TIPO: Record<TipoAlerta, string> = {
-  stock_critico:       'Stock crítico',
-  proximo_vencimiento: 'Próximo vencimiento',
-  variacion_precio:    'Variación de precio',
-  produccion_sugerida: 'Producción sugerida',
-  compra_urgente:      'Compra urgente',
-  merma_excesiva:      'Merma excesiva',
-  otro:                'Otro',
-}
-
-const CLASES_SEVERIDAD: Record<SeveridadAlerta, string> = {
-  critica: 'bg-peligro text-white',
-  alta:    'bg-advertencia text-texto-inverso',
-  media:   'bg-info-suave text-info-texto border border-info-borde',
-  baja:    'bg-fondo-hover text-texto-apagado',
-}
-
-const CLASES_BORDE_SEVERIDAD: Record<SeveridadAlerta, string> = {
-  critica: 'border-l-2 border-l-peligro',
-  alta:    'border-l-2 border-l-advertencia',
-  media:   'border-l-2 border-l-info-texto',
-  baja:    'border-l-2 border-l-fondo-borde',
-}
-
-// ─────────────────────────────────────────────────────────────
-// Subcomponente: tarjeta de alerta
-// ─────────────────────────────────────────────────────────────
-
-interface TarjetaAlertaProps {
-  alerta:           AlertaSistema
-  marcandoLeida:    boolean
-  onMarcarLeida:    (id: string) => void
-}
-
-function TarjetaAlerta({ alerta, marcandoLeida, onMarcarLeida }: TarjetaAlertaProps) {
-  const fechaFormateada = new Date(alerta.creado_en).toLocaleString('es-CL', {
-    day:    'numeric',
-    month:  'short',
-    hour:   '2-digit',
-    minute: '2-digit',
-  })
-
-  return (
-    <div
-      className={`rounded-xl bg-fondo-elevado border border-fondo-borde
-                  overflow-hidden transition-opacity duration-200
-                  ${marcandoLeida ? 'opacity-50' : 'opacity-100'}
-                  ${CLASES_BORDE_SEVERIDAD[alerta.severidad]}`}
-    >
-      <div className="px-4 py-3 space-y-2">
-
-        {/* Fila superior: tipo + badge de severidad */}
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-sans font-medium text-texto-secundario truncate">
-            {ETIQUETAS_TIPO[alerta.tipo]}
-          </p>
-          <span
-            className={`px-2 py-0.5 rounded-full text-2xs font-sans font-medium
-                        flex-shrink-0 ${CLASES_SEVERIDAD[alerta.severidad]}`}
-          >
-            {alerta.severidad}
-          </span>
-        </div>
-
-        {/* Mensaje */}
-        <p className="text-sm font-sans text-texto-primario leading-snug">
-          {alerta.mensaje}
-        </p>
-
-        {/* Pie: timestamp + acción */}
-        <div className="flex items-center justify-between gap-2 pt-0.5">
-          <p className="text-2xs font-sans text-texto-apagado">
-            {fechaFormateada}
-          </p>
-          <button
-            type="button"
-            disabled={marcandoLeida}
-            onClick={() => onMarcarLeida(alerta.id)}
-            className="flex items-center gap-1 text-2xs font-sans font-medium
-                       text-acento active:text-acento/70 transition-colors
-                       disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-          >
-            <CheckCheck size={12} />
-            Marcar como leída
-          </button>
-        </div>
-
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────
-// Componente principal
-// ─────────────────────────────────────────────────────────────
+import { useState } from 'react'
+import Link from 'next/link'
+import { useQuery } from '@tanstack/react-query'
+import { useApp } from '@/providers/AppProvider'
+import { obtenerClienteNavegador } from '@/lib/supabase/navegador'
+import type { AlertaSistema } from '@/types'
 
 export default function AlertasCliente() {
-  const {
-    alertasNoLeidas,
-    totalAlertas,
-    marcarAlertaLeida,
-  } = useApp()
-
-  // Contrato arquitectónico secundario — fuente futura cuando Fase 3.2 complete.
-  // No se accede a data — alertasNoLeidas de useApp() es la fuente real.
-  const {
-    isError: queryError,
-  } = useAlertasActivas()
-
-  // Estado local para deshabilitar el botón mientras se procesa
-  const [marcandoId, setMarcandoId] = useState<string | null>(null)
-  const [errorLectura, setErrorLectura] = useState('')
-
-  const handleMarcarLeida = (alertaId: string) => {
-    if (marcandoId !== null) return  // evitar doble tap
-    setMarcandoId(alertaId)
-    setErrorLectura('')
-    void marcarAlertaLeida(alertaId).catch(() => setErrorLectura('No se pudo guardar la lectura. Comprueba la conexión e inténtalo de nuevo.')).finally(() => {
-      setMarcandoId(null)
-    })
+  const { usuario, marcarAlertaLeida } = useApp()
+  const [filtro, setFiltro] = useState('pendientes')
+  const [pagina, setPagina] = useState(0)
+  const [ocupado, setOcupado] = useState('')
+  const [mensaje, setMensaje] = useState('')
+  const consulta = useQuery({
+    queryKey: ['alertas', 'historial', usuario?.restaurante_id, filtro, pagina], enabled: !!usuario?.restaurante_id, refetchInterval: 15000,
+    queryFn: async () => {
+      let q = obtenerClienteNavegador().from('alertas_sistema').select('*', { count: 'exact' }).eq('restaurante_id', usuario!.restaurante_id).order('creado_en', { ascending: false }).order('id').range(pagina*25, pagina*25+24)
+      if (filtro !== 'todas') q = q.eq('leida', filtro === 'leidas')
+      const { data, error, count } = await q
+      if (error) throw error
+      return { filas: (data ?? []) as AlertaSistema[], total: count ?? 0 }
+    },
+  })
+  async function leer(id: string) {
+    if (ocupado) return
+    setOcupado(id); setMensaje('')
+    try { await marcarAlertaLeida(id); setMensaje('Marcada como leída. Sigue disponible en Leídas.'); await consulta.refetch() }
+    catch { setMensaje('No se pudo guardar la lectura. Comprueba la conexión.') }
+    finally { setOcupado('') }
   }
-
-  return (
-    <div className="px-4 pt-6 pb-28 space-y-6 max-w-lg mx-auto">
-      {errorLectura && <p role="alert" className="text-peligro">{errorLectura}</p>}
-
-      {/* ── Encabezado ───────────────────────────────────── */}
-      <section>
-        <div className="flex items-center gap-2.5">
-          <Bell size={18} className="text-texto-apagado flex-shrink-0" />
-          <h1 className="text-xl font-display font-bold text-texto-primario leading-tight">
-            Alertas
-          </h1>
-          {totalAlertas > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-peligro text-white
-                             text-2xs font-display font-bold flex-shrink-0">
-              {totalAlertas > 9 ? '9+' : totalAlertas}
-            </span>
-          )}
-        </div>
-        <p className="text-xs font-sans text-texto-apagado mt-0.5">
-          {totalAlertas === 0
-            ? 'Sin alertas pendientes'
-            : `${totalAlertas} alerta${totalAlertas !== 1 ? 's' : ''} sin leer`
-          }
-        </p>
-      </section>
-
-      {/* ── Aviso de fuente secundaria (informativo) ──────── */}
-      {queryError && (
-        <section className="rounded-xl bg-info-suave border border-info-borde px-4 py-3">
-          <p className="text-2xs font-sans text-info-texto/70 leading-relaxed">
-            El historial completo de alertas estará disponible próximamente.
-            Las alertas activas se muestran en tiempo real.
-          </p>
-        </section>
-      )}
-
-      {/* ── Estado: sin alertas ──────────────────────────── */}
-      {alertasNoLeidas.length === 0 && (
-        <section className="rounded-xl bg-fondo-elevado border border-fondo-borde
-                            px-4 py-10 text-center">
-          <div className="flex justify-center mb-3">
-            <div className="w-10 h-10 rounded-full bg-exito-suave
-                            flex items-center justify-center">
-              <CheckCheck size={18} className="text-exito-texto" />
-            </div>
-          </div>
-          <p className="text-sm font-sans font-medium text-texto-secundario">
-            Todo en orden
-          </p>
-          <p className="text-xs font-sans text-texto-apagado mt-1">
-            No hay alertas pendientes en este momento.
-          </p>
-        </section>
-      )}
-
-      {/* ── Lista de alertas ─────────────────────────────── */}
-      {alertasNoLeidas.length > 0 && (
-        <section className="space-y-3">
-          {alertasNoLeidas.map((alerta) => (
-            <TarjetaAlerta
-              key={alerta.id}
-              alerta={alerta}
-              marcandoLeida={marcandoId === alerta.id}
-              onMarcarLeida={handleMarcarLeida}
-            />
-          ))}
-        </section>
-      )}
-
-    </div>
-  )
+  return <div className="max-w-lg mx-auto px-4 py-6 pb-28 space-y-4 text-texto-primario">
+    <h1 className="text-xl font-bold">Alertas y su historial</h1>
+    <p className="text-sm text-texto-secundario">Cada alerta conserva lo que ocurrió en su fecha. Leer no repone stock; el Briefing calcula los faltantes actuales.</p>
+    <div className="flex gap-2 flex-wrap">{[['pendientes','Sin leer'],['leidas','Leídas'],['todas','Todas']].map(([valor,nombre]) => <button key={valor} onClick={() => { setFiltro(valor); setPagina(0) }} aria-pressed={filtro===valor} className={`min-h-12 px-4 rounded-xl border ${filtro===valor?'border-acento text-acento':'border-fondo-borde'}`}>{nombre}</button>)}</div>
+    <button className="btn-secundario" disabled={consulta.isFetching} onClick={() => void consulta.refetch()}>{consulta.isFetching ? 'Actualizando…' : 'Actualizar alertas'}</button>
+    {mensaje && <p role="status">{mensaje}</p>}
+    {consulta.isError && <p role="alert">No se pudo verificar el historial de alertas. Comprueba tu conexión.</p>}
+    {consulta.isSuccess && <p className="text-sm">{consulta.data.total} alertas en este filtro.</p>}
+    {consulta.data?.filas.map(a => <article key={a.id} className="tarjeta p-4 space-y-3">
+      <div className="flex justify-between text-xs"><span>{a.tipo.replaceAll('_',' ')}</span><span>{a.severidad} · {a.leida?'Leída':'Sin leer'}</span></div>
+      <p>{a.mensaje}</p><p className="text-xs text-texto-secundario">{new Date(a.creado_en).toLocaleString('es-CL')}</p>
+      {a.tipo === 'stock_critico' && <Link className="block text-acento min-h-11" href="/dashboard">Consultar el faltante actual en Inicio →</Link>}
+      {!a.leida && <button disabled={!!ocupado} className="btn-secundario" onClick={() => void leer(a.id)}>{ocupado===a.id?'Guardando…':'Marcar como leída'}</button>}
+    </article>)}
+    <div className="flex justify-between"><button className="btn-secundario" disabled={pagina===0} onClick={() => setPagina(pagina-1)}>Anterior</button><span>Página {pagina+1}</span><button className="btn-secundario" disabled={!consulta.data || (pagina+1)*25>=consulta.data.total} onClick={() => setPagina(pagina+1)}>Siguiente</button></div>
+  </div>
 }

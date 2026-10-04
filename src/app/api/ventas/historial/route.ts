@@ -38,6 +38,7 @@ export async function POST(request: Request) {
         if (!Number.isInteger(b.paso) || b.paso < 0 || b.paso > 5) throw new Error('Etapa inválida.')
         resultado = await db.rpc('validar_historial_paso', { p_id: b.id, p_manifiesto: b.manifiesto, p_paso: b.paso }); break
       case 'confirmar': resultado = await db.rpc('confirmar_historial_pos', { p_id: b.id }); break
+      case 'confirmar_paso': resultado = await db.rpc('confirmar_historial_paso', { p_id: b.id }); break
       case 'mapear': resultado = await db.rpc('mapear_producto_pos', { p_pos: b.pos, p_estado: b.estado, p_receta: b.receta || null, p_producto: b.producto || null }); break
       default: throw new Error('Acción inválida.')
     }
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
   if (u.searchParams.get('vista') === 'preparaciones') {
     if (!['dueño','administrador','chef_ejecutivo'].includes(perfil.rol)) return NextResponse.json({ error: 'Sin permisos para importar.' }, { status: 403 })
     const { data, error } = await db.from('ventas_importaciones')
-      .select('id,creado_en,estado_procesamiento,manifiesto,resultado,validacion_parcial')
+      .select('id,creado_en,estado_procesamiento,manifiesto,resultado,validacion_parcial,publicacion_parcial')
       .eq('restaurante_id', perfil.restaurante_id).eq('modo', 'historico')
       .order('creado_en', { ascending: false }).limit(10)
     return NextResponse.json(error ? { error: error.message } : { data }, { status: error ? 400 : 200, headers: { 'Cache-Control': 'no-store' } })

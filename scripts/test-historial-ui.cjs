@@ -51,6 +51,8 @@ async function main(){
   assert.equal((await ruta.POST(peticion({accion:'validar_paso',id:'qa',paso:6,manifiesto:{}}))).status,400)
   assert.equal((await ruta.POST(peticion({accion:'validar_paso',id:'qa',paso:0,manifiesto:{}}))).status,200)
   assert.equal(llamadas.at(-1).nombre,'validar_historial_paso')
+  assert.equal((await ruta.POST(peticion({accion:'confirmar_paso',id:'qa'}))).status,200)
+  assert.equal(llamadas.at(-1).nombre,'confirmar_historial_paso')
   const timeoutDb={...db,rpc:async()=>({data:null,error:{code:'57014',message:'canceling statement due to statement timeout'}})}
   const timeoutRuta=cargar('src/app/api/ventas/historial/route.ts',{'@/lib/supabase/servidor':{crearClienteServidor:()=>timeoutDb}})
   const timeout=await timeoutRuta.POST(peticion({accion:'validar_paso',id:'qa',paso:1,manifiesto:{}}))

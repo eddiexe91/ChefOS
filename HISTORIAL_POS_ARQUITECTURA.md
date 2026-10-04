@@ -1,5 +1,15 @@
 # Historial POS y memoria operacional
 
+## Actualización 1.3.3 — 03-10-2026
+
+Cuatro migraciones complementarias, sin reemplazar el modelo canónico; ver `RELEASE_1.3.3.md` para activación. `confirmar_historial_paso(id)` incorpora catálogo, tickets250/bloque, líneas500/bloque y pagos250/bloque, con cursor persistente en `ventas_importaciones.publicacion_parcial`. El cliente repite pasos y puede recuperar tras pérdida de conexión. Cada RPC autentica rol/tenant, bloquea importación y serializa por restaurante. Se permite una publicación pendiente por restaurante; no cambia manifiesto ni validación durante incorporación.
+
+Las filas canónicas pendientes están comprometidas para recuperación **pero no publicadas**: políticas SELECT restrictivas ocultan tickets/líneas/pagos hasta completar el paquete. El helper booleano de estado comprueba membresía, no concede acceso de lectura nuevo. Los pagos nuevos conservan su propia importación, incluso si su ticket ya estaba publicado; las métricas SECURITY DEFINER también excluyen esos pagos pendientes. Los antiguos pagos sin importación usan la del ticket. Totales oficiales nunca se reconstruyen a partir de líneas/pagos.
+
+El último paso cambia a completado y agrega solo filas nuevas de esa importación en la misma transacción. No vuelve a calcular todo el restaurante; reimportación no agrega duplicados. La lectura de preparaciones históricas admite Chef Ejecutivo, sin abrir escritura directa. Los pasos tienen timeout20s/lock5s; validación anterior25s; finalización puede requerir diagnóstico si excede tiempo. Un conflicto detiene incorporación sin exponer datos parciales; no hay limpieza/cancelación automática. El contrato antiguo de confirmación se conserva para compatibilidad, pero la UI nueva no ejecuta la operación monolítica.
+
+La interfaz ofrece resumen comprensible, progreso, recuperar/continuar, equivalencias pendientes buscables y agrupadas, estados Confirmados/Ignorados y feedback. Solo coincidencias exactas sugeridas, siempre revisables. El historial aporta observaciones al motor compartido de Briefing; no exige mapear todo para consultar ventas y no certifica forecast ni capacidad remota por una prueba sintética.
+
 ## Actualización 1.3.2 — 29-09-2026
 
 `20260929030350_historial_validacion_reanudable.sql` aplicada. Extiende el modelo existente con `ventas_importaciones.validacion_parcial`, no crea otro importador. `validar_historial_paso(id,manifiesto,paso)` divide validación en seis transacciones: completitud, duplicados, relaciones, catálogo/mapeo, registros existentes y resumen/pagos. Guarda siguiente etapa/resumen; una etapa fallida revierte solo esa llamada. Una fila de preparación nueva invalida el progreso; repetir bloques idénticos no lo invalida. La confirmación revalida siempre de forma atómica y no confía ciegamente en un resumen antiguo.

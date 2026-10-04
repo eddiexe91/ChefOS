@@ -2,48 +2,8 @@ import { NextResponse } from 'next/server'
 
 import { crearClienteServidor } from '@/lib/supabase/servidor'
 import { observacionesVentas, type ContextoVentas } from '@/lib/ventas/contextoBriefing'
+import { calcularBriefingOperativo, type ProductoBriefing, type RecetaCarta, type RecetaProduccion } from '../../../../../supabase/functions/_shared/briefingOperativo'
 export const maxDuration = 30
-
-type ProductoBriefing = {
-  id: string
-  nombre: string
-  cantidad_gramos: number | null
-  stock_minimo_gramos: number | null
-  unidad_display: string | null
-  unidad_medida: string
-  activo: boolean
-  tipo_operativo: 'materia_prima' | 'insumo' | 'elaborado'
-  stock_actual: number
-  stock_minimo: number
-}
-
-type IngredienteCarta = {
-  cantidad: number | null
-  cantidad_gramos: number | null
-  unidad_medida: string
-  producto: ProductoBriefing | ProductoBriefing[] | null
-}
-
-type RecetaCarta = {
-  id: string
-  nombre: string
-  rendimiento_porciones: number | null
-  unidad_rendimiento: string | null
-  es_produccion: boolean
-  producto_salida_id: string | null
-  ingredientes: IngredienteCarta[] | null
-}
-
-type RecetaProduccion = {
-  id: string
-  nombre: string
-  producto_salida_id: string | null
-  producto_salida: Pick<ProductoBriefing, 'id' | 'nombre' | 'unidad_display' | 'unidad_medida'> | Pick<ProductoBriefing, 'id' | 'nombre' | 'unidad_display' | 'unidad_medida'>[] | null
-}
-
-function productoDeIngrediente(ingrediente: IngredienteCarta): ProductoBriefing | null {
-  return Array.isArray(ingrediente.producto) ? ingrediente.producto[0] ?? null : ingrediente.producto
-}
 
 export async function POST() {
   const supabase = crearClienteServidor()
@@ -60,126 +20,17 @@ export async function POST() {
     supabase.from('productos').select('id,nombre,cantidad_gramos,stock_minimo_gramos,stock_actual,stock_minimo,unidad_display,unidad_medida,activo,tipo_operativo').eq('restaurante_id', perfil.restaurante_id).eq('activo', true).limit(1000),
     supabase.from('alertas_sistema').select('tipo,severidad,mensaje').eq('restaurante_id', perfil.restaurante_id).eq('leida', false).limit(20),
     supabase.from('recetas').select('id,nombre,rendimiento_porciones,unidad_rendimiento,es_produccion,producto_salida_id,ingredientes:recetas_ingredientes(cantidad,cantidad_gramos,unidad_medida,producto:productos(id,nombre,cantidad_gramos,stock_minimo_gramos,unidad_display,unidad_medida,activo,tipo_operativo))').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('en_carta', true).limit(150),
-    supabase.from('recetas').select('id,nombre,producto_salida_id,producto_salida:productos!recetas_producto_salida_id_fkey(id,nombre,unidad_display,unidad_medida)').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('es_produccion', true).limit(150),
+    supabase.from('recetas').select('id,nombre,producto_salida_id,cantidad_salida_gramos,producto_salida:productos!recetas_producto_salida_id_fkey(id,nombre,unidad_display,unidad_medida)').eq('restaurante_id', perfil.restaurante_id).eq('activa', true).eq('es_produccion', true).limit(150),
     supabase.from('produccion_registros').select('receta_id').eq('anulado', false).eq('restaurante_id', perfil.restaurante_id).eq('fecha_produccion', fecha),
   ])
   const [{ data: stock }, { data: alertas }, { data: carta }, { data: produccion }, { data: registros }] = resultados
-  const fuentesIncompletas = resultados.some((r) => r.error)
+  const fuentesIncompletas = resultados.some((r) => r.error) || stock?.length === 1000 || carta?.length === 150 || produccion?.length === 150
   for (const resultado of resultados) if (resultado.error) console.error('[briefing] fuente:', resultado.error.code, resultado.error.message)
 
   const productos = (stock ?? []) as ProductoBriefing[]
   const recetasCarta = (carta ?? []) as RecetaCarta[]
   const recetasProduccion = (produccion ?? []) as RecetaProduccion[]
-
-  const compras = new Map<string, { producto: string; cantidad_sugerida: number; unidad: string; urgencia: 'critica' | 'alta' | 'media' | 'baja'; razon: string }>()
-  const producciones = new Map<string, { nombre: string; cantidad: number; unidad: string; prioridad: 'critica' | 'alta' | 'media' | 'baja'; razon: string }>()
-  const riesgos = new Map<string, { tipo: string; descripcion: string; severidad: 'critica' | 'alta' | 'media' | 'baja'; accion_sugerida: string }>()
-  const produccionPorSalida = new Map<string, RecetaProduccion>()
-
-  for (const receta of recetasProduccion) {
-    if (receta.producto_salida_id) produccionPorSalida.set(receta.producto_salida_id, receta)
-    if (!receta.producto_salida_id && !(registros ?? []).some(r => r.receta_id === receta.id)) {
-      producciones.set(receta.id, { nombre: `Revisar producción de ${receta.nombre}`, cantidad: 1, unidad: 'lote', prioridad: 'alta', razon: 'Receta de producción sin registro hoy. Confirma la cantidad necesaria para el turno.' })
-    }
-  }
-
-  for (const producto of productos) {
-    const stockActual = Number(producto.stock_actual ?? 0)
-    const minimo = Number(producto.stock_minimo ?? 0)
-    if (minimo <= 0) {
-      if (stockActual <= 0) riesgos.set(`minimo-${producto.id}`, { tipo: 'configuracion', descripcion: `${producto.nombre}: sin existencias y sin stock mínimo configurado.`, severidad: 'alta', accion_sugerida: 'Comprueba el conteo, la unidad y el mínimo. No hay base suficiente para indicar una cantidad de compra.' })
-      continue
-    }
-    if (stockActual >= minimo) continue
-    if (producto.tipo_operativo === 'elaborado') {
-      const recetaSalida = produccionPorSalida.get(producto.id)
-      if (recetaSalida) {
-        producciones.set(recetaSalida.id, {
-          nombre: `Preparar ${recetaSalida.nombre}`,
-          cantidad: 1,
-          unidad: 'lote',
-          prioridad: stockActual <= 0 ? 'critica' : 'alta',
-          razon: `Stock bajo de ${producto.nombre}.`,
-        })
-      }
-    } else {
-      compras.set(producto.id, {
-        producto: producto.nombre,
-        cantidad_sugerida: Math.max(minimo - stockActual, 0),
-        unidad: producto.unidad_display ?? producto.unidad_medida ?? 'g',
-        urgencia: stockActual <= 0 ? 'critica' : 'alta',
-        razon: 'Stock bajo en Inventario.',
-      })
-    }
-    if (producto.tipo_operativo === 'elaborado' && !produccionPorSalida.has(producto.id)) riesgos.set(`reponer-${producto.id}`, {
-      tipo: 'produccion', descripcion: `Reponer ${producto.nombre} en Stock disponible.`, severidad: 'alta', accion_sugerida: 'Asocia una receta de producción o actualiza las existencias.',
-    })
-  }
-
-  for (const receta of recetasCarta) {
-    const rendimientoBase = Math.max(Number(receta.rendimiento_porciones ?? 1), 1)
-    const faltantes = (receta.ingredientes ?? []).flatMap((ingrediente) => {
-      const producto = productoDeIngrediente(ingrediente)
-      if (!producto || producto.activo === false) return []
-      const requerido = Number(ingrediente.cantidad_gramos ?? 0) / rendimientoBase
-      const disponible = Number(producto.cantidad_gramos ?? 0)
-      if (requerido <= 0 || disponible >= requerido) return []
-      return [{ producto, requerido, disponible, faltante: Math.max(requerido - disponible, 0), cantidadEnUnidad: Math.max(requerido-disponible,0)/requerido*Number(ingrediente.cantidad)/rendimientoBase, unidad: ingrediente.unidad_medida }]
-    })
-
-    if (faltantes.length === 0) continue
-
-    riesgos.set(`carta-${receta.id}`, {
-      tipo: 'carta',
-      descripcion: `${receta.nombre} tiene faltantes: ${faltantes.map((item) => item.producto.nombre).join(', ')}.`,
-      severidad: faltantes.some((item) => item.disponible <= 0) ? 'critica' : 'alta',
-      accion_sugerida: 'Reponer inventario o producir elaborados antes del servicio.',
-    })
-
-    for (const faltante of faltantes) {
-      if (faltante.producto.tipo_operativo === 'elaborado') {
-        const recetaSalida = produccionPorSalida.get(faltante.producto.id)
-        if (recetaSalida) {
-          producciones.set(recetaSalida.id, {
-            nombre: `Preparar ${recetaSalida.nombre}`,
-            cantidad: 1,
-            unidad: 'lote',
-            prioridad: faltante.disponible <= 0 ? 'critica' : 'alta',
-            razon: `${receta.nombre} necesita ${faltante.producto.nombre}.`,
-          })
-        } else {
-          riesgos.set(`elaborado-${receta.id}-${faltante.producto.id}`, {
-            tipo: 'stock_elaborado',
-            descripcion: `${receta.nombre} requiere ${faltante.producto.nombre} y no hay producción asociada para reponerlo.`,
-            severidad: 'alta',
-            accion_sugerida: 'Crea o ajusta una receta de producción para este elaborado.',
-          })
-        }
-      } else {
-        compras.set(faltante.producto.id, {
-          producto: faltante.producto.nombre,
-          cantidad_sugerida: faltante.cantidadEnUnidad,
-          unidad: faltante.unidad,
-          urgencia: faltante.disponible <= 0 ? 'critica' : 'alta',
-          razon: `Faltante para elaborar una unidad de ${receta.nombre}; no es una estimación de demanda del día.`,
-        })
-      }
-    }
-  }
-
-  for (const alerta of alertas ?? []) {
-    riesgos.set(`alerta-${alerta.tipo}-${alerta.mensaje}`, {
-      tipo: alerta.tipo,
-      descripcion: alerta.mensaje,
-      severidad: alerta.severidad,
-      accion_sugerida: 'Revisar antes del servicio.',
-    })
-  }
-
-  if (fuentesIncompletas) riesgos.set('conexion', { tipo: 'gestion', descripcion: 'No se pudieron verificar todos los datos del turno.', severidad: 'alta', accion_sugerida: 'Revisa la conexión y actualiza el briefing antes del servicio.' })
-  if (!productos.some((p) => p.tipo_operativo !== 'elaborado')) riesgos.set('inventario', { tipo: 'configuracion', descripcion: 'Carga primero las materias primas de tu cocina.', severidad: 'alta', accion_sugerida: 'Completa Inventario para calcular compras y producción.' })
-  if (!productos.some((p) => p.tipo_operativo === 'elaborado')) riesgos.set('stock', { tipo: 'configuracion', descripcion: 'Registra las preparaciones listas para servir.', severidad: 'media', accion_sugerida: 'Actualiza Stock disponible.' })
-  if (!recetasCarta.length) riesgos.set('carta', { tipo: 'configuracion', descripcion: 'Añade los platos que ofrece tu restaurante.', severidad: 'media', accion_sugerida: 'Completa Carta para relacionar platos con existencias.' })
+  const operativo = calcularBriefingOperativo({ stock: productos, carta: recetasCarta, produccion: recetasProduccion, registros: registros ?? [], alertas: alertas ?? [], fuentesIncompletas })
 
   // An unavailable sales context must not block today's stock/production decisions.
   const { data: contextoVentas, error: errorVentas } = await supabase.rpc('contexto_ventas_briefing', { p_restaurante: perfil.restaurante_id, p_fecha: fecha })
@@ -190,9 +41,9 @@ export async function POST() {
     fecha,
     turno: Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 14 ? 'mañana' : Number(new Intl.DateTimeFormat('en', { timeZone: zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) < 19 ? 'tarde' : 'noche',
     confianza_estimacion: null, // Sin calibración, no inventar un nivel de precisión.
-    produccion_sugerida: [...producciones.values()],
-    compras_sugeridas: Array.from(compras.values()),
-    riesgos: Array.from(riesgos.values()),
+    produccion_sugerida: operativo.produccion_sugerida,
+    compras_sugeridas: operativo.compras_sugeridas,
+    riesgos: operativo.riesgos,
     alertas: alertas ?? [],
     actividad_reciente: [],
     contexto_usado: {

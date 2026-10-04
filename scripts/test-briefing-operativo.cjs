@@ -13,6 +13,10 @@ async function main(){
   return q
  }}
  const env={exports:{},console:{error(){}},Intl,Date,AbortSignal,require:n=>n==='@/lib/supabase/servidor'?{crearClienteServidor:()=>db}:n==='@/lib/ventas/contextoBriefing'?{observacionesVentas:()=>[]}:require(n)}
+ const motor={exports:{}}
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync('supabase/functions/_shared/briefingOperativo.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,motor)
+ const requireAnterior=env.require
+ env.require=n=>n.includes('_shared/briefingOperativo')?motor.exports:requireAnterior(n)
  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/app/api/ia/briefing/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,env)
  assert.equal((await env.exports.POST()).status,200)
  assert.equal(saved.compras_sugeridas.length,1)
@@ -21,6 +25,23 @@ async function main(){
  assert.equal(saved.compras_sugeridas[0].unidad,'kg')
  assert.ok(saved.riesgos.some(x=>x.tipo==='configuracion'&&x.descripcion.includes('Sin mínimo')))
  assert.equal(saved.produccion_sugerida.length,0,'no production invented from an open lot')
+ fixtures.alertas_sistema.push({tipo:'stock_critico',severidad:'critica',mensaje:'Existencia antigua: Base 0'})
+ fixtures.productos.push({id:'base',nombre:'Base',stock_actual:0,stock_minimo:5,cantidad_gramos:0,stock_minimo_gramos:5,unidad_medida:'porcion',tipo_operativo:'elaborado'})
+ fixtures.recetas.push({id:'base-receta',nombre:'Base receta',es_produccion:true,producto_salida_id:'base',cantidad_salida_gramos:2,ingredientes:[]})
+ await env.exports.POST()
+ assert.equal(saved.produccion_sugerida.find(x=>x.nombre.includes('Base')).cantidad,3,'5 needed / 2 per recipe rounds to 3 complete batches')
+ assert.ok(!saved.riesgos.some(x=>x.descripcion.includes('Existencia antigua')),'old stock event cannot describe current risk')
+ fixtures.productos.find(p=>p.id==='base').stock_actual=6
+ fixtures.productos.find(p=>p.id==='base').cantidad_gramos=6
+ await env.exports.POST()
+ assert.equal(saved.produccion_sugerida.length,0,'replenishing clears production shortage even without reading the old alert')
+ assert.ok(!saved.riesgos.some(x=>x.descripcion.includes('Base:')))
+ const harina=fixtures.productos.find(p=>p.id==='harina')
+ harina.cantidad_gramos=2000;harina.stock_minimo_gramos=5000
+ fixtures.recetas.push({id:'plato',nombre:'Plato',es_produccion:false,ingredientes:[{cantidad:3000,cantidad_gramos:3000,unidad_medida:'g',producto:harina}]})
+ await env.exports.POST()
+ assert.equal(saved.compras_sugeridas.find(x=>x.producto==='Harina').cantidad_sugerida,3,'Carta must not reduce the minimum shortage or mix grams with kg')
+ assert.equal(saved.compras_sugeridas.find(x=>x.producto==='Harina').unidad,'kg')
  failHistory=true;assert.equal((await env.exports.POST()).status,200)
  assert.equal(saved.compras_sugeridas[0].cantidad_sugerida,3,'history timeout must preserve operational purchases')
  assert.equal(saved.contexto_usado.ventas,null)

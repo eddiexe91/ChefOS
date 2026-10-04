@@ -18,6 +18,6 @@ export default function EstadoSistemaPage() {
       <section className="tarjeta p-4">{fila('URL de Supabase', estado.configuracion.supabaseUrl)}{fila('Clave pública de Supabase', estado.configuracion.supabaseAnonKey)}{fila('Sesión de usuario', estado.autenticado)}{fila('Storage accesible', estado.storage.accesible)}{fila(estado.configuracion.anthropic ? 'Chef IA avanzado (Claude)' : 'Chef IA básico', true)}</section>
       <section className="tarjeta p-4"><h2 className="text-sm mb-2">Buckets disponibles</h2><p className="text-sm text-texto-secundario">{estado.storage.buckets.join(' · ') || 'No se detectaron buckets.'}</p></section>
     </>}
-    <a className="block text-acento min-h-12" href="https://github.com/eddiexe91/ChefOS/blob/main/GUIA_TESTEO_CHEFOS_1.3.2.md" target="_blank" rel="noopener noreferrer">Guía de testeo 1.3.2 y archivos ficticios →</a>
+    <a className="block text-acento min-h-12" href="https://github.com/eddiexe91/ChefOS/blob/main/GUIA_TESTEO_CHEFOS_1.3.3.md" target="_blank" rel="noopener noreferrer">Guía de testeo 1.3.3 y archivos ficticios →</a>
   </div>
 }
