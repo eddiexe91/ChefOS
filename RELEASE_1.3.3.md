@@ -65,3 +65,9 @@ Reproducir: `powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1 
 La nueva escala completa **150.000 líneas,15.000 tickets y15.000 pagos** pasó con el cuarto complemento. Preparación219,0s, validación5,725s, publicación103,479s en422pasos, **máximo0,951s por paso**, finalización0,951s; total328,3s. PostgreSQL local/PGlite, sin red ni datos reales; no certifica tiempos Supabase, capacidad del teléfono ni el paquete de tres años del usuario. Primer benchmark lento interrumpido registrado arriba, no ocultado.
 
 `git diff --check` pasa; diff revisado. No se incluyen adjuntos, secretos, APK/keystore ni `AUDITORIA_NORTE_2026-09-17.md`, que ya estaba fuera del seguimiento. No hubo testeo físico ni escrituras E2E remotas de negocio en esta entrega; se requiere la guía con QA.
+
+## Publicación verificada
+
+Código publicado en `main`: `d98e6e53da9b2d5e00d3fa76148ef35ccc511707`. GitHub informa Vercel **success / Deployment has completed**. Comprobación remota del 04-10-2026 UTC: `/api/health` devuelve versión **1.3.3**, `ok: true`, Storage accesible y disponibilidad del historial, validación por etapas y publicación por bloques. La guía de esta versión en GitHub devuelve HTTP 200.
+
+Las cuatro migraciones y la función automática compartida están activadas según la evidencia anterior. No se importó historial real ni se modificó stock para comprobar la publicación. La APK enlazada conserva la firma de 1.3.2 y no exige reinstalar desde cero. El próximo paso es el testeo físico del usuario con la guía: publicación y pruebas sintéticas no equivalen a una certificación del 100% del producto.

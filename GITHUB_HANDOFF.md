@@ -6,6 +6,8 @@ Consultar primero [RELEASE_1.3.3.md](RELEASE_1.3.3.md) y [GUIA_TESTEO_CHEFOS_1.3
 
 Cambios: avance onboarding inmediato, diálogo de duplicados, escalar por factor, total frente a costo por unidad, merma manual directa, historial/refresh de alertas, riesgo actual del Briefing, motor compartido manual/cron, snapshot mediante RPC segura, CSV operativo en Ventas, equivalencias buscables/filtrables y publicación histórica por bloques con RLS y métricas que ocultan filas pendientes. Cuatro migraciones nuevas; ver release para activación y pruebas concretas. No asumir que publicaciones/teléfono pasan por compilar.
 
+**Publicación verificada:** código `d98e6e5` en `main`, Vercel success, health remoto **1.3.3 / ok**, historial y publicación por bloques disponibles, guía GitHub HTTP 200. Las cuatro migraciones están aplicadas y la función automática desplegada con diagnóstico privado sin escrituras aprobado. APK `artifacts/ChefOS-1.3.3-test.apk`, versionCode 7 y firma compatible con 1.3.2; no borrar datos. Prueba sintética local de 150.000 líneas aprobada en 422 pasos, máximo 0,951 s por paso; no certifica tiempos del servidor ni el paquete real.
+
 Pendientes: validar paquete grande real y testeo físico1.3.3; retención/cancelación segura; bienvenida Crear/Unirme solicitada para futuro; Excel flexible, tutoriales interactivos, PKCE/OTP, offline completo y modelos de previsión/decisiones. No reimplementar estos cambios ni declarar visión100%. Los archivos descargables se reutilizan de1.3.2 con nombresQA132; la guía explica cómo no duplicar existencias.
 
 ## Entrega 1.3.2 — 29-09-2026
